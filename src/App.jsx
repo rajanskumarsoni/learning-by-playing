@@ -870,6 +870,23 @@ export default function App() {
   const mentorSectionRef = useRef(null);
   const prevDiagnosticsKeyRef = useRef('');
   const [highlightMentor, setHighlightMentor] = useState(false);
+  const inspectorSectionRef = useRef(null);
+  const [highlightInspector, setHighlightInspector] = useState(false);
+
+  // Select node and smoothly bring Component Inspector into screen view in right panel
+  const handleSelectNode = useCallback((nodeId) => {
+    setSelectedNodeId(nodeId);
+    if (rightPanelCollapsed) {
+      setRightPanelCollapsed(false);
+    }
+    setTimeout(() => {
+      if (inspectorSectionRef.current) {
+        inspectorSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 60);
+    setHighlightInspector(true);
+    setTimeout(() => setHighlightInspector(false), 2200);
+  }, [rightPanelCollapsed]);
 
   // Load level when switched (validates unlocked levels)
   const selectLevel = useCallback((idx) => {
@@ -1195,7 +1212,7 @@ export default function App() {
       return;
     }
     if (!canvasRef.current) return;
-    setSelectedNodeId(nodeId);
+    handleSelectNode(nodeId);
     const rect = canvasRef.current.getBoundingClientRect();
     const screenX = e.clientX - rect.left;
     const screenY = e.clientY - rect.top;
@@ -2062,10 +2079,19 @@ export default function App() {
                         handlePortClick(e, node.id, 'in');
                         return;
                       }
-                      setSelectedNodeId(node.id);
+                      handleSelectNode(node.id);
                     }}
-                    className={`no-pan pointer-events-auto absolute z-20 bg-slate-900/95 backdrop-blur rounded-xl border ${statusColor} p-2.5 shadow-xl transition-shadow cursor-grab active:cursor-grabbing`}
+                    title="Click to inspect and configure this component"
+                    className={`no-pan pointer-events-auto absolute z-20 bg-slate-900/95 backdrop-blur rounded-xl border ${statusColor} p-2.5 shadow-xl transition-all cursor-pointer group`}
                   >
+                    {/* Hover "Click to Inspect" Floating Badge */}
+                    <div className="absolute -top-7 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-40 whitespace-nowrap">
+                      <div className="px-2.5 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-bold shadow-2xl flex items-center gap-1 border border-indigo-400/50 animate-bounce">
+                        <Sliders className="w-2.5 h-2.5 text-indigo-200" />
+                        <span>Click to inspect</span>
+                      </div>
+                    </div>
+
                     {/* Left Input Port */}
                     {node.type !== 'SOURCE' && (
                       <button
@@ -2161,6 +2187,12 @@ export default function App() {
                         <div className="flex items-center justify-between text-[9px] pt-0.5 text-slate-400">
                           <span className="text-cyan-300 font-mono">{m.effectiveLatency}ms</span>
                           <span>Cap: {(m.capacity / 1000).toFixed(1)}k</span>
+                        </div>
+
+                        {/* Subtle Hover Hint inside Node */}
+                        <div className="hidden group-hover:flex items-center justify-center gap-1 pt-1 border-t border-indigo-500/20 text-[9px] text-indigo-300 font-semibold transition-all">
+                          <Sliders className="w-2.5 h-2.5" />
+                          <span>Click to inspect &amp; tune</span>
                         </div>
                       </div>
                     )}
@@ -2542,20 +2574,34 @@ export default function App() {
           {/* =============================================================== */}
           {/* 2. SELECTED COMPONENT INSPECTOR & TUNING                         */}
           {/* =============================================================== */}
-          <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-3.5 space-y-3">
+          <div
+            ref={inspectorSectionRef}
+            className={`bg-slate-950/80 border rounded-2xl p-3.5 space-y-3 transition-all duration-500 ${
+              highlightInspector
+                ? 'border-indigo-400 ring-2 ring-indigo-400/50 bg-indigo-950/30 shadow-2xl shadow-indigo-950/40 scale-[1.01]'
+                : 'border-slate-800'
+            }`}
+          >
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-indigo-400 flex items-center gap-1.5">
-                <Settings className="w-3.5 h-3.5" />
+                <Settings className={`w-3.5 h-3.5 ${highlightInspector ? 'animate-spin text-indigo-300' : ''}`} />
                 <span>Component Inspector</span>
               </span>
-              {selectedNode && selectedNode.type !== 'SOURCE' && (
-                <button
-                  onClick={() => deleteNode(selectedNode.id)}
-                  className="text-xs text-rose-400 hover:text-rose-300 flex items-center gap-1"
-                >
-                  <Trash2 className="w-3.5 h-3.5" /> Delete
-                </button>
-              )}
+              <div className="flex items-center gap-2">
+                {highlightInspector && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500 text-white animate-pulse">
+                    Inspecting
+                  </span>
+                )}
+                {selectedNode && selectedNode.type !== 'SOURCE' && (
+                  <button
+                    onClick={() => deleteNode(selectedNode.id)}
+                    className="text-xs text-rose-400 hover:text-rose-300 flex items-center gap-1"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> Delete
+                  </button>
+                )}
+              </div>
             </div>
 
             {selectedNode && selectedSpec && selectedMetrics ? (
