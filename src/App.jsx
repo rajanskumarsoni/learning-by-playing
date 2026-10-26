@@ -1196,11 +1196,11 @@ export default function App() {
   }, [activeCatalogTab]);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans select-none overflow-hidden">
+    <div className="h-screen w-screen max-h-screen overflow-hidden bg-slate-950 text-slate-100 flex flex-col font-sans select-none fixed inset-0">
       {/* =================================================================== */}
       {/* 1. TOP TELEMETRY & NAVIGATION HEADER                                */}
       {/* =================================================================== */}
-      <header className="bg-slate-900/95 border-b border-slate-800 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 z-30 shadow-md">
+      <header className="shrink-0 bg-slate-900/95 border-b border-slate-800 px-4 py-2 flex flex-wrap items-center justify-between gap-3 z-30 shadow-md">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 text-lg">
             ⚡
@@ -1339,7 +1339,7 @@ export default function App() {
 
       {/* Campaign Level Progress / Navigation Rail */}
       {gameMode === 'CAMPAIGN' && (
-        <div className="bg-slate-900 border-b border-slate-800 px-4 py-2 flex items-center justify-between text-xs overflow-x-auto gap-4">
+        <div className="shrink-0 bg-slate-900 border-b border-slate-800 px-4 py-1.5 flex items-center justify-between text-xs overflow-x-auto gap-4">
           <div className="flex items-center gap-2">
             {CAMPAIGN_LEVELS.map((lvl, idx) => (
               <button
@@ -1387,17 +1387,17 @@ export default function App() {
       {/* =================================================================== */}
       {/* 2. MAIN WORKSPACE: PALETTE + INTERACTIVE GRAPH CANVAS + INSPECTOR    */}
       {/* =================================================================== */}
-      <div className="flex-1 grid grid-cols-12 min-h-0 relative">
+      <div className="flex-1 grid grid-cols-12 min-h-0 h-full overflow-hidden relative">
         {/* LEFT COLUMN: INFRASTRUCTURE COMPONENT PALETTE (3 Cols) */}
-        <aside className="col-span-3 bg-slate-900/80 border-r border-slate-800 flex flex-col justify-between overflow-y-auto p-3 gap-3">
-          <div>
-            <div className="flex items-center justify-between mb-2">
+        <aside className="col-span-3 h-full bg-slate-900/80 border-r border-slate-800 flex flex-col p-3 min-h-0 overflow-hidden">
+          {/* Category Filter Pills (Pinned Header) */}
+          <div className="shrink-0 mb-2">
+            <div className="flex items-center justify-between mb-1.5">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-300">Cloud Components</span>
               <span className="text-[10px] text-slate-500">Click to deploy</span>
             </div>
 
-            {/* Category Filter Pills */}
-            <div className="grid grid-cols-5 gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 mb-2.5 text-[10px] font-bold">
+            <div className="grid grid-cols-5 gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-[10px] font-bold">
               {[
                 { id: 'ALL', label: 'All' },
                 { id: 'Edge', label: 'Edge' },
@@ -1416,48 +1416,48 @@ export default function App() {
                 </button>
               ))}
             </div>
-
-            {/* Component Cards */}
-            <div className="space-y-2">
-              {availableCatalog.map((item) => {
-                const Icon = item.icon;
-                const isAllowed = gameMode !== 'CAMPAIGN' || currentLevel.allowedComponents.includes(item.type);
-                return (
-                  <button
-                    key={item.type}
-                    disabled={!isAllowed}
-                    onClick={() => handleAddService(item.type)}
-                    className={`w-full text-left p-2.5 rounded-xl border transition-all flex items-start gap-2.5 ${
-                      isAllowed
-                        ? 'bg-slate-950/90 hover:bg-slate-800/90 border-slate-800 hover:border-indigo-500/50 cursor-pointer'
-                        : 'bg-slate-950/30 border-slate-900 opacity-40 cursor-not-allowed'
-                    }`}
-                  >
-                    <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${item.color} flex items-center justify-center shrink-0 shadow text-white`}>
-                      <Icon className="w-4 h-4" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-xs text-slate-200 truncate">{item.name}</span>
-                        <span className="text-xs font-mono font-bold text-emerald-400">${item.baseCost}/hr</span>
-                      </div>
-                      <p className="text-[10px] text-slate-400 leading-snug mt-0.5 line-clamp-2">
-                        {item.description}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-400">
-                        <span>{(item.baseCapacity / 1000).toFixed(1)}k RPS</span>
-                        <span>•</span>
-                        <span className="text-cyan-300">{item.baseLatency}ms</span>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
           </div>
 
-          {/* Traffic Types Packet Legend */}
-          <div className="pt-3 border-t border-slate-800 space-y-1 text-[11px] text-slate-400">
+          {/* Component Cards (Scrollable inside panel) */}
+          <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0">
+            {availableCatalog.map((item) => {
+              const Icon = item.icon;
+              const isAllowed = gameMode !== 'CAMPAIGN' || currentLevel.allowedComponents.includes(item.type);
+              return (
+                <button
+                  key={item.type}
+                  disabled={!isAllowed}
+                  onClick={() => handleAddService(item.type)}
+                  className={`w-full text-left p-2.5 rounded-xl border transition-all flex items-start gap-2.5 ${
+                    isAllowed
+                      ? 'bg-slate-950/90 hover:bg-slate-800/90 border-slate-800 hover:border-indigo-500/50 cursor-pointer'
+                      : 'bg-slate-950/30 border-slate-900 opacity-40 cursor-not-allowed'
+                  }`}
+                >
+                  <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${item.color} flex items-center justify-center shrink-0 shadow text-white`}>
+                    <Icon className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-xs text-slate-200 truncate">{item.name}</span>
+                      <span className="text-xs font-mono font-bold text-emerald-400">${item.baseCost}/hr</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 leading-snug mt-0.5 line-clamp-2">
+                      {item.description}
+                    </p>
+                    <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-400">
+                      <span>{(item.baseCapacity / 1000).toFixed(1)}k RPS</span>
+                      <span>•</span>
+                      <span className="text-cyan-300">{item.baseLatency}ms</span>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Traffic Types Packet Legend (Pinned Footer) */}
+          <div className="shrink-0 pt-2.5 mt-2 border-t border-slate-800 space-y-1 text-[11px] text-slate-400">
             <div className="font-semibold text-slate-300 text-xs mb-1">Traffic Flow Legend</div>
             <div className="grid grid-cols-2 gap-1.5 text-[10px]">
               {Object.values(TRAFFIC_TYPES).map((t) => (
@@ -1479,7 +1479,7 @@ export default function App() {
             setIsPanning(false);
             setDraggingNodeId(null);
           }}
-          className={`col-span-6 relative bg-slate-950 flex flex-col overflow-hidden select-none min-h-[520px] ${
+          className={`col-span-6 h-full relative bg-slate-950 flex flex-col overflow-hidden select-none min-h-0 ${
             isPanning ? 'cursor-grabbing' : 'cursor-grab'
           }`}
           style={{
@@ -1932,7 +1932,7 @@ export default function App() {
         </main>
 
         {/* RIGHT COLUMN: ARCHITECTURAL TUNING INSPECTOR & LIVE MENTOR (3 Cols) */}
-        <aside className="col-span-3 bg-slate-900/80 border-l border-slate-800 flex flex-col justify-between overflow-y-auto p-3.5 gap-4">
+        <aside className="col-span-3 h-full bg-slate-900/80 border-l border-slate-800 flex flex-col overflow-y-auto p-3.5 space-y-4 min-h-0">
           <div className="space-y-4">
             {/* Selected Node Inspector */}
             <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-3.5">
