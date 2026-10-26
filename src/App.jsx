@@ -983,6 +983,14 @@ export default function App() {
     return evaluateArchitecture(nodes, edges, currentLiveRps, activeTrafficMix, currentMaxBudget);
   }, [nodes, edges, currentLiveRps, activeTrafficMix, currentMaxBudget]);
 
+  // Real-time pass criteria evaluation
+  const targetLatency = gameMode === 'CAMPAIGN' ? currentLevel.maxLatencyMs : 250;
+  const targetMinUptime = gameMode === 'CAMPAIGN' ? currentLevel.minUptimePct : 98.0;
+  const passedLatency = evaluation.p99Latency <= targetLatency;
+  const passedUptime = evaluation.uptimePct >= targetMinUptime;
+  const passedBudget = !currentMaxBudget || evaluation.totalHourlyCost <= currentMaxBudget;
+  const isLevelPassing = passedLatency && passedUptime && passedBudget;
+
   // Global mouseup listener to reliably release drag and pan anywhere on window
   useEffect(() => {
     const handleGlobalMouseUp = () => {
@@ -1343,46 +1351,71 @@ export default function App() {
           {/* P99 Latency SLA */}
           <div
             className={`border px-3 py-1.5 rounded-xl flex items-center gap-2 ${
-              evaluation.p99Latency > (gameMode === 'CAMPAIGN' ? currentLevel.maxLatencyMs : 200)
-                ? 'bg-rose-950/40 border-rose-500/50 text-rose-300'
-                : 'bg-slate-950 border-slate-800 text-slate-200'
+              passedLatency
+                ? 'bg-slate-950 border-emerald-500/40 text-emerald-300'
+                : 'bg-rose-950/40 border-rose-500/50 text-rose-300'
             }`}
+            title={`P99 Latency: ${evaluation.p99Latency}ms (Target: < ${targetLatency}ms)`}
           >
             <span className="text-xs text-slate-400">P99:</span>
-            <span className="text-xs font-mono font-bold text-cyan-300">{evaluation.p99Latency}ms</span>
-            {gameMode === 'CAMPAIGN' && (
-              <span className="text-[10px] text-slate-500">(SLA &lt; {currentLevel.maxLatencyMs}ms)</span>
-            )}
+            <span className="text-xs font-mono font-bold">{evaluation.p99Latency}ms</span>
+            <span className="text-[10px] text-slate-500 hidden sm:inline">(&lt;{targetLatency}ms)</span>
+            <span className={`text-[10px] font-bold ${passedLatency ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {passedLatency ? '✓' : '✗'}
+            </span>
           </div>
 
           {/* Uptime % */}
-          <div className="bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-xl flex items-center gap-2">
+          <div
+            className={`border px-3 py-1.5 rounded-xl flex items-center gap-2 ${
+              passedUptime
+                ? 'bg-slate-950 border-emerald-500/40 text-emerald-300'
+                : 'bg-rose-950/40 border-rose-500/50 text-rose-300'
+            }`}
+            title={`Uptime: ${evaluation.uptimePct}% (Target: ≥ ${targetMinUptime}%)`}
+          >
             <span className="text-xs text-slate-400">Uptime:</span>
-            <span
-              className={`text-xs font-mono font-bold ${
-                evaluation.uptimePct < 99.0 ? 'text-rose-400' : 'text-emerald-400'
-              }`}
-            >
-              {evaluation.uptimePct}%
+            <span className="text-xs font-mono font-bold">{evaluation.uptimePct}%</span>
+            <span className="text-[10px] text-slate-500 hidden sm:inline">(&ge;{targetMinUptime}%)</span>
+            <span className={`text-[10px] font-bold ${passedUptime ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {passedUptime ? '✓' : '✗'}
             </span>
           </div>
 
           {/* Hourly Cost */}
-          <div className="bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-xl flex items-center gap-1.5">
+          <div
+            className={`border px-3 py-1.5 rounded-xl flex items-center gap-1.5 ${
+              passedBudget
+                ? 'bg-slate-950 border-emerald-500/40 text-emerald-300'
+                : 'bg-rose-950/40 border-rose-500/50 text-rose-300'
+            }`}
+            title={`Hourly Cost: $${evaluation.totalHourlyCost}/hr ${currentMaxBudget ? `(Budget: ≤ $${currentMaxBudget})` : ''}`}
+          >
             <span className="text-xs text-slate-400">Cost:</span>
-            <span
-              className={`text-xs font-mono font-bold ${
-                currentMaxBudget && evaluation.totalHourlyCost > currentMaxBudget
-                  ? 'text-rose-400'
-                  : 'text-emerald-400'
-              }`}
-            >
-              ${evaluation.totalHourlyCost}/hr
-            </span>
+            <span className="text-xs font-mono font-bold">${evaluation.totalHourlyCost}/hr</span>
             {currentMaxBudget && (
-              <span className="text-[10px] text-slate-500">(&le; ${currentMaxBudget})</span>
+              <span className="text-[10px] text-slate-500 hidden sm:inline">(&le;${currentMaxBudget})</span>
+            )}
+            {currentMaxBudget && (
+              <span className={`text-[10px] font-bold ${passedBudget ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {passedBudget ? '✓' : '✗'}
+              </span>
             )}
           </div>
+
+          {/* Overall Level Readiness Pill (Campaign Mode) */}
+          {gameMode === 'CAMPAIGN' && (
+            <div
+              className={`hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-[11px] font-bold ${
+                isLevelPassing
+                  ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300'
+                  : 'bg-rose-950/60 border-rose-500/50 text-rose-300'
+              }`}
+              title={isLevelPassing ? 'Current system status meets all targets to pass this level!' : 'Current system status breaches latency or uptime targets'}
+            >
+              <span>{isLevelPassing ? '✅ Ready to Pass' : '❌ Targets Breached'}</span>
+            </div>
+          )}
 
           {/* Simulation Controls */}
           <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
@@ -2205,42 +2238,175 @@ export default function App() {
                 {currentLevel.brief}
               </p>
 
-              {/* SLA & Budget Constraints Grid */}
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="bg-slate-900/90 p-2 rounded-xl border border-slate-800">
-                  <div className="text-[10px] text-slate-400 flex items-center gap-1">
-                    <span>🎯 Target Peak Load</span>
+              {/* CURRENT STATUS vs. TARGET TO PASS LEVEL */}
+              <div className="bg-slate-900/90 rounded-2xl p-3.5 border border-slate-800 space-y-3 shadow-inner">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                  <div className="flex items-center gap-1.5">
+                    <Activity className="w-3.5 h-3.5 text-cyan-400" />
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-200">
+                      System Status vs. Target to Pass
+                    </span>
                   </div>
-                  <div className="font-mono font-bold text-white mt-0.5">
-                    {currentLevel.targetRps.toLocaleString()} RPS
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 ${
+                      isLevelPassing
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                        : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                    }`}
+                  >
+                    {isLevelPassing ? '✅ Ready to Pass' : '❌ Targets Breached'}
+                  </span>
+                </div>
+
+                {/* Side-by-Side Comparison Rows */}
+                <div className="space-y-2 text-xs">
+                  {/* Metric 1: Traffic Load */}
+                  <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/80 flex items-center justify-between">
+                    <div>
+                      <div className="text-[10px] text-slate-400 font-medium">1. Peak Traffic Load</div>
+                      <div className="font-mono text-xs font-bold mt-0.5 flex items-center gap-1.5 flex-wrap">
+                        <span className="text-slate-400">Current:</span>
+                        <span className="text-amber-300">{currentLiveRps.toLocaleString()} RPS</span>
+                        <span className="text-slate-600">→</span>
+                        <span className="text-slate-400">Target:</span>
+                        <span className="text-cyan-300 font-extrabold">{currentLevel.targetRps.toLocaleString()} RPS</span>
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-800">
+                        {isRunning ? `Surge ${Math.round(waveProgress)}%` : 'Baseline'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Metric 2: P99 Latency SLA */}
+                  <div
+                    className={`p-2.5 rounded-xl border flex items-center justify-between transition-colors ${
+                      passedLatency
+                        ? 'bg-slate-950 border-emerald-500/30'
+                        : 'bg-rose-950/25 border-rose-500/40'
+                    }`}
+                  >
+                    <div>
+                      <div className="text-[10px] text-slate-400 font-medium">2. P99 Latency SLA</div>
+                      <div className="font-mono text-xs font-bold mt-0.5 flex items-center gap-1.5 flex-wrap">
+                        <span className="text-slate-400">Current:</span>
+                        <span className={passedLatency ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                          {evaluation.p99Latency}ms
+                        </span>
+                        <span className="text-slate-600">→</span>
+                        <span className="text-slate-400">Target:</span>
+                        <span className="text-cyan-300">&lt; {currentLevel.maxLatencyMs}ms</span>
+                      </div>
+                    </div>
+                    <div>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded border flex items-center gap-1 ${
+                          passedLatency
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                            : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                        }`}
+                      >
+                        {passedLatency ? '✅ Passing' : '❌ Breached'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Metric 3: Uptime SLA */}
+                  <div
+                    className={`p-2.5 rounded-xl border flex items-center justify-between transition-colors ${
+                      passedUptime
+                        ? 'bg-slate-950 border-emerald-500/30'
+                        : 'bg-rose-950/25 border-rose-500/40'
+                    }`}
+                  >
+                    <div>
+                      <div className="text-[10px] text-slate-400 font-medium">3. Uptime SLA</div>
+                      <div className="font-mono text-xs font-bold mt-0.5 flex items-center gap-1.5 flex-wrap">
+                        <span className="text-slate-400">Current:</span>
+                        <span className={passedUptime ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                          {evaluation.uptimePct}%
+                        </span>
+                        <span className="text-slate-600">→</span>
+                        <span className="text-slate-400">Target:</span>
+                        <span className="text-purple-300">&ge; {currentLevel.minUptimePct}%</span>
+                      </div>
+                    </div>
+                    <div>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded border flex items-center gap-1 ${
+                          passedUptime
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                            : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                        }`}
+                      >
+                        {passedUptime ? '✅ Passing' : '❌ Dropping'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Metric 4: Cloud Budget */}
+                  <div
+                    className={`p-2.5 rounded-xl border flex items-center justify-between transition-colors ${
+                      passedBudget
+                        ? 'bg-slate-950 border-emerald-500/30'
+                        : 'bg-rose-950/25 border-rose-500/40'
+                    }`}
+                  >
+                    <div>
+                      <div className="text-[10px] text-slate-400 font-medium">4. Cloud Budget</div>
+                      <div className="font-mono text-xs font-bold mt-0.5 flex items-center gap-1.5 flex-wrap">
+                        <span className="text-slate-400">Current:</span>
+                        <span className={passedBudget ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                          ${evaluation.totalHourlyCost}/hr
+                        </span>
+                        <span className="text-slate-600">→</span>
+                        <span className="text-slate-400">Target:</span>
+                        <span className="text-emerald-300">&le; ${currentLevel.maxBudgetHr}/hr</span>
+                      </div>
+                    </div>
+                    <div>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded border flex items-center gap-1 ${
+                          passedBudget
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                            : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                        }`}
+                      >
+                        {passedBudget ? '✅ Within Budget' : '❌ Over Budget'}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                <div className="bg-slate-900/90 p-2 rounded-xl border border-slate-800">
-                  <div className="text-[10px] text-slate-400 flex items-center gap-1">
-                    <span>⏱️ Latency SLA</span>
+                {/* Instruction / Action Banner to Pass Level */}
+                <div
+                  className={`p-2.5 rounded-xl border text-[11px] flex items-center justify-between gap-2 ${
+                    isLevelPassing
+                      ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-200'
+                      : 'bg-amber-950/30 border-amber-500/40 text-amber-200'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">{isLevelPassing ? '🎉' : '⚠️'}</span>
+                    <span>
+                      {isLevelPassing
+                        ? 'All SLA targets currently met! Run the Peak Wave to pass this scenario.'
+                        : 'Resolve the bottleneck above to bring latency & uptime within targets.'}
+                    </span>
                   </div>
-                  <div className="font-mono font-bold text-cyan-300 mt-0.5">
-                    &lt; {currentLevel.maxLatencyMs}ms
-                  </div>
-                </div>
-
-                <div className="bg-slate-900/90 p-2 rounded-xl border border-slate-800">
-                  <div className="text-[10px] text-slate-400 flex items-center gap-1">
-                    <span>💰 Max Cloud Budget</span>
-                  </div>
-                  <div className="font-mono font-bold text-emerald-400 mt-0.5">
-                    &le; ${currentLevel.maxBudgetHr}/hr
-                  </div>
-                </div>
-
-                <div className="bg-slate-900/90 p-2 rounded-xl border border-slate-800">
-                  <div className="text-[10px] text-slate-400 flex items-center gap-1">
-                    <span>🛡️ Min Uptime SLA</span>
-                  </div>
-                  <div className="font-mono font-bold text-purple-300 mt-0.5">
-                    &ge; {currentLevel.minUptimePct}%
-                  </div>
+                  {!isRunning && (
+                    <button
+                      onClick={() => setIsRunning(true)}
+                      className={`px-3 py-1 rounded-lg font-black text-[10px] uppercase tracking-wider shrink-0 transition shadow ${
+                        isLevelPassing
+                          ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 animate-pulse'
+                          : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                      }`}
+                    >
+                      {isLevelPassing ? 'Simulate Wave ▶' : 'Test Wave ▶'}
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -2285,18 +2451,35 @@ export default function App() {
               <p className="text-xs text-slate-300 leading-relaxed bg-slate-900/80 p-2.5 rounded-xl border border-slate-800/80">
                 Survive as many waves as possible! Traffic surges by +2,500 RPS every wave with malicious bot swarms and random Chaos Monkey server outages. Maintain &ge;98% availability to advance!
               </p>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="bg-slate-900/90 p-2 rounded-xl border border-slate-800">
-                  <span className="text-[10px] text-slate-400">Current Wave Load</span>
-                  <div className="font-mono font-bold text-amber-300 mt-0.5">
-                    {(3000 + survivalWave * 2500).toLocaleString()} RPS
-                  </div>
+              {/* Live Status vs Survival Target */}
+              <div className="space-y-2 text-xs bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
+                <div className="flex items-center justify-between text-[10px] text-slate-400 font-bold uppercase tracking-wider pb-1 border-b border-slate-800">
+                  <span>System Status vs Target</span>
+                  <span className={passedUptime && passedLatency ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                    {passedUptime && passedLatency ? '✅ Passing' : '❌ Failing'}
+                  </span>
                 </div>
-                <div className="bg-slate-900/90 p-2 rounded-xl border border-slate-800">
-                  <span className="text-[10px] text-slate-400">Survival Target</span>
-                  <div className="font-mono font-bold text-emerald-400 mt-0.5">
-                    SLA &ge; 98.0%
-                  </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-slate-400">Wave Load:</span>
+                  <span className="font-mono font-bold text-amber-300">
+                    {currentLiveRps.toLocaleString()} / {(3000 + survivalWave * 2500).toLocaleString()} RPS
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-slate-400">P99 Latency:</span>
+                  <span className="font-mono font-bold flex items-center gap-1.5">
+                    <span className={passedLatency ? 'text-emerald-400' : 'text-rose-400'}>{evaluation.p99Latency}ms</span>
+                    <span className="text-slate-500 font-normal">(&le; 250ms)</span>
+                    <span>{passedLatency ? '✓' : '✗'}</span>
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-slate-400">Uptime SLA:</span>
+                  <span className="font-mono font-bold flex items-center gap-1.5">
+                    <span className={passedUptime ? 'text-emerald-400' : 'text-rose-400'}>{evaluation.uptimePct}%</span>
+                    <span className="text-slate-500 font-normal">(&ge; 98%)</span>
+                    <span>{passedUptime ? '✓' : '✗'}</span>
+                  </span>
                 </div>
               </div>
             </div>
