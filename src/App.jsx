@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   Play, Pause, RotateCcw, Trash2, Shield, Cpu, Database,
   Zap, Award, AlertTriangle, CheckCircle2, DollarSign, Heart,
   Activity, Wrench, ArrowUpCircle, BookOpen, Sparkles, Flame,
-  Code, Clock, Copy, Check, Terminal, HelpCircle, Layers
+  Code, Clock, Copy, Check, Terminal, HelpCircle, Layers,
+  ZoomIn, ZoomOut, Maximize2, Move, Share2, X
 } from 'lucide-react';
 
 // ============================================================================
@@ -446,10 +447,64 @@ export default function App() {
   const [copiedCode, setCopiedCode] = useState(false);
   const [activeToolbarTab, setActiveToolbarTab] = useState('ALL');
 
-  // Dragging refs
-  const svgRef = useRef(null);
-  const draggingNodeRef = useRef(null);
-  const dragOffsetRef = useRef({ x: 0, y: 0 });
+  // Canvas Infinite Pan, Zoom & Drag State
+  const canvasRef = useRef(null);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [isPanning, setIsPanning] = useState(false);
+  const panStartRef = useRef({ x: 0, y: 0 });
+  const [draggingNodeId, setDraggingNodeId] = useState(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+  // Global mouseup listener to reliably release drag and pan anywhere on window
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      setIsPanning(false);
+      setDraggingNodeId(null);
+    };
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+  }, []);
+
+  // Non-passive wheel listener for smooth infinite pan and pinch/ctrl-wheel zoom
+  useEffect(() => {
+    const canvasEl = canvasRef.current;
+    if (!canvasEl) return;
+
+    const handleWheelNative = (e) => {
+      e.preventDefault();
+      const rect = canvasEl.getBoundingClientRect();
+      const mouseScreenX = e.clientX - rect.left;
+      const mouseScreenY = e.clientY - rect.top;
+
+      if (e.ctrlKey || e.metaKey) {
+        // Pinch-zoom or Ctrl+scroll zoom centered at mouse pointer
+        const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
+        setZoom((currentZoom) => {
+          const newZoom = Math.max(0.35, Math.min(2.5, +(currentZoom * zoomFactor).toFixed(3)));
+          setPan((currentPan) => {
+            const worldX = (mouseScreenX - currentPan.x) / currentZoom;
+            const worldY = (mouseScreenY - currentPan.y) / currentZoom;
+            return {
+              x: Math.round(mouseScreenX - worldX * newZoom),
+              y: Math.round(mouseScreenY - worldY * newZoom)
+            };
+          });
+          return newZoom;
+        });
+      } else {
+        // 2-finger trackpad scroll or mousewheel pan
+        setPan((prev) => ({
+          x: Math.round(prev.x - e.deltaX),
+          y: Math.round(prev.y - e.deltaY)
+        }));
+      }
+    };
+
+    canvasEl.addEventListener('wheel', handleWheelNative, { passive: false });
+    return () => canvasEl.removeEventListener('wheel', handleWheelNative);
+  }, []);
 
   // Reset or Switch Level/Mode
   const loadScenario = (mode, levelIndex = 0) => {
@@ -460,6 +515,8 @@ export default function App() {
     setReputation(100);
     setP99Latency(38);
     setLevelStatus('PLAYING');
+    setPan({ x: 0, y: 0 });
+    setZoom(1);
 
     if (mode === 'CAMPAIGN') {
       const lvl = CAMPAIGN_LEVELS[levelIndex];
@@ -800,14 +857,21 @@ export default function App() {
     }
     const newId = `n_${Date.now().toString().slice(-4)}`;
     const offset = (nodes.length % 5) * 30;
+    let spawnX = 270 + offset;
+    let spawnY = 100 + offset;
+    if (canvasRef.current && (Math.abs(pan.x) > 60 || Math.abs(pan.y) > 60 || zoom !== 1)) {
+      const rect = canvasRef.current.getBoundingClientRect();
+      spawnX = Math.round((-pan.x + rect.width / 2) / zoom - 88 + offset);
+      spawnY = Math.round((-pan.y + rect.height / 2) / zoom - 52 + offset);
+    }
     if (gameMode !== 'SANDBOX') setMoney(prev => +(prev - spec.cost).toFixed(1));
     setNodes(prev => [
       ...prev,
       {
         id: newId,
         type: serviceType,
-        x: 270 + offset,
-        y: 100 + offset,
+        x: spawnX,
+        y: spawnY,
         tier: 1,
         health: 100,
         handledRps: 0,
@@ -848,6 +912,19 @@ export default function App() {
     setSelectedNodeId('src');
   };
 
+  const handlePortClick = (e, nodeId, portType) => {
+    e.stopPropagation();
+    if (portType === 'out') {
+      setConnectingFromId(connectingFromId === nodeId ? null : nodeId);
+    } else if (portType === 'in' && connectingFromId && connectingFromId !== nodeId) {
+      const exists = edges.some(ed => ed.from === connectingFromId && ed.to === nodeId);
+      if (!exists) {
+        setEdges(prev => [...prev, { id: `e_${Date.now()}`, from: connectingFromId, to: nodeId, flowRps: 0 }]);
+      }
+      setConnectingFromId(null);
+    }
+  };
+
   const handleNodeClick = (nodeId, e) => {
     e.stopPropagation();
     if (connectingFromId) {
@@ -865,22 +942,104 @@ export default function App() {
 
   const handleMouseDownNode = (nodeId, e) => {
     e.stopPropagation();
-    if (connectingFromId || !svgRef.current) return;
-    const node = nodes.find(n => n.id === nodeId);
-    if (!node) return;
-    const rect = svgRef.current.getBoundingClientRect();
-    draggingNodeRef.current = nodeId;
-    dragOffsetRef.current = { x: e.clientX - rect.left - node.x, y: e.clientY - rect.top - node.y };
+    if (connectingFromId && connectingFromId !== nodeId && nodeId !== 'src') {
+      handlePortClick(e, nodeId, 'in');
+      return;
+    }
+    if (!canvasRef.current) return;
     setSelectedNodeId(nodeId);
+    const rect = canvasRef.current.getBoundingClientRect();
+    const screenX = e.clientX - rect.left;
+    const screenY = e.clientY - rect.top;
+    const worldX = (screenX - pan.x) / zoom;
+    const worldY = (screenY - pan.y) / zoom;
+    const node = nodes.find(n => n.id === nodeId);
+    setDraggingNodeId(nodeId);
+    setDragOffset({
+      x: worldX - (node?.x || 0),
+      y: worldY - (node?.y || 0)
+    });
   };
 
-  const handleMouseMoveCanvas = (e) => {
-    if (!draggingNodeRef.current || !svgRef.current) return;
-    const rect = svgRef.current.getBoundingClientRect();
-    const nx = Math.max(15, Math.min(rect.width - 175, e.clientX - rect.left - dragOffsetRef.current.x));
-    const ny = Math.max(15, Math.min(rect.height - 105, e.clientY - rect.top - dragOffsetRef.current.y));
-    setNodes(prev => prev.map(n => (n.id === draggingNodeRef.current ? { ...n, x: nx, y: ny } : n)));
+  const handleCanvasMouseDown = (e) => {
+    if (e.target.closest('.no-pan') || e.target.closest('button') || e.target.closest('input')) {
+      return;
+    }
+    setIsPanning(true);
+    panStartRef.current = {
+      x: e.clientX - pan.x,
+      y: e.clientY - pan.y
+    };
+    setConnectingFromId(null);
   };
+
+  const handleCanvasMouseMove = (e) => {
+    if (!canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const screenX = e.clientX - rect.left;
+    const screenY = e.clientY - rect.top;
+
+    const worldX = (screenX - pan.x) / zoom;
+    const worldY = (screenY - pan.y) / zoom;
+    setMousePos({ x: worldX, y: worldY });
+
+    if (isPanning) {
+      setPan({
+        x: Math.round(e.clientX - panStartRef.current.x),
+        y: Math.round(e.clientY - panStartRef.current.y)
+      });
+      return;
+    }
+
+    if (draggingNodeId) {
+      setNodes(prev =>
+        prev.map(n =>
+          n.id === draggingNodeId
+            ? {
+                ...n,
+                x: Math.round(worldX - dragOffset.x),
+                y: Math.round(worldY - dragOffset.y)
+              }
+            : n
+        )
+      );
+    }
+  };
+
+  const fitView = useCallback(() => {
+    if (!canvasRef.current || nodes.length === 0) {
+      setPan({ x: 0, y: 0 });
+      setZoom(1);
+      return;
+    }
+    const rect = canvasRef.current.getBoundingClientRect();
+    const minX = Math.min(...nodes.map(n => n.x));
+    const maxX = Math.max(...nodes.map(n => n.x + 180));
+    const minY = Math.min(...nodes.map(n => n.y));
+    const maxY = Math.max(...nodes.map(n => n.y + 110));
+
+    const graphWidth = maxX - minX;
+    const graphHeight = maxY - minY;
+    const padding = 70;
+
+    const scaleX = (rect.width - padding * 2) / Math.max(1, graphWidth);
+    const scaleY = (rect.height - padding * 2) / Math.max(1, graphHeight);
+    const targetZoom = Math.max(0.4, Math.min(1.15, +(Math.min(scaleX, scaleY)).toFixed(2)));
+
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+
+    setZoom(targetZoom);
+    setPan({
+      x: Math.round(rect.width / 2 - centerX * targetZoom),
+      y: Math.round(rect.height / 2 - centerY * targetZoom)
+    });
+  }, [nodes]);
+
+  const resetView = useCallback(() => {
+    setPan({ x: 0, y: 0 });
+    setZoom(1);
+  }, []);
 
   const selectedNode = useMemo(
     () => nodes.find(n => n.id === selectedNodeId) || nodes[0],
@@ -1224,130 +1383,250 @@ An original interactive System Design & Cloud Architecture game built with React
           </div>
         </aside>
 
-        {/* CENTER COLUMN: INTERACTIVE SVG ARCHITECTURE CANVAS (6 Cols) */}
-        <main className="col-span-6 relative bg-slate-950 flex flex-col overflow-hidden">
-          {/* Live AI Mentor Banner */}
-          <div
-            className={`mx-3 mt-3 px-3.5 py-2 rounded-xl border flex items-center justify-between gap-3 z-10 ${coachMessage.type === 'error'
-              ? 'bg-red-950/80 border-red-500/50 text-red-200'
-              : coachMessage.type === 'warning'
-                ? 'bg-amber-950/80 border-amber-500/50 text-amber-200'
-                : coachMessage.type === 'success'
-                  ? 'bg-emerald-950/80 border-emerald-500/50 text-emerald-200'
+        {/* CENTER COLUMN: INTERACTIVE ARCHITECTURE CANVAS (6 Cols) */}
+        <main
+          ref={canvasRef}
+          onMouseDown={handleCanvasMouseDown}
+          onMouseMove={handleCanvasMouseMove}
+          onMouseUp={() => {
+            setIsPanning(false);
+            setDraggingNodeId(null);
+          }}
+          className={`col-span-6 relative bg-slate-950 flex flex-col overflow-hidden select-none min-h-[520px] ${
+            isPanning ? 'cursor-grabbing' : 'cursor-grab'
+          }`}
+          style={{
+            backgroundImage:
+              'radial-gradient(circle, rgba(99, 102, 241, 0.16) 1.2px, transparent 1.2px)',
+            backgroundSize: `${24 * zoom}px ${24 * zoom}px`,
+            backgroundPosition: `${pan.x}px ${pan.y}px`
+          }}
+        >
+          {/* Live AI Mentor Banner inside Canvas */}
+          <div className="absolute top-3 left-3 right-3 flex flex-wrap items-center justify-between gap-2 pointer-events-none z-30">
+            <div
+              className={`px-3.5 py-2 rounded-xl border flex items-center justify-between gap-3 shadow-lg backdrop-blur-md pointer-events-auto ${
+                coachMessage.type === 'error'
+                  ? 'bg-red-950/85 border-red-500/50 text-red-200'
+                  : coachMessage.type === 'warning'
+                  ? 'bg-amber-950/85 border-amber-500/50 text-amber-200'
+                  : coachMessage.type === 'success'
+                  ? 'bg-emerald-950/85 border-emerald-500/50 text-emerald-200'
                   : 'bg-slate-900/90 border-slate-700/80 text-slate-200'
               }`}
-          >
-            <div className="flex items-center gap-2 text-xs">
-              <span className="text-base">🧑‍🏫</span>
-              <div>
-                <span className="font-extrabold mr-1.5">{coachMessage.title}</span>
-                <span className="text-slate-300">{coachMessage.text}</span>
+            >
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-base">🧑‍🏫</span>
+                <div>
+                  <span className="font-extrabold mr-1.5">{coachMessage.title}</span>
+                  <span className="text-slate-300">{coachMessage.text}</span>
+                </div>
               </div>
+              {connectingFromId && (
+                <button
+                  onClick={() => setConnectingFromId(null)}
+                  className="px-2.5 py-1 rounded-lg bg-amber-400 text-slate-950 font-extrabold text-xs shrink-0 animate-bounce"
+                >
+                  Cancel Wire
+                </button>
+              )}
             </div>
-            {connectingFromId && (
-              <button
-                onClick={() => setConnectingFromId(null)}
-                className="px-2.5 py-1 rounded-lg bg-amber-400 text-slate-950 font-extrabold text-xs shrink-0 animate-bounce"
-              >
-                Click Target Node (or Cancel)
-              </button>
-            )}
           </div>
 
-          <div className="flex-1 relative">
+          {/* FLOATING CANVAS HUD CONTROLS (BOTTOM-RIGHT) */}
+          <div className="absolute bottom-3 right-3 flex items-center gap-1 z-30 pointer-events-auto bg-slate-900/95 backdrop-blur-md border border-slate-800 p-1 rounded-xl shadow-2xl">
+            <button
+              onClick={() => setZoom((z) => Math.min(2.5, +(z + 0.15).toFixed(2)))}
+              className="w-7 h-7 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 flex items-center justify-center transition"
+              title="Zoom In (+)"
+            >
+              <ZoomIn className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={resetView}
+              className="px-2 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-[11px] font-mono text-slate-200 transition font-medium"
+              title="Click to reset zoom to 100%"
+            >
+              {Math.round(zoom * 100)}%
+            </button>
+            <button
+              onClick={() => setZoom((z) => Math.max(0.35, +(z - 0.15).toFixed(2)))}
+              className="w-7 h-7 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 flex items-center justify-center transition"
+              title="Zoom Out (-)"
+            >
+              <ZoomOut className="w-3.5 h-3.5" />
+            </button>
+            <div className="w-px h-4 bg-slate-700 mx-0.5" />
+            <button
+              onClick={fitView}
+              className="w-7 h-7 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 flex items-center justify-center transition"
+              title="Center & Fit Graph in View"
+            >
+              <Maximize2 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={resetView}
+              className="w-7 h-7 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 flex items-center justify-center transition"
+              title="Reset View to Origin (0,0)"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* FLOATING STATUS (BOTTOM-LEFT) */}
+          <div className="absolute bottom-3 left-3 z-30 pointer-events-none flex items-center gap-2">
+            <div className="bg-slate-900/85 backdrop-blur border border-slate-800 px-2.5 py-1 rounded-lg text-[10px] text-slate-400 font-mono flex items-center gap-2 shadow-lg">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Canvas: ({Math.round(pan.x)}, {Math.round(pan.y)})</span>
+              <span className="hidden sm:inline text-slate-500">• Pan anywhere</span>
+            </div>
+          </div>
+
+          {/* GRAPH WORLD CONTAINER (TRANSFORMED BY PAN & ZOOM) */}
+          <div
+            className="absolute inset-0 origin-top-left pointer-events-none"
+            style={{
+              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+              transformOrigin: '0 0'
+            }}
+          >
+            {/* SVG WIRES & ANIMATED TRAFFIC PARTICLES */}
             <svg
-              ref={svgRef}
-              onMouseMove={handleMouseMoveCanvas}
-              onMouseUp={() => {
-                draggingNodeRef.current = null;
-              }}
-              onClick={() => setConnectingFromId(null)}
-              className="w-full h-full cursor-crosshair"
-              style={{
-                backgroundImage:
-                  'radial-gradient(circle at 1px 1px, rgba(148, 163, 184, 0.14) 1px, transparent 0)',
-                backgroundSize: '28px 28px'
-              }}
+              className="overflow-visible absolute inset-0 pointer-events-none z-10"
+              style={{ width: '1px', height: '1px' }}
             >
               <defs>
-                <marker
-                  id="arrow"
-                  viewBox="0 0 10 10"
-                  refX="6"
-                  refY="5"
-                  markerWidth="6"
-                  markerHeight="6"
-                  orient="auto-start-reverse"
-                >
-                  <path d="M 0 1 L 10 5 L 0 9 z" fill="#64748b" />
-                </marker>
+                <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feGaussianBlur stdDeviation="2.5" result="blur" />
+                  <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                </filter>
               </defs>
 
-              {/* Wires & Animated Packet Particles */}
+              {/* Active Connection Preview Wire */}
+              {connectingFromId && (() => {
+                const srcNode = nodes.find(n => n.id === connectingFromId);
+                if (!srcNode) return null;
+                const x1 = srcNode.x + 176;
+                const y1 = srcNode.y + 44;
+                const x2 = mousePos.x;
+                const y2 = mousePos.y;
+                return (
+                  <path
+                    d={`M ${x1} ${y1} C ${x1 + 60} ${y1}, ${x2 - 60} ${y2}, ${x2} ${y2}`}
+                    fill="none"
+                    stroke="#818cf8"
+                    strokeWidth="2.5"
+                    strokeDasharray="6 4"
+                  />
+                );
+              })()}
+
+              {/* Connected Edges */}
               {edges.map(edge => {
                 const fromNode = nodes.find(n => n.id === edge.from);
                 const toNode = nodes.find(n => n.id === edge.to);
                 if (!fromNode || !toNode) return null;
 
-                const x1 = fromNode.x + 156;
+                const x1 = fromNode.x + 176;
                 const y1 = fromNode.y + 44;
                 const x2 = toNode.x;
                 const y2 = toNode.y + 44;
-                const cx1 = x1 + Math.max(40, (x2 - x1) * 0.45);
-                const cx2 = x2 - Math.max(40, (x2 - x1) * 0.45);
-                const pathData = `M ${x1} ${y1} C ${cx1} ${y1}, ${cx2} ${y2}, ${x2} ${y2}`;
+                const dx = Math.max(50, Math.abs(x2 - x1) * 0.5);
+                const pathD = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
 
                 const activeRpsOnEdge = edge.flowRps || 0;
                 const domType = edge.dominantType || 'READ';
                 const packetColor = TRAFFIC_TYPES[domType]?.color || '#3b82f6';
+                const hasTraffic = isRunning && activeRpsOnEdge > 0.1;
+                const animDuration = Math.max(0.45, 2.0 - Math.min(1.5, activeRpsOnEdge / 30));
 
                 return (
-                  <g key={edge.id}>
+                  <g key={edge.id} className="pointer-events-auto group">
+                    {/* Invisible wider stroke for easy clicking to delete edge */}
                     <path
-                      d={pathData}
+                      d={pathD}
                       fill="none"
-                      stroke={activeRpsOnEdge > 0.2 ? packetColor : '#334155'}
-                      strokeOpacity={activeRpsOnEdge > 0.2 ? 0.55 : 0.7}
-                      strokeWidth={activeRpsOnEdge > 10 ? 4 : 2.5}
-                      markerEnd="url(#arrow)"
+                      stroke="transparent"
+                      strokeWidth="16"
+                      className="cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEdges(prev => prev.filter(ed => ed.id !== edge.id));
+                      }}
                     />
-                    {isRunning && activeRpsOnEdge > 0.2 && (
+
+                    {/* Base Wire */}
+                    <path
+                      d={pathD}
+                      fill="none"
+                      stroke={hasTraffic ? '#475569' : '#1e293b'}
+                      strokeWidth={hasTraffic ? 3 : 2}
+                      className="group-hover:stroke-rose-500 transition-colors"
+                    />
+
+                    {/* Animated Glow Packets */}
+                    {hasTraffic && (
                       <>
-                        <circle r="5" fill={packetColor}>
+                        <circle r="4.5" fill={packetColor} filter="url(#glow)">
                           <animateMotion
-                            dur={`${Math.max(0.4, 1.7 - activeRpsOnEdge * 0.04)}s`}
+                            dur={`${animDuration}s`}
                             repeatCount="indefinite"
-                            path={pathData}
+                            path={pathD}
                           />
                         </circle>
-                        <circle r="4" fill={packetColor} opacity="0.75">
+                        <circle r="3.5" fill={packetColor} opacity="0.8" filter="url(#glow)">
                           <animateMotion
-                            dur={`${Math.max(0.4, 1.7 - activeRpsOnEdge * 0.04)}s`}
-                            begin="0.45s"
+                            dur={`${animDuration * 1.15}s`}
+                            begin="0.25s"
                             repeatCount="indefinite"
-                            path={pathData}
+                            path={pathD}
                           />
                         </circle>
                       </>
                     )}
+
+                    {/* RPS Flow Label on Wire */}
                     <g
                       transform={`translate(${(x1 + x2) / 2}, ${(y1 + y2) / 2 - 8})`}
-                      className="cursor-pointer group"
-                      onClick={e => {
+                      className="cursor-pointer group/label"
+                      onClick={(e) => {
                         e.stopPropagation();
                         setEdges(prev => prev.filter(ed => ed.id !== edge.id));
                       }}
                     >
-                      <rect x="-28" y="-10" width="56" height="18" rx="6" fill="#0f172a" stroke="#334155" />
-                      <text textAnchor="middle" y="2" className="text-[9px] fill-slate-300 font-bold group-hover:fill-red-400">
-                        {activeRpsOnEdge > 0.1 ? `${Math.round(activeRpsOnEdge)}/s ✕` : 'wire ✕'}
+                      <rect
+                        x="-28"
+                        y="-10"
+                        width="56"
+                        height="18"
+                        rx="6"
+                        fill="#0f172a"
+                        stroke="#334155"
+                        strokeWidth="1"
+                        className="group-hover/label:stroke-rose-500 group-hover/label:fill-rose-950/80 transition-colors"
+                      />
+                      <text
+                        textAnchor="middle"
+                        y="2"
+                        fill="#94a3b8"
+                        fontSize="9"
+                        fontWeight="bold"
+                        className="group-hover/label:fill-rose-300 select-none"
+                      >
+                        {activeRpsOnEdge > 0.1
+                          ? activeRpsOnEdge >= 1000
+                            ? `${(activeRpsOnEdge / 1000).toFixed(1)}k/s`
+                            : `${Math.round(activeRpsOnEdge)}/s`
+                          : 'wire ✕'}
                       </text>
                     </g>
                   </g>
                 );
               })}
+            </svg>
 
-              {/* Nodes */}
+            {/* INFRASTRUCTURE NODES ON CANVAS */}
+            <div className="absolute inset-0 pointer-events-none">
               {nodes.map(node => {
                 const spec = SERVICE_CATALOG[node.type];
                 const isSelected = selectedNodeId === node.id;
@@ -1359,157 +1638,203 @@ An original interactive System Design & Cloud Architecture game built with React
                     ? 40
                     : Math.min(100, Math.round(((node.handledRps || 0) / maxCap) * 100));
 
+                let statusColor = 'border-slate-700/90 hover:border-slate-500';
+                if (node.dropReason || node.health < 25) {
+                  statusColor = 'border-rose-600 ring-2 ring-rose-600/50 animate-pulse';
+                } else if (loadPct > 90) {
+                  statusColor = 'border-rose-500 ring-2 ring-rose-500/40';
+                } else if (loadPct > 70) {
+                  statusColor = 'border-amber-500';
+                } else if (isSelected) {
+                  statusColor = 'border-indigo-400 ring-2 ring-indigo-500/30';
+                }
+
                 return (
-                  <foreignObject
+                  <div
                     key={node.id}
-                    x={node.x}
-                    y={node.y}
-                    width="162"
-                    height="104"
-                    className="overflow-visible"
+                    style={{ left: node.x, top: node.y, width: 176 }}
+                    onMouseDown={(e) => handleMouseDownNode(node.id, e)}
+                    onClick={(e) => handleNodeClick(node.id, e)}
+                    className={`no-pan pointer-events-auto absolute z-20 bg-slate-900/95 backdrop-blur rounded-xl border ${statusColor} p-2.5 shadow-xl transition-shadow cursor-grab active:cursor-grabbing`}
                   >
-                    <div
-                      onMouseDown={e => handleMouseDownNode(node.id, e)}
-                      onClick={e => handleNodeClick(node.id, e)}
-                      className={`w-[156px] rounded-2xl p-2.5 bg-slate-900/95 border-2 transition-all shadow-xl cursor-grab active:cursor-grabbing ${isConnectingSource
-                        ? 'border-amber-400 ring-4 ring-amber-400/30'
-                        : isSelected
-                          ? 'border-indigo-400 ring-2 ring-indigo-500/30'
-                          : node.dropReason
-                            ? 'border-red-500 animate-pulse'
-                            : 'border-slate-700/90 hover:border-slate-500'
+                    {/* Left Input Port */}
+                    {node.id !== 'src' && (
+                      <button
+                        onClick={(e) => handlePortClick(e, node.id, 'in')}
+                        title="Input Port (Click to finish wire connection)"
+                        className={`w-4 h-4 rounded-full border-2 absolute -left-2 top-10 transition-transform hover:scale-125 z-10 ${
+                          connectingFromId && connectingFromId !== node.id
+                            ? 'bg-amber-400 border-white scale-125 animate-bounce'
+                            : 'bg-slate-800 border-slate-400 hover:border-indigo-400'
                         }`}
-                    >
-                      <div className="flex items-center justify-between gap-1">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <span className="text-base">{spec.emoji}</span>
-                          <span className="text-[11px] font-extrabold text-white truncate">
-                            {kidFriendlyMode ? spec.kidName.replace(/^[^\s]+\s/, '') : spec.proName}
-                          </span>
-                        </div>
-                        {node.type !== 'INTERNET' && (
-                          <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">
-                            T{node.tier}
-                          </span>
-                        )}
-                      </div>
+                      />
+                    )}
 
-                      {node.type !== 'INTERNET' ? (
-                        <div className="mt-1.5 space-y-1">
-                          <div className="flex justify-between text-[9px] text-slate-400 font-semibold">
-                            <span>{Math.round(node.handledRps || 0)}/{maxCap} rps</span>
-                            <span className="text-cyan-300">{node.nodeLatency || spec.baseLatencyMs}ms</span>
-                            <span className={node.health < 45 ? 'text-red-400 font-bold' : 'text-emerald-400'}>
-                              {Math.round(node.health)}%
-                            </span>
-                          </div>
-                          <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full transition-all ${loadPct > 90 ? 'bg-red-500' : loadPct > 70 ? 'bg-amber-400' : 'bg-cyan-400'
-                                }`}
-                              style={{ width: `${loadPct}%` }}
-                            />
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="mt-1.5 text-[10px] text-emerald-300 font-bold">
-                          Ingress: {gameMode === 'CAMPAIGN' ? currentLevel.baseRps : customRps} req/sec
-                        </div>
-                      )}
+                    {/* Right Output Port */}
+                    <button
+                      onClick={(e) => handlePortClick(e, node.id, 'out')}
+                      title="Output Port (Click to start drawing wire)"
+                      className={`w-4 h-4 rounded-full border-2 absolute -right-2 top-10 transition-transform hover:scale-125 z-10 ${
+                        isConnectingSource
+                          ? 'bg-indigo-400 border-white scale-125'
+                          : 'bg-indigo-600 border-slate-200 hover:bg-indigo-400'
+                      }`}
+                    />
 
-                      <div className="mt-2 flex items-center justify-between gap-1">
-                        <button
-                          onClick={e => {
-                            e.stopPropagation();
-                            setConnectingFromId(connectingFromId === node.id ? null : node.id);
-                          }}
-                          className={`flex-1 py-0.5 px-1.5 rounded text-[9px] font-bold border transition-all ${isConnectingSource
-                            ? 'bg-amber-400 text-slate-950 border-amber-300'
-                            : 'bg-slate-800 hover:bg-indigo-600 text-slate-200 border-slate-700'
-                            }`}
+                    {/* Node Header */}
+                    <div className="flex items-center justify-between gap-1.5">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div
+                          className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 shadow text-base"
+                          style={{ backgroundColor: `${spec.color}25`, border: `1px solid ${spec.color}60` }}
                         >
-                          {isConnectingSource ? '📍 Target' : '🔗 Wire'}
-                        </button>
-                        {node.type !== 'INTERNET' && node.health < 90 && (
-                          <button
-                            onClick={e => {
-                              e.stopPropagation();
-                              handleRepairNode(node.id);
-                            }}
-                            className="py-0.5 px-1.5 rounded text-[9px] font-bold bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-300 border border-emerald-500/40"
-                          >
-                            🔧 Fix
-                          </button>
-                        )}
+                          {spec.emoji}
+                        </div>
+                        <div className="truncate">
+                          <div className="text-xs font-bold text-white truncate">
+                            {kidFriendlyMode ? spec.kidName.replace(/^[^\s]+\s/, '') : spec.proName}
+                          </div>
+                          <div className="text-[10px] text-slate-400">
+                            {node.type === 'INTERNET' ? 'Traffic Source' : `$${spec.cost} • T${node.tier}`}
+                          </div>
+                        </div>
                       </div>
+
+                      {node.id !== 'src' && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteNode(node.id);
+                          }}
+                          className="text-slate-500 hover:text-rose-400 p-0.5 transition"
+                          title="Remove Node"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
-                  </foreignObject>
+
+                    {/* Live Node Metrics Footer */}
+                    {node.type !== 'INTERNET' ? (
+                      <div className="mt-2 pt-1.5 border-t border-slate-800/90 space-y-1">
+                        <div className="flex items-center justify-between text-[10px]">
+                          <span className="text-slate-400">
+                            {Math.round(node.handledRps || 0)}/{maxCap} rps
+                          </span>
+                          <span
+                            className={`font-semibold ${
+                              loadPct > 90
+                                ? 'text-rose-400'
+                                : loadPct > 70
+                                ? 'text-amber-400'
+                                : 'text-emerald-400'
+                            }`}
+                          >
+                            {loadPct}% Load
+                          </span>
+                        </div>
+
+                        <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full transition-all duration-200 ${
+                              loadPct > 90
+                                ? 'bg-rose-500'
+                                : loadPct > 70
+                                ? 'bg-amber-400'
+                                : 'bg-emerald-500'
+                            }`}
+                            style={{ width: `${Math.min(100, loadPct)}%` }}
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between text-[9px] pt-0.5">
+                          <span className="text-cyan-300 font-mono">
+                            {node.nodeLatency || spec.baseLatencyMs}ms
+                          </span>
+                          <span className={node.health < 45 ? 'text-red-400 font-bold' : 'text-emerald-400 font-semibold'}>
+                            {Math.round(node.health)}% HP
+                          </span>
+                          {node.health < 90 && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRepairNode(node.id);
+                              }}
+                              className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-300 border border-emerald-500/40"
+                            >
+                              🔧 Fix
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mt-2 pt-1.5 border-t border-slate-800/90 text-[10px] text-emerald-400 font-bold">
+                        Ingress: {gameMode === 'CAMPAIGN' ? currentLevel.baseRps : customRps} req/sec
+                      </div>
+                    )}
+                  </div>
                 );
               })}
 
               {/* Floating Failure Badges */}
               {failureBadges.map((b, i) => (
-                <foreignObject
+                <div
                   key={`${b.nodeId}_${i}`}
-                  x={Math.max(10, b.x - 10)}
-                  y={Math.max(5, b.y - 32)}
-                  width="205"
-                  height="30"
+                  style={{ left: Math.max(10, b.x - 10), top: Math.max(5, b.y - 32) }}
+                  className="no-pan pointer-events-none absolute z-30 px-2 py-0.5 rounded-lg bg-red-600/95 text-white text-[10px] font-extrabold shadow-lg border border-red-300 truncate animate-bounce"
                 >
-                  <div className="px-2 py-0.5 rounded-lg bg-red-600/95 text-white text-[10px] font-extrabold shadow-lg border border-red-300 truncate animate-bounce">
-                    {b.text}
-                  </div>
-                </foreignObject>
+                  {b.text}
+                </div>
               ))}
-            </svg>
+            </div>
+          </div>
 
-            {/* Win / Loss Post-Mortem Overlay with 1-to-3 Star Grading */}
-            {levelStatus !== 'PLAYING' && (
-              <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-6 z-30">
-                <div className="max-w-md w-full bg-slate-900 border-2 border-indigo-500/50 rounded-3xl p-6 text-center shadow-2xl">
-                  <div className="text-4xl mb-2">
-                    {levelStatus === 'WON' ? '⭐'.repeat(earnedStars) : '💥🚒'}
-                  </div>
-                  <h2 className="text-xl font-extrabold text-white">
-                    {levelStatus === 'WON' ? `SLA Passed (${earnedStars}/3 Stars)!` : 'SLA Breached (System Outage)'}
-                  </h2>
-                  <p className="text-xs text-slate-300 mt-2 leading-relaxed">{coachMessage.text}</p>
+          {/* Win / Loss Post-Mortem Overlay with 1-to-3 Star Grading */}
+          {levelStatus !== 'PLAYING' && (
+            <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-6 z-40">
+              <div className="max-w-md w-full bg-slate-900 border-2 border-indigo-500/50 rounded-3xl p-6 text-center shadow-2xl">
+                <div className="text-4xl mb-2">
+                  {levelStatus === 'WON' ? '⭐'.repeat(earnedStars) : '💥🚒'}
+                </div>
+                <h2 className="text-xl font-extrabold text-white">
+                  {levelStatus === 'WON' ? `SLA Passed (${earnedStars}/3 Stars)!` : 'SLA Breached (System Outage)'}
+                </h2>
+                <p className="text-xs text-slate-300 mt-2 leading-relaxed">{coachMessage.text}</p>
 
-                  {gameMode === 'CAMPAIGN' && (
-                    <div className="mt-4 p-3 rounded-2xl bg-indigo-950/60 border border-indigo-500/30 text-left text-xs">
-                      <div className="font-bold text-indigo-300 mb-1">
-                        🎓 Key Takeaway ({currentLevel.concept}):
-                      </div>
-                      <p className="text-slate-300">{currentLevel.schoolAnalogy}</p>
+                {gameMode === 'CAMPAIGN' && (
+                  <div className="mt-4 p-3 rounded-2xl bg-indigo-950/60 border border-indigo-500/30 text-left text-xs">
+                    <div className="font-bold text-indigo-300 mb-1">
+                      🎓 Key Takeaway ({currentLevel.concept}):
                     </div>
-                  )}
-
-                  <div className="mt-5 flex items-center justify-center gap-3">
-                    <button
-                      onClick={() => loadScenario(gameMode, currentLevelIdx)}
-                      className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs"
-                    >
-                      🔄 Replay
-                    </button>
-                    {levelStatus === 'WON' &&
-                      gameMode === 'CAMPAIGN' &&
-                      currentLevelIdx < CAMPAIGN_LEVELS.length - 1 && (
-                        <button
-                          onClick={() => {
-                            const next = currentLevelIdx + 1;
-                            setCurrentLevelIdx(next);
-                            loadScenario('CAMPAIGN', next);
-                          }}
-                          className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold text-xs shadow-lg"
-                        >
-                          Next Level ➡️
-                        </button>
-                      )}
+                    <p className="text-slate-300">{currentLevel.schoolAnalogy}</p>
                   </div>
+                )}
+
+                <div className="mt-5 flex items-center justify-center gap-3">
+                  <button
+                    onClick={() => loadScenario(gameMode, currentLevelIdx)}
+                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs"
+                  >
+                    🔄 Replay
+                  </button>
+                  {levelStatus === 'WON' &&
+                    gameMode === 'CAMPAIGN' &&
+                    currentLevelIdx < CAMPAIGN_LEVELS.length - 1 && (
+                      <button
+                        onClick={() => {
+                          const next = currentLevelIdx + 1;
+                          setCurrentLevelIdx(next);
+                          loadScenario('CAMPAIGN', next);
+                        }}
+                        className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold text-xs shadow-lg"
+                      >
+                        Next Level ➡️
+                      </button>
+                    )}
                 </div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </main>
 
         {/* RIGHT COLUMN: COMPONENT INSPECTOR & ROUTING GUIDE (3 Cols) */}
