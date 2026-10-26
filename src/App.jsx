@@ -878,14 +878,26 @@ export default function App() {
     return { READ: 0.40, WRITE: 0.25, STATIC: 0.15, SEARCH: 0.10, BOT: 0.05, AI_PROMPT: 0.05 };
   }, [gameMode, currentLevel, survivalWave]);
 
+  const [idleTick, setIdleTick] = useState(0);
+
+  // Subtle heartbeat timer for natural baseline traffic variation
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setIdleTick((t) => (t + 1) % 100);
+    }, 1200);
+    return () => clearInterval(timer);
+  }, []);
+
   const currentLiveRps = useMemo(() => {
     if (!isRunning && waveProgress === 0) {
-      return Math.round(targetPeakRps * 0.35); // Standby preview load
+      // Real-time active baseline load with natural user traffic fluctuation
+      const baseJitter = 1 + Math.sin(idleTick * 0.45) * 0.03;
+      return Math.round(targetPeakRps * 0.38 * baseJitter);
     }
     const rampFactor = 0.25 + 0.75 * Math.min(1, waveProgress / 75);
     const jitter = isRunning ? 1 + Math.sin(waveProgress * 0.4) * 0.03 : 1;
     return Math.round(targetPeakRps * rampFactor * jitter);
-  }, [isRunning, waveProgress, targetPeakRps]);
+  }, [isRunning, waveProgress, targetPeakRps, idleTick]);
 
   const currentMaxBudget = gameMode === 'CAMPAIGN' ? currentLevel.maxBudgetHr : null;
 
@@ -1229,8 +1241,14 @@ export default function App() {
         <div className="flex items-center gap-2.5 flex-wrap">
           {/* RPS Counter */}
           <div className="bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-xl flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-xs text-slate-400">Load:</span>
+            <span
+              className={`w-2 h-2 rounded-full ${
+                isRunning ? 'bg-amber-400 animate-ping' : 'bg-emerald-400 animate-pulse'
+              }`}
+            />
+            <span className="text-xs text-slate-400">
+              {isRunning ? 'Wave Surge:' : 'Active Users:'}
+            </span>
             <span className="text-xs font-mono font-bold text-white">{currentLiveRps.toLocaleString()} RPS</span>
           </div>
 
@@ -1289,7 +1307,7 @@ export default function App() {
               }`}
             >
               {isRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-              {isRunning ? 'Pause' : 'Start Wave'}
+              {isRunning ? 'Pause Wave' : 'Simulate Peak Wave'}
             </button>
             <button
               onClick={() => setSimSpeed(simSpeed === 1 ? 2 : simSpeed === 2 ? 5 : 1)}
@@ -1609,9 +1627,10 @@ export default function App() {
                 const pathD = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
 
                 const flow = evaluation.edgeFlows[edge.id] || { flowRps: 0, dominantType: 'READ' };
-                const hasTraffic = isRunning && flow.flowRps > 0.1;
+                // Active users flow continuously through the network even before manual wave launch
+                const hasTraffic = flow.flowRps > 0.1;
                 const packetColor = TRAFFIC_TYPES[flow.dominantType]?.color || '#38bdf8';
-                const animDuration = Math.max(0.45, 2.0 - Math.min(1.5, flow.flowRps / 3000));
+                const animDuration = Math.max(0.55, 2.4 - Math.min(1.8, flow.flowRps / 2500));
 
                 return (
                   <g key={edge.id} className="pointer-events-auto group">
@@ -1632,19 +1651,55 @@ export default function App() {
                     <path
                       d={pathD}
                       fill="none"
-                      stroke={hasTraffic ? '#475569' : '#1e293b'}
-                      strokeWidth={hasTraffic ? 3 : 2}
+                      stroke={hasTraffic ? (isRunning ? '#64748b' : '#334155') : '#1e293b'}
+                      strokeWidth={hasTraffic ? (isRunning ? 3 : 2.5) : 2}
                       className="group-hover:stroke-rose-500 transition-colors"
                     />
 
-                    {/* Animated Glow Packets */}
+                    {/* Flowing Data Stream Line */}
+                    {hasTraffic && (
+                      <path
+                        d={pathD}
+                        fill="none"
+                        stroke={packetColor}
+                        strokeWidth={isRunning ? 2.5 : 1.5}
+                        strokeOpacity={isRunning ? 0.45 : 0.28}
+                        strokeDasharray="6 8"
+                      >
+                        <animate
+                          attributeName="stroke-dashoffset"
+                          from="14"
+                          to="0"
+                          dur={`${animDuration}s`}
+                          repeatCount="indefinite"
+                        />
+                      </path>
+                    )}
+
+                    {/* Animated Active Packets (Continuously flowing for active users) */}
                     {hasTraffic && (
                       <>
-                        <circle r="4.5" fill={packetColor} filter="url(#glow)">
+                        {/* Packet 1 */}
+                        <circle r={isRunning ? 4.5 : 3.5} fill={packetColor} filter="url(#glow)">
                           <animateMotion dur={`${animDuration}s`} repeatCount="indefinite" path={pathD} />
                         </circle>
-                        <circle r="3.5" fill={packetColor} opacity="0.8" filter="url(#glow)">
-                          <animateMotion dur={`${animDuration * 1.15}s`} begin="0.25s" repeatCount="indefinite" path={pathD} />
+                        {/* Packet 2 */}
+                        <circle r={isRunning ? 4 : 3} fill={packetColor} opacity="0.85" filter="url(#glow)">
+                          <animateMotion
+                            dur={`${animDuration}s`}
+                            begin={`${(animDuration * 0.33).toFixed(2)}s`}
+                            repeatCount="indefinite"
+                            path={pathD}
+                          />
+                        </circle>
+                        {/* Packet 3 */}
+                        <circle r={isRunning ? 3.5 : 2.5} fill={packetColor} opacity="0.7" filter="url(#glow)">
+                          <animateMotion
+                            dur={`${animDuration}s`}
+                            begin={`${(animDuration * 0.66).toFixed(2)}s`}
+                            repeatCount="indefinite"
+                            path={pathD}
+                          />
                         </circle>
                       </>
                     )}
@@ -1665,14 +1720,15 @@ export default function App() {
                         height="18"
                         rx="6"
                         fill="#0f172a"
-                        stroke="#334155"
+                        stroke={hasTraffic ? packetColor : '#334155'}
                         strokeWidth="1"
+                        strokeOpacity={hasTraffic ? 0.75 : 1}
                         className="group-hover/label:stroke-rose-500 group-hover/label:fill-rose-950/80 transition-colors"
                       />
                       <text
                         textAnchor="middle"
                         y="2"
-                        fill="#94a3b8"
+                        fill={hasTraffic ? '#f8fafc' : '#94a3b8'}
                         fontSize="9"
                         fontWeight="bold"
                         className="group-hover/label:fill-rose-300 select-none"
