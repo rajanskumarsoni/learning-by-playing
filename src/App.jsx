@@ -834,7 +834,7 @@ export default function App() {
   // Progressive Level Unlocking State (Persisted in localStorage)
   const [unlockedLevelIdx, setUnlockedLevelIdx] = useState(() => {
     try {
-      const saved = localStorage.getItem('archquest_unlocked_level');
+      const saved = localStorage.getItem('systemsaviour_unlocked_level') || localStorage.getItem('archquest_unlocked_level');
       return saved !== null ? Math.min(CAMPAIGN_LEVELS.length - 1, Math.max(0, parseInt(saved, 10))) : 0;
     } catch (e) {
       return 0;
@@ -1067,6 +1067,7 @@ export default function App() {
               setUnlockedLevelIdx((prev) => {
                 const updated = Math.min(CAMPAIGN_LEVELS.length - 1, Math.max(prev, currentLevelIdx + 1));
                 try {
+                  localStorage.setItem('systemsaviour_unlocked_level', updated.toString());
                   localStorage.setItem('archquest_unlocked_level', updated.toString());
                 } catch (e) {}
                 return updated;
@@ -1304,7 +1305,7 @@ export default function App() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="font-extrabold text-sm tracking-tight text-white">
-                ArchQuest <span className="text-indigo-400">Simulator</span>
+                System Saviour <span className="text-indigo-400">Simulator</span>
               </h1>
               <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
                 Cloud Architect
@@ -1488,7 +1489,7 @@ export default function App() {
           <button
             onClick={() => setShowWelcomeModal(true)}
             className="px-2.5 py-1.5 rounded-xl bg-indigo-950/70 border border-indigo-500/40 hover:bg-indigo-900 text-xs text-indigo-300 flex items-center gap-1.5 transition shadow-sm"
-            title="Learn what you get from playing ArchQuest and how game modes work"
+            title="Learn what you get from playing System Saviour and how game modes work"
           >
             <BookOpen className="w-3.5 h-3.5 text-indigo-400" />
             <span className="hidden sm:inline">Guide</span>
@@ -2665,7 +2666,7 @@ export default function App() {
               <div>
                 <div className="flex items-center gap-2">
                   <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                    Welcome to ArchQuest
+                    Welcome to System Saviour
                   </h2>
                   <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">
                     Simulator

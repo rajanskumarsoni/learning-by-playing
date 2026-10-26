@@ -1,4 +1,4 @@
-# ArchQuest: Interactive System Design Simulator
+# System Saviour: Interactive System Design Simulator
 
 Learn distributed systems and cloud architecture by playing an interactive wave-defense simulation game!
 
