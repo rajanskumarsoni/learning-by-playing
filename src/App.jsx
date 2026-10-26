@@ -72,7 +72,12 @@ const COMPONENT_CATALOG = {
     baseLatency: 5,
     description: 'Client traffic ingress generating live request streams.',
     isRemovable: false,
-    beginnerTip: 'The front door of your cloud! All user requests enter here.'
+    beginnerTip: 'The front door of your cloud! All user requests enter here.',
+    analogyTitle: 'The Stadium Turnstiles',
+    analogyStory: 'Think of Internet Ingress like the front gates and ticket turnstiles of a 100,000-seat stadium. Fans (requests) arrive from everywhere across the city. Without proper gates, crowds crush into an uncontrollable bottleneck.',
+    caseStudyCompany: 'Cloudflare & Akamai',
+    caseStudyStory: 'Global Anycast DNS networks route billions of users to the nearest physical data center (PoP) in over 300 cities worldwide, terminating TLS handshake connections in single-digit milliseconds before forwarding traffic to origin servers.',
+    architectureTips: 'Always placed as the origin source. Cannot be removed. Connect downstream to WAF, CDN, or Load Balancer.'
   },
   WAF: {
     type: 'WAF',
@@ -86,6 +91,11 @@ const COMPONENT_CATALOG = {
     baseLatency: 4,
     description: 'Inspects L7 traffic. Filters 98% of malicious DDoS bots and rate-limits abusive spikes.',
     beginnerTip: 'Like the security bouncer at the gate checking IDs to keep pranksters and attackers out.',
+    analogyTitle: 'The Nightclub Bouncer with a Metal Detector',
+    analogyStory: 'Imagine an exclusive club where anyone can knock. Without a bouncer, rival mobs, pranksters with airhorns, and ticket scalpers flood the dance floor. The WAF checks every incoming request against a blacklist of bad behavior and turns malicious traffic away immediately.',
+    caseStudyCompany: 'Cloudflare / AWS WAF',
+    caseStudyStory: 'In 2022, Cloudflare mitigated a record-breaking 26 million request-per-second HTTPS DDoS attack targeting a customer portal. By terminating malicious IP swarms at the edge, the customer origin servers experienced zero load increase.',
+    architectureTips: 'Position immediately after Internet Ingress (Source -> WAF). Blocking bad packets early prevents expensive CPU and database saturation downstream.',
     configOptions: {
       mode: { label: 'Protection Shield', values: ['Standard Rate Limit', 'AI Deep Inspection (+40% Cost)'], costMult: [1, 1.4] }
     }
@@ -102,6 +112,11 @@ const COMPONENT_CATALOG = {
     baseLatency: 6,
     description: 'Edge cache terminating 95% of Static Media and 65-80% of Read requests at ultra-low 6ms latency.',
     beginnerTip: 'Like posting popular flyers on the school bulletin board so everyone does not have to ask the office.',
+    analogyTitle: 'The Neighborhood Convenience Store (7-Eleven)',
+    analogyStory: 'Instead of driving 40 miles to a distant dairy farm every time you want a carton of milk, your neighborhood 7-Eleven keeps milk in stock right down your street. A CDN places copies of images, CSS, and read queries in local edge caches right next to your users.',
+    caseStudyCompany: 'Netflix Open Connect',
+    caseStudyStory: 'Netflix built Open Connect, deploying custom storage appliances directly inside thousands of local Internet Service Providers (ISPs) worldwide. When you watch a movie, 100% of video bits stream from an ISP box down your street, completely bypassing transatlantic transit cables.',
+    architectureTips: 'Place between Internet Ingress and your Load Balancer. Handles 95% of static assets and up to 80% of read queries at sub-10ms response times.',
     configOptions: {
       hitRatio: { label: 'Edge Cache Policy', values: ['Standard (65% Read Hit)', 'Aggressive Edge (80% Read Hit)'], hitRate: [0.65, 0.80], costMult: [1, 1.35] }
     }
@@ -118,6 +133,11 @@ const COMPONENT_CATALOG = {
     baseLatency: 5,
     description: 'Distributes traffic evenly across downstream compute servers with health checks.',
     beginnerTip: 'Like a smart traffic cop directing cars into multiple lanes so no single lane jams up.',
+    analogyTitle: 'The Airport Security Line Coordinator',
+    analogyStory: 'When 2,000 travelers arrive at an airport security checkpoint, a queuing marshal directs travelers to whichever metal detector line is currently shortest. If one screener takes a lunch break, the coordinator routes travelers to the other screening lanes.',
+    caseStudyCompany: 'Uber Reverse Proxy & Envoy Mesh',
+    caseStudyStory: 'Uber processes millions of rider/driver GPS heartbeats per second using Envoy load balancers. If a microservice pod crashes in AWS us-east-1, the load balancer removes it in under 200 milliseconds, routing traffic to healthy instances without dropping rides.',
+    architectureTips: 'Position upstream of API/Web Servers. Essential for horizontal scaling and high availability—wiring 2+ servers behind an LB eliminates single points of failure (SPOF).',
     configOptions: {
       algorithm: { label: 'Routing Algorithm', values: ['Round Robin (1x)', 'Least Connections (+10% Cost)'], costMult: [1, 1.1] }
     }
@@ -134,6 +154,11 @@ const COMPONENT_CATALOG = {
     baseLatency: 18,
     description: 'Stateless compute instances running business logic and routing downstream queries.',
     beginnerTip: 'The waiters in a restaurant taking customer orders and communicating with the kitchen.',
+    analogyTitle: 'The Restaurant Waitstaff',
+    analogyStory: 'Waiters do not cook the steaks (databases do that) and they do not store the ingredients (storages do that). They greet diners, parse menu orders, calculate bills, and pass requests to the kitchen. When dining rooms get packed, you hire more waiters.',
+    caseStudyCompany: 'Discord Kubernetes Fleet',
+    caseStudyStory: 'Discord runs stateless Elixir & Rust microservices across tens of thousands of container pods. Because the web servers store zero session state in local memory, Discord can scale from 5,000 to 20,000 pods dynamically during global gaming spikes.',
+    architectureTips: 'Keep servers stateless. Never store session files on local disks. Connect downstream to Caches, Databases, Queues, and Search clusters.',
     configOptions: {
       tier: { label: 'Instance Size', values: ['t3.medium (1x)', 'c6i.xlarge (2.5x)', 'c6i.4xlarge (5x)'], capMult: [1, 2.5, 5], costMult: [1, 2.1, 4.0] }
     }
@@ -150,6 +175,11 @@ const COMPONENT_CATALOG = {
     baseLatency: 3,
     description: 'In-memory key-value store. Absorbs 75-88% of database Read queries in 3ms.',
     beginnerTip: 'Writing answers on sticky notes on your desk so you answer instantly without opening the encyclopedia.',
+    analogyTitle: 'The Sticky Note on Your Computer Monitor',
+    analogyStory: 'If your coworker asks you for the office WiFi password 30 times a day, you do not unlock the heavy filing cabinet in the basement every time. You jot the password on a sticky note attached to your monitor for an instant 1-second answer.',
+    caseStudyCompany: 'Twitter / X Home Timeline Cache',
+    caseStudyStory: 'When 200 million users refresh their Twitter feeds, querying relational SQL tables would cause immediate disk collapse. Twitter stores serialized timeline IDs directly in Redis RAM clusters, serving 99% of read requests in under 4ms.',
+    architectureTips: 'Place between Web Servers and PostgreSQL (Web -> Cache -> SQL). Absorbs 75-88% of read load, shielding slow disks from read saturation.',
     configOptions: {
       eviction: { label: 'Cache Strategy', values: ['Standard LRU (75% Hit)', 'Semantic + LRU (88% Hit)'], hitRate: [0.75, 0.88], costMult: [1, 1.5] }
     }
@@ -166,6 +196,11 @@ const COMPONENT_CATALOG = {
     baseLatency: 8,
     description: 'Decouples heavy Write bursts! Buffers write spikes by 65% for downstream workers.',
     beginnerTip: 'A numbered ticket dispenser at a busy bakery so customers form an orderly line instead of mobbing the counter.',
+    analogyTitle: 'The Delicatessen Numbered Ticket Dispenser',
+    analogyStory: 'When 100 hungry shoppers enter a deli at lunchtime, having them all scream their sandwich orders at the lone chef causes total chaos and dropped orders. Instead, each customer takes a numbered ticket and waits calmly while the chef prepares orders in sequence.',
+    caseStudyCompany: 'LinkedIn & Uber Event Streams',
+    caseStudyStory: 'LinkedIn invented Apache Kafka to handle hundreds of billions of user clicks and analytics events per day. During massive traffic spikes, write events are safely written to sequential commit logs in milliseconds, allowing backend processors to catch up without data loss.',
+    architectureTips: 'Place between Web Servers and Async Workers / Databases for heavy write workflows (checkouts, reservations, analytics). Prevents write spikes from locking relational tables.',
     configOptions: {
       partitions: { label: 'Broker Partitions', values: ['8 Partitions (1x)', '32 Partitions (2x)'], capMult: [1, 2], costMult: [1, 1.55] }
     }
@@ -182,6 +217,11 @@ const COMPONENT_CATALOG = {
     baseLatency: 15,
     description: 'Consumes jobs from Kafka Queue and writes batches asynchronously to the database.',
     beginnerTip: 'Chefs working quietly in the background processing tickets from the order rack.',
+    analogyTitle: 'The Kitchen Prep Cook Team',
+    analogyStory: 'While the front counter clerks greet visitors, the prep cooks in the back focus 100% on chopping vegetables and baking bread in batches. They do not talk to diners; they pull orders from the carousel rack and finish them efficiently.',
+    caseStudyCompany: 'Shopify Flash Sale Batching',
+    caseStudyStory: 'During Black Friday, Shopify processes over $3.3 billion in merchant orders. Background worker pools consume order messages from queues, running fraud checks, inventory adjustments, and email dispatches asynchronously without blocking the user checkout button.',
+    architectureTips: 'Place downstream of Kafka Message Queue and upstream of SQL Database (Queue -> Worker -> SQL).',
     configOptions: {
       tier: { label: 'Worker Concurrency', values: ['4 Workers (1x)', '12 Workers (2.5x)'], capMult: [1, 2.5], costMult: [1, 2.0] }
     }
@@ -198,6 +238,11 @@ const COMPONENT_CATALOG = {
     baseLatency: 28,
     description: 'ACID relational primary database for state persistence. Heavy uncached reads saturate disk I/O.',
     beginnerTip: 'The master hardbound record notebook. Guaranteed not to lose entries, but gets crowded if everyone writes at once.',
+    analogyTitle: 'The County Deeds & Land Title Registry',
+    analogyStory: 'The city land registry holds the official deed to every home. It is guarded in a fireproof vault with strict legal verification (ACID guarantees). You can never erase or double-sell land, but getting a document notarized takes deliberate paperwork and time.',
+    caseStudyCompany: 'Stripe Primary Ledger',
+    caseStudyStory: 'Stripe processes hundreds of billions of dollars using PostgreSQL. To ensure not a single penny is duplicated or vanished, they rely on strict ACID transactions and Write-Ahead Logging (WAL), utilizing read replicas and partition sharding as transaction volumes scale.',
+    architectureTips: 'The single source of truth for persistent data. Protect it from read saturation with Redis and from write stampedes with Kafka.',
     configOptions: {
       scaling: {
         label: 'Topology Mode',
@@ -220,6 +265,11 @@ const COMPONENT_CATALOG = {
     baseLatency: 12,
     description: 'Inverted-index search cluster optimized for fuzzy full-text queries at 12ms.',
     beginnerTip: 'The alphabetized index at the back of a library book, finding topics 10x faster than reading every page.',
+    analogyTitle: 'The Back-of-the-Book Subject Index',
+    analogyStory: 'If you want to find every mention of "photosynthesis" in an 800-page biology textbook, reading every page from page 1 takes 4 hours. Flipping to the alphabetical index in the back tells you "Pages 42, 118, 203" in 2 seconds flat.',
+    caseStudyCompany: 'Wikipedia & GitHub Code Search',
+    caseStudyStory: 'Wikipedia handles billions of monthly search queries across 60+ million articles using Elasticsearch. Inverted indexes tokenize every word into memory shards, returning relevant articles sorted by BM25 relevance in under 15 milliseconds.',
+    architectureTips: 'Connect downstream from Web Servers. Offloads expensive fuzzy and text search queries from your primary relational database.',
     configOptions: {
       shards: { label: 'Index Sharding', values: ['2 Shards (1x)', '6 Shards + Replica (2.5x)'], capMult: [1, 2.5], costMult: [1, 1.8] }
     }
@@ -236,6 +286,11 @@ const COMPONENT_CATALOG = {
     baseLatency: 22,
     description: 'Cost-effective blob vault for static media and uploads that bypass edge CDN.',
     beginnerTip: 'The school basement warehouse storing all old yearbooks and large video recordings.',
+    analogyTitle: 'The Shipping Container Storage Yard',
+    analogyStory: 'Storing giant boxes of seasonal clothing and old furniture in your expensive downtown living room wastes money. You put them in an inexpensive, secure shipping container depot out of town. When you need a box, you drive over and fetch it.',
+    caseStudyCompany: 'Airbnb Photo Vault on Amazon S3',
+    caseStudyStory: 'Airbnb hosts upload millions of high-resolution house photos. Storing these on high-performance database SSDs would cost millions of dollars a month. Storing them on S3 object storage provides 99.999999999% (11 9s) durability at 1/10th the cost of database disks.',
+    architectureTips: 'Connect to Web Servers or CDN for blob uploads, static files, and media archives. Cheap, durable, and highly available.',
     configOptions: {
       redundancy: { label: 'Storage Tier', values: ['Standard S3 (1x)', 'Multi-AZ Replicated (1.8x)'], capMult: [1, 1.8], costMult: [1, 1.4] }
     }
@@ -252,6 +307,11 @@ const COMPONENT_CATALOG = {
     baseLatency: 38,
     description: 'High-throughput embeddings and GPU LLM token generation for AI search queries.',
     beginnerTip: 'The high-tech AI robotics lab answering complex student questions.',
+    analogyTitle: 'The University Think Tank Research Professor',
+    analogyStory: 'While a clerk can stamp a parking pass in 2 seconds, an Oxford research professor synthesizing cross-disciplinary answers to complex questions needs intense focus and specialized brainpower. GPU nodes are the deep-thinking professors of your cloud.',
+    caseStudyCompany: 'Perplexity & ChatGPT RAG Architecture',
+    caseStudyStory: 'Modern AI search tools embed user questions into high-dimensional vector spaces (e.g., 1536 floats), perform cosine similarity search across vector indexes (Pinecone/Milvus), and stream context through GPU inference clusters using TensorRT-LLM continuous batching.',
+    architectureTips: 'Position downstream from Web Servers. High compute and latency requirements; combine with semantic caching on Redis to avoid redundant LLM calls.',
     configOptions: {
       batching: {
         label: 'Inference Accelerator',
@@ -770,6 +830,20 @@ export default function App() {
   const [selectedNodeId, setSelectedNodeId] = useState('web-1');
   const [connectingFromId, setConnectingFromId] = useState(null);
 
+  // Progressive Level Unlocking State (Persisted in localStorage)
+  const [unlockedLevelIdx, setUnlockedLevelIdx] = useState(() => {
+    try {
+      const saved = localStorage.getItem('archquest_unlocked_level');
+      return saved !== null ? Math.min(CAMPAIGN_LEVELS.length - 1, Math.max(0, parseInt(saved, 10))) : 0;
+    } catch (e) {
+      return 0;
+    }
+  });
+
+  // Welcome Screen & Component Details Modal States
+  const [showWelcomeModal, setShowWelcomeModal] = useState(true);
+  const [detailModalComponent, setDetailModalComponent] = useState(null);
+
   // Simulation State
   const [isRunning, setIsRunning] = useState(false);
   const [simSpeed, setSimSpeed] = useState(1);
@@ -778,7 +852,6 @@ export default function App() {
   const [survivalWave, setSurvivalWave] = useState(1);
   const [sandboxRps, setSandboxRps] = useState(12000);
   const [postMortemModal, setPostMortemModal] = useState(null);
-  const [showGuideModal, setShowGuideModal] = useState(false);
   const [showBeginnerHints, setShowBeginnerHints] = useState(true);
 
   // Canvas Pan, Zoom & Drag State
@@ -792,8 +865,9 @@ export default function App() {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [activeCatalogTab, setActiveCatalogTab] = useState('ALL');
 
-  // Load level when switched
+  // Load level when switched (validates unlocked levels)
   const selectLevel = useCallback((idx) => {
+    if (idx > unlockedLevelIdx) return;
     const lvl = CAMPAIGN_LEVELS[idx];
     setCurrentLevelIdx(idx);
     setNodes(JSON.parse(JSON.stringify(lvl.initialNodes)));
@@ -805,7 +879,7 @@ export default function App() {
     setPostMortemModal(null);
     setPan({ x: 0, y: 0 });
     setZoom(1);
-  }, []);
+  }, [unlockedLevelIdx]);
 
   const switchMode = (mode) => {
     setGameMode(mode);
@@ -977,8 +1051,18 @@ export default function App() {
           const passedBudget = !currentMaxBudget || evaluation.totalHourlyCost <= currentMaxBudget;
 
           if (gameMode === 'CAMPAIGN') {
+            const isWon = passedSLA && passedBudget;
+            if (isWon) {
+              setUnlockedLevelIdx((prev) => {
+                const updated = Math.min(CAMPAIGN_LEVELS.length - 1, Math.max(prev, currentLevelIdx + 1));
+                try {
+                  localStorage.setItem('archquest_unlocked_level', updated.toString());
+                } catch (e) {}
+                return updated;
+              });
+            }
             setPostMortemModal({
-              won: passedSLA && passedBudget,
+              won: isWon,
               passedSLA,
               passedBudget,
               p99Latency: evaluation.p99Latency,
@@ -1006,10 +1090,10 @@ export default function App() {
     }, 100);
 
     return () => clearInterval(interval);
-  }, [isRunning, simSpeed, chaosActive, evaluation, gameMode, currentLevel, currentMaxBudget, survivalWave]);
+  }, [isRunning, simSpeed, chaosActive, evaluation, gameMode, currentLevel, currentMaxBudget, survivalWave, currentLevelIdx]);
 
   // Component Actions & Dragging
-  const handleAddService = (type) => {
+  const handleAddService = (type, explicitX, explicitY) => {
     const spec = COMPONENT_CATALOG[type];
     if (!spec) return;
 
@@ -1021,10 +1105,10 @@ export default function App() {
     }
 
     const countOfType = nodes.filter((n) => n.type === type).length;
-    let spawnX = 400 + (countOfType % 3) * 30;
-    let spawnY = 120 + ((countOfType * 110) % 330);
+    let spawnX = explicitX !== undefined ? explicitX : 400 + (countOfType % 3) * 30;
+    let spawnY = explicitY !== undefined ? explicitY : 120 + ((countOfType * 110) % 330);
 
-    if (canvasRef.current && (Math.abs(pan.x) > 60 || Math.abs(pan.y) > 60 || zoom !== 1)) {
+    if (explicitX === undefined && canvasRef.current && (Math.abs(pan.x) > 60 || Math.abs(pan.y) > 60 || zoom !== 1)) {
       const rect = canvasRef.current.getBoundingClientRect();
       spawnX = Math.round((-pan.x + rect.width / 2) / zoom - 88 + (countOfType % 3) * 25);
       spawnY = Math.round((-pan.y + rect.height / 2) / zoom - 55 + (countOfType % 3) * 25);
@@ -1041,6 +1125,7 @@ export default function App() {
 
     setNodes((prev) => [...prev, newNode]);
     setSelectedNodeId(newNode.id);
+    return newNode;
   };
 
   const deleteNode = (nodeId) => {
@@ -1334,6 +1419,16 @@ export default function App() {
             <Flame className="w-3.5 h-3.5 text-amber-400" />
             <span className="hidden sm:inline">Chaos</span>
           </button>
+
+          {/* Welcome Guide / Tutorial Trigger */}
+          <button
+            onClick={() => setShowWelcomeModal(true)}
+            className="px-2.5 py-1.5 rounded-xl bg-indigo-950/70 border border-indigo-500/40 hover:bg-indigo-900 text-xs text-indigo-300 flex items-center gap-1.5 transition shadow-sm"
+            title="Learn what you get from playing ArchQuest and how game modes work"
+          >
+            <BookOpen className="w-3.5 h-3.5 text-indigo-400" />
+            <span className="hidden sm:inline">Guide</span>
+          </button>
         </div>
       </header>
 
@@ -1341,19 +1436,39 @@ export default function App() {
       {gameMode === 'CAMPAIGN' && (
         <div className="shrink-0 bg-slate-900 border-b border-slate-800 px-4 py-1.5 flex items-center justify-between text-xs overflow-x-auto gap-4">
           <div className="flex items-center gap-2">
-            {CAMPAIGN_LEVELS.map((lvl, idx) => (
-              <button
-                key={lvl.id}
-                onClick={() => selectLevel(idx)}
-                className={`px-3 py-1 rounded-lg font-bold text-xs transition flex items-center gap-1.5 shrink-0 ${
-                  currentLevelIdx === idx
-                    ? 'bg-indigo-600 text-white shadow'
-                    : 'bg-slate-950/60 text-slate-400 hover:text-white'
-                }`}
-              >
-                <span>{lvl.title.split(':')[0]}</span>
-              </button>
-            ))}
+            {CAMPAIGN_LEVELS.map((lvl, idx) => {
+              const isUnlocked = idx <= unlockedLevelIdx;
+              const isPassed = idx < unlockedLevelIdx;
+              const isCurrent = currentLevelIdx === idx;
+
+              return (
+                <button
+                  key={lvl.id}
+                  disabled={!isUnlocked}
+                  onClick={() => isUnlocked && selectLevel(idx)}
+                  title={isUnlocked ? lvl.title : `🔒 Pass Level ${idx} to unlock this scenario`}
+                  className={`px-3 py-1 rounded-lg font-bold text-xs transition flex items-center gap-1.5 shrink-0 ${
+                    isCurrent
+                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-indigo-400/40'
+                      : isPassed
+                      ? 'bg-emerald-950/60 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-900/50'
+                      : isUnlocked
+                      ? 'bg-slate-950/80 text-slate-300 hover:text-white border border-slate-800'
+                      : 'bg-slate-950/30 text-slate-600 border border-slate-900/40 cursor-not-allowed opacity-50'
+                  }`}
+                >
+                  {isPassed ? (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  ) : isUnlocked ? (
+                    <span className="w-2 h-2 rounded-full bg-indigo-400 shrink-0" />
+                  ) : (
+                    <Lock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                  )}
+                  <span>{lvl.title.split(':')[0]}</span>
+                  {!isUnlocked && <span className="text-[10px] text-slate-500 font-normal">🔒 Locked</span>}
+                </button>
+              );
+            })}
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
@@ -1394,7 +1509,7 @@ export default function App() {
           <div className="shrink-0 mb-2">
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-300">Cloud Components</span>
-              <span className="text-[10px] text-slate-500">Click to deploy</span>
+              <span className="text-[10px] text-indigo-400 font-medium">Drag or Click</span>
             </div>
 
             <div className="grid grid-cols-5 gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-[10px] font-bold">
@@ -1418,40 +1533,59 @@ export default function App() {
             </div>
           </div>
 
-          {/* Component Cards (Scrollable inside panel) */}
+          {/* Component Cards (Scrollable inside panel with Drag & Drop + Click to Inspect) */}
           <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0">
             {availableCatalog.map((item) => {
               const Icon = item.icon;
               const isAllowed = gameMode !== 'CAMPAIGN' || currentLevel.allowedComponents.includes(item.type);
               return (
-                <button
+                <div
                   key={item.type}
-                  disabled={!isAllowed}
-                  onClick={() => handleAddService(item.type)}
-                  className={`w-full text-left p-2.5 rounded-xl border transition-all flex items-start gap-2.5 ${
+                  draggable={isAllowed}
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData('application/archquest-component', item.type);
+                    e.dataTransfer.setData('text/plain', item.type);
+                    e.dataTransfer.effectAllowed = 'copy';
+                  }}
+                  onClick={() => setDetailModalComponent(item.type)}
+                  className={`group relative w-full text-left p-2.5 rounded-xl border transition-all select-none ${
                     isAllowed
-                      ? 'bg-slate-950/90 hover:bg-slate-800/90 border-slate-800 hover:border-indigo-500/50 cursor-pointer'
+                      ? 'bg-slate-950/90 hover:bg-slate-850 border-slate-800 hover:border-indigo-500/60 cursor-grab active:cursor-grabbing shadow-sm hover:shadow-indigo-500/10'
                       : 'bg-slate-950/30 border-slate-900 opacity-40 cursor-not-allowed'
                   }`}
                 >
-                  <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${item.color} flex items-center justify-center shrink-0 shadow text-white`}>
-                    <Icon className="w-4 h-4" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-xs text-slate-200 truncate">{item.name}</span>
-                      <span className="text-xs font-mono font-bold text-emerald-400">${item.baseCost}/hr</span>
+                  {/* Hover Floating Guide Badge */}
+                  {isAllowed && (
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 absolute -top-2.5 right-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full shadow-lg border border-indigo-400/40 pointer-events-none z-30 flex items-center gap-1">
+                      <span>💡 Click to see details • Drag & drop to use</span>
                     </div>
-                    <p className="text-[10px] text-slate-400 leading-snug mt-0.5 line-clamp-2">
-                      {item.description}
-                    </p>
-                    <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-400">
-                      <span>{(item.baseCapacity / 1000).toFixed(1)}k RPS</span>
-                      <span>•</span>
-                      <span className="text-cyan-300">{item.baseLatency}ms</span>
+                  )}
+
+                  <div className="flex items-start gap-2.5">
+                    <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${item.color} flex items-center justify-center shrink-0 shadow text-white`}>
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-xs text-slate-200 truncate">{item.name}</span>
+                        <span className="text-xs font-mono font-bold text-emerald-400">${item.baseCost}/hr</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 leading-snug mt-0.5 line-clamp-2">
+                        {item.description}
+                      </p>
+                      <div className="flex items-center justify-between mt-1 text-[10px] text-slate-400">
+                        <div className="flex items-center gap-2">
+                          <span>{(item.baseCapacity / 1000).toFixed(1)}k RPS</span>
+                          <span>•</span>
+                          <span className="text-cyan-300">{item.baseLatency}ms</span>
+                        </div>
+                        <span className="text-[9px] text-indigo-400 font-semibold group-hover:text-indigo-300">
+                          Details &rarr;
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
@@ -1478,6 +1612,24 @@ export default function App() {
           onMouseUp={() => {
             setIsPanning(false);
             setDraggingNodeId(null);
+          }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            const compType = e.dataTransfer.getData('application/archquest-component') || e.dataTransfer.getData('text/plain');
+            if (compType && COMPONENT_CATALOG[compType]) {
+              const isAllowed = gameMode !== 'CAMPAIGN' || currentLevel.allowedComponents.includes(compType);
+              if (!isAllowed) return;
+              const rect = canvasRef.current.getBoundingClientRect();
+              const screenX = e.clientX - rect.left;
+              const screenY = e.clientY - rect.top;
+              const worldX = Math.round((screenX - pan.x) / zoom) - 88;
+              const worldY = Math.round((screenY - pan.y) / zoom) - 44;
+              handleAddService(compType, worldX, worldY);
+            }
           }}
           className={`col-span-6 h-full relative bg-slate-950 flex flex-col overflow-hidden select-none min-h-0 ${
             isPanning ? 'cursor-grabbing' : 'cursor-grab'
@@ -2086,6 +2238,351 @@ export default function App() {
           )}
         </aside>
       </div>
+
+      {/* =================================================================== */}
+      {/* 4. WELCOME & ORIENTATION MODAL (EXPLAINS REWARDS & 3 GAME MODES)   */}
+      {/* =================================================================== */}
+      {showWelcomeModal && (
+        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="relative max-w-4xl w-full bg-slate-900 border border-indigo-500/40 rounded-3xl p-6 sm:p-8 shadow-2xl my-auto text-slate-100 max-h-[92vh] flex flex-col">
+            {/* Close Button */}
+            <button
+              onClick={() => setShowWelcomeModal(false)}
+              className="absolute top-5 right-5 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
+              title="Close Guide"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Modal Header */}
+            <div className="flex items-center gap-3.5 mb-5 shrink-0">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-indigo-500/25 text-2xl">
+                ⚡
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                    Welcome to ArchQuest
+                  </h2>
+                  <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">
+                    Simulator
+                  </span>
+                </div>
+                <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
+                  Interactive Distributed Systems Architecture &amp; Capacity Simulator
+                </p>
+              </div>
+            </div>
+
+            {/* Modal Body (Scrollable) */}
+            <div className="flex-1 overflow-y-auto space-y-6 pr-2 min-h-0 text-xs sm:text-sm">
+              {/* What You Will Get Section */}
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-400 mb-2.5 flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-indigo-400" />
+                  <span>What You Will Gain By Playing</span>
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-1">
+                    <div className="font-bold text-white flex items-center gap-2">
+                      <span>🧠 Real-World Architecture Mastery</span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Bridge the gap between reading interview books and feeling how distributed systems actually scale under live traffic. Learn why Netflix needs CDNs and Twitter needs in-memory caches.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-1">
+                    <div className="font-bold text-white flex items-center gap-2">
+                      <span>⏱️ SLA Latency &amp; Bottleneck Diagnosis</span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Diagnose exponential queuing latencies, server CPU saturation, database disk I/O bottlenecks, and single points of failure (SPOFs) before they cause outages.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-1">
+                    <div className="font-bold text-white flex items-center gap-2">
+                      <span>💰 Cloud Cost vs Performance Tradeoffs</span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Experience the real tension of cloud budgeting! Satisfy sub-100ms latency SLAs while keeping AWS/GCP hourly compute bills within strict budget limits.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-1">
+                    <div className="font-bold text-white flex items-center gap-2">
+                      <span>💥 Chaos Engineering &amp; Self-Healing</span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Trigger Chaos Monkey server crashes mid-wave. Test whether your multi-replica topologies and load balancers auto-heal traffic or drop requests.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Game Modes Section */}
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-purple-400 mb-2.5 flex items-center gap-1.5">
+                  <Layers className="w-4 h-4 text-purple-400" />
+                  <span>3 Game Modes Available</span>
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {/* Campaign */}
+                  <div className="p-4 rounded-2xl bg-slate-950/80 border border-indigo-500/30 flex flex-col justify-between space-y-3">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-sm text-indigo-300">🎓 1. Campaign Mode</span>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-200">
+                          Progressive Lock
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 leading-relaxed">
+                        5 progressive real-world scenarios: Viral Launch ➔ Influencer CDN ➔ Black Friday Checkout ➔ Bot Attack ➔ Global AI Search.
+                      </p>
+                      <div className="text-[11px] text-amber-300/90 pt-1 border-t border-slate-800/80">
+                        🔒 <strong>Progression Rule:</strong> Each level stays locked until you pass the preceding scenario&apos;s SLA and budget!
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        switchMode('CAMPAIGN');
+                        setShowWelcomeModal(false);
+                      }}
+                      className="w-full py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition shadow"
+                    >
+                      Play Campaign &rarr;
+                    </button>
+                  </div>
+
+                  {/* Survival */}
+                  <div className="p-4 rounded-2xl bg-slate-950/80 border border-amber-500/30 flex flex-col justify-between space-y-3">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-sm text-amber-300">🔥 2. Survival Wave</span>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-200">
+                          Endless
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 leading-relaxed">
+                        Endless scaling stress test waves! Traffic surges by +2,500 RPS each wave with escalating bot swarms and random node crashes.
+                      </p>
+                      <div className="text-[11px] text-slate-400 pt-1 border-t border-slate-800/80">
+                        ⚡ <strong>Goal:</strong> Test your cluster&apos;s breaking point. How many waves can you survive?
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        switchMode('SURVIVAL');
+                        setShowWelcomeModal(false);
+                      }}
+                      className="w-full py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs transition shadow"
+                    >
+                      Play Survival &rarr;
+                    </button>
+                  </div>
+
+                  {/* Sandbox */}
+                  <div className="p-4 rounded-2xl bg-slate-950/80 border border-emerald-500/30 flex flex-col justify-between space-y-3">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-sm text-emerald-300">🧪 3. Sandbox Lab</span>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-200">
+                          Unrestricted
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 leading-relaxed">
+                        Freeform open architect workbench. Zero budget ceilings, custom traffic slider from 1,000 to 35,000+ RPS, and all 11 components unlocked.
+                      </p>
+                      <div className="text-[11px] text-slate-400 pt-1 border-t border-slate-800/80">
+                        🛠️ <strong>Freedom:</strong> Experiment freely with sharding, caching, and GPU AI inference pipelines.
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        switchMode('SANDBOX');
+                        setShowWelcomeModal(false);
+                      }}
+                      className="w-full py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold text-xs transition shadow"
+                    >
+                      Play Sandbox &rarr;
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick How to Play */}
+              <div className="p-4 rounded-2xl bg-indigo-950/30 border border-indigo-500/30 space-y-2">
+                <div className="font-bold text-indigo-300 text-xs uppercase tracking-wider">
+                  Quickstart Guide (4 Steps):
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs text-slate-300">
+                  <div>
+                    <strong>1. Drag &amp; Drop:</strong> Drag any cloud component from the left palette directly onto the canvas.
+                  </div>
+                  <div>
+                    <strong>2. Connect Wires:</strong> Click a right output port, then click a downstream left input port.
+                  </div>
+                  <div>
+                    <strong>3. Tune Architectures:</strong> Click any node to switch instance sizes, read replicas, or cache policies.
+                  </div>
+                  <div>
+                    <strong>4. Test the Wave:</strong> Press &quot;Simulate Peak Wave&quot; to test traffic and pass the SLA!
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer CTA */}
+            <div className="pt-4 mt-4 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3 shrink-0">
+              <span className="text-xs text-slate-500">
+                You can reopen this guide anytime using the <strong>Guide</strong> button in the top navigation.
+              </span>
+              <button
+                onClick={() => setShowWelcomeModal(false)}
+                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 text-white font-extrabold text-xs shadow-lg shadow-indigo-500/25 transition"
+              >
+                🚀 Start Playing (Level 1: Garage Startup) &rarr;
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =================================================================== */}
+      {/* 5. COMPONENT DEEP-DIVE MODAL (CASE STUDY & REAL-LIFE ANALOGY)       */}
+      {/* =================================================================== */}
+      {detailModalComponent && (() => {
+        const item = COMPONENT_CATALOG[detailModalComponent];
+        if (!item) return null;
+        const Icon = item.icon;
+
+        return (
+          <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
+            <div className="relative max-w-2xl w-full bg-slate-900 border border-slate-700/80 rounded-3xl p-6 sm:p-7 shadow-2xl my-auto text-slate-100 max-h-[90vh] flex flex-col">
+              {/* Close Button */}
+              <button
+                onClick={() => setDetailModalComponent(null)}
+                className="absolute top-5 right-5 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
+                title="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              {/* Component Header */}
+              <div className="flex items-center gap-3.5 mb-5 pb-4 border-b border-slate-800 shrink-0">
+                <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${item.color} flex items-center justify-center shadow-lg text-white shrink-0`}>
+                  <Icon className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-xl font-black text-white">{item.name}</h3>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                      {item.category}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">{item.description}</p>
+                </div>
+              </div>
+
+              {/* Modal Body Content (Scrollable) */}
+              <div className="flex-1 overflow-y-auto space-y-4 pr-1 text-xs sm:text-sm min-h-0">
+                {/* 1. Real Life Analogy */}
+                <div className="p-4 rounded-2xl bg-amber-950/20 border border-amber-500/30 space-y-1.5">
+                  <div className="flex items-center gap-2 text-amber-300 font-bold text-xs uppercase tracking-wider">
+                    <span>💡 Real-Life Everyday Analogy:</span>
+                    <span>{item.analogyTitle}</span>
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    {item.analogyStory}
+                  </p>
+                </div>
+
+                {/* 2. Real World Tech Case Study */}
+                <div className="p-4 rounded-2xl bg-indigo-950/25 border border-indigo-500/30 space-y-1.5">
+                  <div className="flex items-center gap-2 text-indigo-300 font-bold text-xs uppercase tracking-wider">
+                    <span>🏢 Production Tech Case Study:</span>
+                    <span>{item.caseStudyCompany}</span>
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    {item.caseStudyStory}
+                  </p>
+                </div>
+
+                {/* 3. Architectural Role & Placement */}
+                <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2">
+                  <div className="font-bold text-xs uppercase tracking-wider text-slate-300">
+                    📐 Architecture Placement &amp; Specs:
+                  </div>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    {item.architectureTips}
+                  </p>
+                  <div className="grid grid-cols-3 gap-2 pt-2 text-center text-xs">
+                    <div className="bg-slate-900 p-2 rounded-xl border border-slate-800">
+                      <div className="text-[10px] text-slate-400">Base Capacity</div>
+                      <div className="font-mono font-bold text-white mt-0.5">
+                        {(item.baseCapacity / 1000).toFixed(1)}k RPS
+                      </div>
+                    </div>
+                    <div className="bg-slate-900 p-2 rounded-xl border border-slate-800">
+                      <div className="text-[10px] text-slate-400">Base Latency</div>
+                      <div className="font-mono font-bold text-cyan-300 mt-0.5">
+                        {item.baseLatency}ms
+                      </div>
+                    </div>
+                    <div className="bg-slate-900 p-2 rounded-xl border border-slate-800">
+                      <div className="text-[10px] text-slate-400">Hourly Cost</div>
+                      <div className="font-mono font-bold text-emerald-400 mt-0.5">
+                        ${item.baseCost}/hr
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. Configuration Options */}
+                {item.configOptions && (
+                  <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2">
+                    <div className="font-bold text-xs uppercase tracking-wider text-slate-300">
+                      ⚙️ Architectural Tuning Available in Inspector:
+                    </div>
+                    <div className="space-y-1.5 text-xs text-slate-400">
+                      {Object.keys(item.configOptions).map((k) => (
+                        <div key={k} className="flex items-center justify-between bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800">
+                          <span className="font-medium text-slate-200">{item.configOptions[k].label}:</span>
+                          <span className="text-[11px] text-indigo-300 font-mono">
+                            {item.configOptions[k].values.join(' • ')}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer Actions */}
+              <div className="pt-4 mt-4 border-t border-slate-800 flex items-center justify-between gap-3 shrink-0">
+                <button
+                  onClick={() => setDetailModalComponent(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={() => {
+                    handleAddService(detailModalComponent);
+                    setDetailModalComponent(null);
+                  }}
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 text-white font-extrabold text-xs shadow-lg shadow-indigo-500/25 transition flex items-center gap-1.5"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Deploy to Canvas</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
