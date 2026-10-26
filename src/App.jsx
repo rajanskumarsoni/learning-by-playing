@@ -865,13 +865,15 @@ export default function App() {
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [activeCatalogTab, setActiveCatalogTab] = useState('ALL');
-  const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
-  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
+  const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(() => typeof window !== 'undefined' && window.innerWidth < 1024);
+  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(() => typeof window !== 'undefined' && window.innerWidth < 1024);
   const mentorSectionRef = useRef(null);
   const prevDiagnosticsKeyRef = useRef('');
   const [highlightMentor, setHighlightMentor] = useState(false);
   const inspectorSectionRef = useRef(null);
   const [highlightInspector, setHighlightInspector] = useState(false);
+  const touchStartDistRef = useRef(0);
+  const touchStartZoomRef = useRef(1);
 
   // Select node and smoothly bring Component Inspector into screen view in right panel
   const handleSelectNode = useCallback((nodeId) => {
@@ -1032,14 +1034,21 @@ export default function App() {
     prevDiagnosticsKeyRef.current = currentKey;
   }, [evaluation.diagnostics, rightPanelCollapsed]);
 
-  // Global mouseup listener to reliably release drag and pan anywhere on window
+  // Global mouseup and touchend listener to reliably release drag and pan anywhere on window
   useEffect(() => {
-    const handleGlobalMouseUp = () => {
+    const handleGlobalRelease = () => {
       setIsPanning(false);
       setDraggingNodeId(null);
+      touchStartDistRef.current = 0;
     };
-    window.addEventListener('mouseup', handleGlobalMouseUp);
-    return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+    window.addEventListener('mouseup', handleGlobalRelease);
+    window.addEventListener('touchend', handleGlobalRelease);
+    window.addEventListener('touchcancel', handleGlobalRelease);
+    return () => {
+      window.removeEventListener('mouseup', handleGlobalRelease);
+      window.removeEventListener('touchend', handleGlobalRelease);
+      window.removeEventListener('touchcancel', handleGlobalRelease);
+    };
   }, []);
 
   // Non-passive wheel listener for smooth infinite pan and pinch/ctrl-wheel zoom
@@ -1271,6 +1280,67 @@ export default function App() {
     }
   };
 
+  // Touch event handlers for mobile panning, dragging nodes, and pinch-to-zoom
+  const handleTouchStartNode = (nodeId, e) => {
+    e.stopPropagation();
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      handleMouseDownNode(nodeId, {
+        clientX: touch.clientX,
+        clientY: touch.clientY,
+        stopPropagation: () => e.stopPropagation()
+      });
+    }
+  };
+
+  const handleCanvasTouchStart = (e) => {
+    if (e.target.closest('.no-pan') || e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) {
+      return;
+    }
+    if (e.touches.length === 1) {
+      // 1-finger pan
+      const touch = e.touches[0];
+      setIsPanning(true);
+      panStartRef.current = {
+        x: touch.clientX - pan.x,
+        y: touch.clientY - pan.y
+      };
+      setConnectingFromId(null);
+    } else if (e.touches.length === 2) {
+      // 2-finger pinch zoom
+      setIsPanning(false);
+      setDraggingNodeId(null);
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      touchStartDistRef.current = Math.hypot(dx, dy);
+      touchStartZoomRef.current = zoom;
+    }
+  };
+
+  const handleCanvasTouchMove = (e) => {
+    if (!canvasRef.current) return;
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      handleCanvasMouseMove({
+        clientX: touch.clientX,
+        clientY: touch.clientY
+      });
+    } else if (e.touches.length === 2 && touchStartDistRef.current > 0) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const currentDist = Math.hypot(dx, dy);
+      const ratio = currentDist / touchStartDistRef.current;
+      const newZoom = Math.max(0.35, Math.min(2.5, +(touchStartZoomRef.current * ratio).toFixed(2)));
+      setZoom(newZoom);
+    }
+  };
+
+  const handleCanvasTouchEnd = () => {
+    setIsPanning(false);
+    setDraggingNodeId(null);
+    touchStartDistRef.current = 0;
+  };
+
   const fitView = useCallback(() => {
     if (!canvasRef.current || nodes.length === 0) {
       setPan({ x: 0, y: 0 });
@@ -1338,24 +1408,37 @@ export default function App() {
       {/* =================================================================== */}
       {/* 1. TOP TELEMETRY & NAVIGATION HEADER                                */}
       {/* =================================================================== */}
-      <header className="shrink-0 bg-slate-900/95 border-b border-slate-800 px-4 py-2 flex flex-wrap items-center justify-between gap-3 z-30 shadow-md">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 text-lg">
+      <header className="shrink-0 bg-slate-900/95 border-b border-slate-800 px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-2.5 sm:gap-3 z-30 shadow-md">
+        <div className="flex items-center gap-2.5 sm:gap-3">
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 text-base sm:text-lg shrink-0">
             ⚡
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="font-extrabold text-sm tracking-tight text-white">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <h1 className="font-extrabold text-xs sm:text-sm tracking-tight text-white truncate">
                 System Saviour <span className="text-indigo-400">Simulator</span>
               </h1>
-              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
-                Cloud Architect
+              <span className="text-[9px] sm:text-[10px] font-bold uppercase px-1.5 sm:px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 shrink-0">
+                Architect
               </span>
             </div>
-            <p className="text-[11px] text-slate-400">Interactive Distributed Systems & Capacity Simulator</p>
+            <p className="text-[10px] sm:text-[11px] text-slate-400 hidden sm:block">Interactive Distributed Systems & Capacity Simulator</p>
           </div>
 
-          {/* Mode Switcher */}
+          {/* Mobile Mode Switcher Dropdown */}
+          <div className="md:hidden">
+            <select
+              value={gameMode}
+              onChange={(e) => switchMode(e.target.value)}
+              className="bg-slate-950 text-indigo-300 text-xs font-bold border border-slate-800 rounded-lg px-2 py-1 outline-none"
+            >
+              <option value="CAMPAIGN">🎓 Campaign</option>
+              <option value="SURVIVAL">🔥 Survival Wave</option>
+              <option value="SANDBOX">🧪 Sandbox</option>
+            </select>
+          </div>
+
+          {/* Desktop Mode Switcher */}
           <div className="hidden md:flex bg-slate-950 p-1 rounded-xl border border-slate-800 ml-2">
             {[
               { id: 'CAMPAIGN', label: '🎓 Campaign (5 Scenarios)' },
@@ -1376,30 +1459,30 @@ export default function App() {
         </div>
 
         {/* Live Simulation SLA Metrics */}
-        <div className="flex items-center gap-2.5 flex-wrap">
+        <div className="flex items-center gap-2 overflow-x-auto max-w-full pb-0.5 scrollbar-none shrink-0">
           {/* RPS Counter */}
-          <div className="bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-xl flex items-center gap-2">
+          <div className="bg-slate-950 border border-slate-800 px-2.5 sm:px-3 py-1.5 rounded-xl flex items-center gap-1.5 sm:gap-2 shrink-0">
             <span
-              className={`w-2 h-2 rounded-full ${
+              className={`w-2 h-2 rounded-full shrink-0 ${
                 isRunning ? 'bg-amber-400 animate-ping' : 'bg-emerald-400 animate-pulse'
               }`}
             />
-            <span className="text-xs text-slate-400">
-              {isRunning ? 'Wave Surge:' : 'Active Users:'}
+            <span className="text-[11px] sm:text-xs text-slate-400 whitespace-nowrap">
+              {isRunning ? 'Wave Surge:' : 'Active:'}
             </span>
-            <span className="text-xs font-mono font-bold text-white">{currentLiveRps.toLocaleString()} RPS</span>
+            <span className="text-xs font-mono font-bold text-white whitespace-nowrap">{currentLiveRps.toLocaleString()} RPS</span>
           </div>
 
           {/* P99 Latency SLA */}
           <div
-            className={`border px-3 py-1.5 rounded-xl flex items-center gap-2 ${
+            className={`border px-2.5 sm:px-3 py-1.5 rounded-xl flex items-center gap-1.5 sm:gap-2 shrink-0 ${
               passedLatency
                 ? 'bg-slate-950 border-emerald-500/40 text-emerald-300'
                 : 'bg-rose-950/40 border-rose-500/50 text-rose-300'
             }`}
             title={`P99 Latency: ${evaluation.p99Latency}ms (Target: < ${targetLatency}ms)`}
           >
-            <span className="text-xs text-slate-400">P99:</span>
+            <span className="text-[11px] sm:text-xs text-slate-400">P99:</span>
             <span className="text-xs font-mono font-bold">{evaluation.p99Latency}ms</span>
             <span className="text-[10px] text-slate-500 hidden sm:inline">(&lt;{targetLatency}ms)</span>
             <span className={`text-[10px] font-bold ${passedLatency ? 'text-emerald-400' : 'text-rose-400'}`}>
@@ -1409,14 +1492,14 @@ export default function App() {
 
           {/* Uptime % */}
           <div
-            className={`border px-3 py-1.5 rounded-xl flex items-center gap-2 ${
+            className={`border px-2.5 sm:px-3 py-1.5 rounded-xl flex items-center gap-1.5 sm:gap-2 shrink-0 ${
               passedUptime
                 ? 'bg-slate-950 border-emerald-500/40 text-emerald-300'
                 : 'bg-rose-950/40 border-rose-500/50 text-rose-300'
             }`}
             title={`Uptime: ${evaluation.uptimePct}% (Target: ≥ ${targetMinUptime}%)`}
           >
-            <span className="text-xs text-slate-400">Uptime:</span>
+            <span className="text-[11px] sm:text-xs text-slate-400">Uptime:</span>
             <span className="text-xs font-mono font-bold">{evaluation.uptimePct}%</span>
             <span className="text-[10px] text-slate-500 hidden sm:inline">(&ge;{targetMinUptime}%)</span>
             <span className={`text-[10px] font-bold ${passedUptime ? 'text-emerald-400' : 'text-rose-400'}`}>
@@ -1426,14 +1509,14 @@ export default function App() {
 
           {/* Hourly Cost */}
           <div
-            className={`border px-3 py-1.5 rounded-xl flex items-center gap-1.5 ${
+            className={`border px-2.5 sm:px-3 py-1.5 rounded-xl flex items-center gap-1.5 shrink-0 ${
               passedBudget
                 ? 'bg-slate-950 border-emerald-500/40 text-emerald-300'
                 : 'bg-rose-950/40 border-rose-500/50 text-rose-300'
             }`}
             title={`Hourly Cost: $${evaluation.totalHourlyCost}/hr ${currentMaxBudget ? `(Budget: ≤ $${currentMaxBudget})` : ''}`}
           >
-            <span className="text-xs text-slate-400">Cost:</span>
+            <span className="text-[11px] sm:text-xs text-slate-400">Cost:</span>
             <span className="text-xs font-mono font-bold">${evaluation.totalHourlyCost}/hr</span>
             {currentMaxBudget && (
               <span className="text-[10px] text-slate-500 hidden sm:inline">(&le;${currentMaxBudget})</span>
@@ -1448,7 +1531,7 @@ export default function App() {
           {/* Overall Level Readiness Pill (Campaign Mode) */}
           {gameMode === 'CAMPAIGN' && (
             <div
-              className={`hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-[11px] font-bold ${
+              className={`hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-[11px] font-bold shrink-0 ${
                 isLevelPassing
                   ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300'
                   : 'bg-rose-950/60 border-rose-500/50 text-rose-300'
@@ -1458,6 +1541,10 @@ export default function App() {
               <span>{isLevelPassing ? '✅ Ready to Pass' : '❌ Targets Breached'}</span>
             </div>
           )}
+        </div>
+
+        {/* Simulation Controls & Quick Toggles */}
+        <div className="flex items-center gap-2 flex-wrap">
 
           {/* Simulation Controls */}
           <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
@@ -1609,12 +1696,20 @@ export default function App() {
       {/* 2. MAIN WORKSPACE: PALETTE + INTERACTIVE GRAPH CANVAS + INSPECTOR    */}
       {/* =================================================================== */}
       <div className="flex-1 flex min-h-0 h-full overflow-hidden relative">
+        {/* Mobile Backdrop for Left Panel */}
+        {!leftPanelCollapsed && (
+          <div
+            className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity"
+            onClick={() => setLeftPanelCollapsed(true)}
+          />
+        )}
+
         {/* LEFT COLUMN: INFRASTRUCTURE COMPONENT PALETTE */}
         <aside
-          className={`h-full bg-slate-900/80 border-r border-slate-800 flex flex-col min-h-0 overflow-hidden relative transition-all duration-300 ease-in-out shrink-0 z-20 ${
+          className={`h-full bg-slate-900 border-r border-slate-800 flex flex-col min-h-0 overflow-hidden transition-all duration-300 ease-in-out shrink-0 z-50 max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:w-80 max-lg:max-w-[85vw] max-lg:shadow-2xl ${
             leftPanelCollapsed
-              ? 'w-0 p-0 border-r-0 opacity-0 pointer-events-none'
-              : 'w-72 xl:w-80 2xl:w-88 p-3 opacity-100'
+              ? 'w-0 p-0 border-r-0 opacity-0 pointer-events-none max-lg:-translate-x-full'
+              : 'w-72 xl:w-80 2xl:w-88 p-3 opacity-100 max-lg:translate-x-0'
           }`}
         >
           {/* Category Filter Pills (Pinned Header) */}
@@ -1627,7 +1722,7 @@ export default function App() {
               <button
                 onClick={() => setLeftPanelCollapsed(true)}
                 className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
-                title="Collapse Component Palette (Make Canvas Bigger)"
+                title="Collapse Component Palette"
               >
                 <PanelLeftClose className="w-3.5 h-3.5" />
               </button>
@@ -1654,7 +1749,7 @@ export default function App() {
             </div>
           </div>
 
-          {/* Component Cards (Scrollable inside panel with Drag & Drop + Click to Inspect) */}
+          {/* Component Cards (Scrollable inside panel with Drag & Drop + Direct Deploy + Click to Inspect) */}
           <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0">
             {availableCatalog.map((item) => {
               const Icon = item.icon;
@@ -1678,7 +1773,7 @@ export default function App() {
                   {/* Hover Floating Guide Badge */}
                   {isAllowed && (
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 absolute -top-2.5 right-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full shadow-lg border border-indigo-400/40 pointer-events-none z-30 flex items-center gap-1">
-                      <span>💡 Click to see details • Drag & drop to use</span>
+                      <span>💡 Click details • Deploy button to use</span>
                     </div>
                   )}
 
@@ -1700,9 +1795,28 @@ export default function App() {
                           <span>•</span>
                           <span className="text-cyan-300">{item.baseLatency}ms</span>
                         </div>
-                        <span className="text-[9px] text-indigo-400 font-semibold group-hover:text-indigo-300">
-                          Details &rarr;
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          {isAllowed && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAddService(item.type);
+                                if (window.innerWidth < 1024) {
+                                  setLeftPanelCollapsed(true);
+                                }
+                              }}
+                              className="px-2 py-0.5 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[10px] shadow flex items-center gap-0.5 active:scale-95 transition"
+                              title="Deploy to canvas"
+                            >
+                              <Plus className="w-3 h-3" />
+                              <span>Deploy</span>
+                            </button>
+                          )}
+                          <span className="text-[9px] text-indigo-400 font-semibold group-hover:text-indigo-300">
+                            Details &rarr;
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1734,6 +1848,10 @@ export default function App() {
             setIsPanning(false);
             setDraggingNodeId(null);
           }}
+          onTouchStart={handleCanvasTouchStart}
+          onTouchMove={handleCanvasTouchMove}
+          onTouchEnd={handleCanvasTouchEnd}
+          onTouchCancel={handleCanvasTouchEnd}
           onDragOver={(e) => {
             e.preventDefault();
             e.dataTransfer.dropEffect = 'copy';
@@ -1756,6 +1874,7 @@ export default function App() {
             isPanning ? 'cursor-grabbing' : 'cursor-grab'
           }`}
           style={{
+            touchAction: 'none',
             backgroundImage: 'radial-gradient(circle, rgba(99, 102, 241, 0.16) 1.2px, transparent 1.2px)',
             backgroundSize: `${24 * zoom}px ${24 * zoom}px`,
             backgroundPosition: `${pan.x}px ${pan.y}px`
@@ -1766,10 +1885,10 @@ export default function App() {
             <button
               onClick={() => setLeftPanelCollapsed(false)}
               className="absolute left-3 top-14 z-30 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/95 backdrop-blur-md border border-indigo-500/50 text-xs font-bold text-indigo-300 hover:text-white hover:bg-slate-800 shadow-2xl transition hover:scale-105 pointer-events-auto"
-              title="Expand Component Palette (Make Canvas Smaller)"
+              title="Expand Component Palette"
             >
               <PanelLeftOpen className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Components</span>
+              <span className="hidden sm:inline">Components</span>
             </button>
           )}
 
@@ -1782,9 +1901,9 @@ export default function App() {
                   ? 'border-amber-400 ring-2 ring-amber-400/60 bg-amber-950/80 text-amber-200 animate-pulse'
                   : 'border-indigo-500/50 text-indigo-300 hover:text-white hover:bg-slate-800'
               }`}
-              title="Expand Problem & Inspector (Make Canvas Smaller)"
+              title="Expand Problem & Inspector"
             >
-              <span>Problem &amp; Inspector</span>
+              <span className="hidden sm:inline">Problem &amp; Inspector</span>
               {highlightMentor && <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />}
               <PanelRightOpen className="w-3.5 h-3.5 text-indigo-400" />
             </button>
@@ -1792,21 +1911,21 @@ export default function App() {
 
           {/* Top Helper / Connection Banner */}
           <div className="absolute top-3 left-3 right-3 flex flex-wrap items-center justify-between gap-2 pointer-events-none z-30">
-            <div className="bg-slate-900/90 backdrop-blur border border-slate-800 px-3.5 py-1.5 rounded-xl text-xs text-slate-300 flex items-center gap-2 pointer-events-auto shadow-lg">
-              <Share2 className="w-3.5 h-3.5 text-indigo-400" />
-              <span>
+            <div className="bg-slate-900/90 backdrop-blur border border-slate-800 px-3.5 py-1.5 rounded-xl text-xs text-slate-300 flex items-center gap-2 pointer-events-auto shadow-lg max-w-full overflow-hidden truncate">
+              <Share2 className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+              <span className="truncate">
                 {connectingFromId ? (
                   <span className="text-amber-300 font-bold">
-                    Click another node&apos;s LEFT input port (or body) to wire connection...
+                    Tap/click target node to wire...
                   </span>
                 ) : (
-                  'Drag canvas to pan anywhere • Scroll/pinch to zoom • Click a right port to wire • Click wire to delete'
+                  '1-finger pan • 2-finger zoom • tap node ports to wire'
                 )}
               </span>
               {connectingFromId && (
                 <button
                   onClick={() => setConnectingFromId(null)}
-                  className="ml-2 px-2 py-0.5 rounded bg-slate-800 text-xs text-slate-300 hover:text-white"
+                  className="ml-2 px-2 py-0.5 rounded bg-slate-800 text-xs text-slate-300 hover:text-white shrink-0"
                 >
                   Cancel
                 </button>
@@ -1831,7 +1950,7 @@ export default function App() {
           </div>
 
           {/* FLOATING CANVAS HUD CONTROLS (BOTTOM-RIGHT) */}
-          <div className="absolute bottom-3 right-3 flex items-center gap-1 z-30 pointer-events-auto bg-slate-900/95 backdrop-blur-md border border-slate-800 p-1 rounded-xl shadow-2xl">
+          <div className="absolute bottom-16 lg:bottom-3 right-3 flex items-center gap-1 z-30 pointer-events-auto bg-slate-900/95 backdrop-blur-md border border-slate-800 p-1 rounded-xl shadow-2xl">
             <button
               onClick={() => setZoom((z) => Math.min(2.5, +(z + 0.15).toFixed(2)))}
               className="w-7 h-7 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 flex items-center justify-center transition"
@@ -1871,10 +1990,10 @@ export default function App() {
           </div>
 
           {/* FLOATING STATUS PILL (BOTTOM-LEFT) */}
-          <div className="absolute bottom-3 left-3 z-30 pointer-events-none flex items-center gap-2">
+          <div className="absolute bottom-16 lg:bottom-3 left-3 z-30 pointer-events-none flex items-center gap-2">
             <div className="bg-slate-900/85 backdrop-blur border border-slate-800 px-2.5 py-1 rounded-lg text-[10px] text-slate-400 font-mono flex items-center gap-2 shadow-lg">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Canvas: ({Math.round(pan.x)}, {Math.round(pan.y)})</span>
+              <span>({Math.round(pan.x)}, {Math.round(pan.y)})</span>
               <span className="hidden sm:inline text-slate-500">• Pan anywhere</span>
             </div>
           </div>
@@ -2071,8 +2190,9 @@ export default function App() {
                 return (
                   <div
                     key={node.id}
-                    style={{ left: node.x, top: node.y, width: 176 }}
+                    style={{ left: node.x, top: node.y, width: 176, touchAction: 'none' }}
                     onMouseDown={(e) => handleMouseDownNode(node.id, e)}
+                    onTouchStart={(e) => handleTouchStartNode(node.id, e)}
                     onClick={(e) => {
                       e.stopPropagation();
                       if (connectingFromId && connectingFromId !== node.id && node.type !== 'SOURCE') {
@@ -2096,6 +2216,10 @@ export default function App() {
                     {node.type !== 'SOURCE' && (
                       <button
                         onClick={(e) => handlePortClick(e, node.id, 'in')}
+                        onTouchEnd={(e) => {
+                          e.stopPropagation();
+                          handlePortClick(e, node.id, 'in');
+                        }}
                         title="Input Port (Click to finish wire connection)"
                         className={`w-4 h-4 rounded-full border-2 absolute -left-2 top-10 transition-transform hover:scale-125 z-10 ${
                           connectingFromId && connectingFromId !== node.id
@@ -2108,6 +2232,10 @@ export default function App() {
                     {/* Right Output Port */}
                     <button
                       onClick={(e) => handlePortClick(e, node.id, 'out')}
+                      onTouchEnd={(e) => {
+                        e.stopPropagation();
+                        handlePortClick(e, node.id, 'out');
+                      }}
                       title="Output Port (Click to start drawing wire)"
                       className={`w-4 h-4 rounded-full border-2 absolute -right-2 top-10 transition-transform hover:scale-125 z-10 ${
                         isConnectingSource
@@ -2248,12 +2376,20 @@ export default function App() {
           )}
         </main>
 
+        {/* Mobile Backdrop for Right Panel */}
+        {!rightPanelCollapsed && (
+          <div
+            className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity"
+            onClick={() => setRightPanelCollapsed(true)}
+          />
+        )}
+
         {/* RIGHT COLUMN: PROBLEM STATEMENT, INSPECTOR & LIVE MENTOR */}
         <aside
-          className={`h-full bg-slate-900/80 border-l border-slate-800 flex flex-col overflow-y-auto min-h-0 relative transition-all duration-300 ease-in-out shrink-0 z-20 ${
+          className={`h-full bg-slate-900 border-l border-slate-800 flex flex-col overflow-y-auto min-h-0 transition-all duration-300 ease-in-out shrink-0 z-50 max-lg:fixed max-lg:inset-y-0 max-lg:right-0 max-lg:w-88 max-lg:max-w-[90vw] max-lg:shadow-2xl ${
             rightPanelCollapsed
-              ? 'w-0 p-0 border-l-0 opacity-0 pointer-events-none'
-              : 'w-80 xl:w-96 2xl:w-[420px] p-3.5 space-y-4 opacity-100'
+              ? 'w-0 p-0 border-l-0 opacity-0 pointer-events-none max-lg:translate-x-full'
+              : 'w-80 xl:w-96 2xl:w-[420px] p-3.5 space-y-4 opacity-100 max-lg:translate-x-0'
           }`}
         >
           {/* Panel Header & Collapse Action */}
@@ -2738,6 +2874,64 @@ export default function App() {
           </div>
         </aside>
       </div>
+
+      {/* =================================================================== */}
+      {/* MOBILE BOTTOM NAVIGATION BAR (< lg screens)                         */}
+      {/* =================================================================== */}
+      <nav className="lg:hidden shrink-0 bg-slate-900/95 border-t border-slate-800 px-3 py-2 flex items-center justify-around z-30 shadow-2xl backdrop-blur-md safe-bottom">
+        <button
+          type="button"
+          onClick={() => {
+            setRightPanelCollapsed(true);
+            setLeftPanelCollapsed(!leftPanelCollapsed);
+          }}
+          className={`flex flex-col items-center gap-1 text-[11px] font-bold px-3 py-1 rounded-xl transition ${
+            !leftPanelCollapsed ? 'text-indigo-400 bg-indigo-500/15' : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <Layers className="w-4 h-4" />
+          <span>Components</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setLeftPanelCollapsed(true);
+            setRightPanelCollapsed(true);
+          }}
+          className={`flex flex-col items-center gap-1 text-[11px] font-bold px-3 py-1 rounded-xl transition ${
+            leftPanelCollapsed && rightPanelCollapsed ? 'text-indigo-400 bg-indigo-500/15' : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <Move className="w-4 h-4" />
+          <span>Canvas</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setIsRunning(!isRunning)}
+          className={`flex flex-col items-center gap-1 text-[11px] font-bold px-3 py-1 rounded-xl transition ${
+            isRunning ? 'text-amber-300 bg-amber-500/20' : 'text-emerald-400 bg-emerald-500/15'
+          }`}
+        >
+          {isRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+          <span>{isRunning ? 'Pause' : 'Simulate'}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setLeftPanelCollapsed(true);
+            setRightPanelCollapsed(!rightPanelCollapsed);
+          }}
+          className={`flex flex-col items-center gap-1 text-[11px] font-bold px-3 py-1 rounded-xl transition ${
+            !rightPanelCollapsed ? 'text-indigo-400 bg-indigo-500/15' : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <AlertTriangle className="w-4 h-4" />
+          <span>Mission</span>
+        </button>
+      </nav>
 
       {/* =================================================================== */}
       {/* 4. WELCOME & ORIENTATION MODAL (EXPLAINS REWARDS & 3 GAME MODES)   */}
