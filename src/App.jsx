@@ -4,7 +4,7 @@ import {
   RotateCcw, AlertTriangle, CheckCircle2, HelpCircle, Github, Plus, Trash2,
   Settings, Award, Terminal, Flame, ChevronRight, Copy, Check, Download,
   FastForward, Eye, Sliders, Share2, Lock, Unlock, Box, HardDrive, Network,
-  ArrowRight, Sparkles, Info, X, RefreshCw
+  ArrowRight, Sparkles, Info, X, RefreshCw, ZoomIn, ZoomOut, Maximize2, Move
 } from 'lucide-react';
 
 // ============================================================================
@@ -801,11 +801,64 @@ export default function App() {
   const [telemetryHistory, setTelemetryHistory] = useState([]);
   const waveStatsRef = useRef({ peakLatency: 0, minUptime: 100, ticks: 0, slaBreaches: 0 });
 
-  // Canvas Drag State
+  // Canvas Infinite Pan, Zoom & Drag State
   const canvasRef = useRef(null);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [isPanning, setIsPanning] = useState(false);
+  const panStartRef = useRef({ x: 0, y: 0 });
   const [draggingNodeId, setDraggingNodeId] = useState(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+  // Global mouseup listener to reliably release drag and pan anywhere on screen
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      setIsPanning(false);
+      setDraggingNodeId(null);
+    };
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+  }, []);
+
+  // Non-passive wheel listener for smooth infinite pan and pinch/ctrl-wheel zoom
+  useEffect(() => {
+    const canvasEl = canvasRef.current;
+    if (!canvasEl) return;
+
+    const handleWheelNative = (e) => {
+      e.preventDefault();
+      const rect = canvasEl.getBoundingClientRect();
+      const mouseScreenX = e.clientX - rect.left;
+      const mouseScreenY = e.clientY - rect.top;
+
+      if (e.ctrlKey || e.metaKey) {
+        // Pinch-zoom or Ctrl+scroll zoom centered at mouse pointer
+        const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
+        setZoom((currentZoom) => {
+          const newZoom = Math.max(0.35, Math.min(2.5, +(currentZoom * zoomFactor).toFixed(3)));
+          setPan((currentPan) => {
+            const worldX = (mouseScreenX - currentPan.x) / currentZoom;
+            const worldY = (mouseScreenY - currentPan.y) / currentZoom;
+            return {
+              x: Math.round(mouseScreenX - worldX * newZoom),
+              y: Math.round(mouseScreenY - worldY * newZoom)
+            };
+          });
+          return newZoom;
+        });
+      } else {
+        // 2-finger trackpad scroll or mousewheel pan
+        setPan((prev) => ({
+          x: Math.round(prev.x - e.deltaX),
+          y: Math.round(prev.y - e.deltaY)
+        }));
+      }
+    };
+
+    canvasEl.addEventListener('wheel', handleWheelNative, { passive: false });
+    return () => canvasEl.removeEventListener('wheel', handleWheelNative);
+  }, []);
 
   // Load level when switched
   const selectLevel = useCallback((idx) => {
@@ -820,6 +873,8 @@ export default function App() {
     setChaosActive(lvl.chaosEnabled);
     setPostMortemModal(null);
     setTelemetryHistory([]);
+    setPan({ x: 0, y: 0 });
+    setZoom(1);
     waveStatsRef.current = { peakLatency: 0, minUptime: 100, ticks: 0, slaBreaches: 0 };
   }, []);
 
@@ -945,7 +1000,7 @@ export default function App() {
       });
     }
 
-    // Stagger position cleanly on canvas
+    // Stagger position cleanly on canvas, adapting to current pan/zoom viewport
     const countOfType = nodes.filter((n) => n.type === type).length;
     const columnMap = {
       WAF: 190,
@@ -959,11 +1014,21 @@ export default function App() {
       VECTOR_AI: 880
     };
 
+    let spawnX = (columnMap[type] || 450) + (countOfType % 2) * 30;
+    let spawnY = 110 + ((countOfType * 115) % 340);
+
+    // If canvas has been panned away from origin, spawn near current viewport center
+    if (canvasRef.current && (Math.abs(pan.x) > 60 || Math.abs(pan.y) > 60 || zoom !== 1)) {
+      const rect = canvasRef.current.getBoundingClientRect();
+      spawnX = Math.round((-pan.x + rect.width / 2) / zoom - 88 + (countOfType % 3) * 25);
+      spawnY = Math.round((-pan.y + rect.height / 2) / zoom - 55 + (countOfType % 3) * 25);
+    }
+
     const newNode = {
       id: `${type.toLowerCase()}-${Date.now().toString().slice(-4)}`,
       type,
-      x: (columnMap[type] || 450) + (countOfType % 2) * 30,
-      y: 110 + ((countOfType * 115) % 340),
+      x: spawnX,
+      y: spawnY,
       config: defaultConfig,
       crashed: false
     };
@@ -1001,12 +1066,38 @@ export default function App() {
     }
   };
 
+  const handleCanvasMouseDown = (e) => {
+    // If clicking on a button, input, port or node card, don't start canvas panning
+    if (e.target.closest('.no-pan') || e.target.closest('button') || e.target.closest('input')) {
+      return;
+    }
+    setIsPanning(true);
+    panStartRef.current = {
+      x: e.clientX - pan.x,
+      y: e.clientY - pan.y
+    };
+    setSelectedNodeId(null);
+    setConnectingFromId(null);
+  };
+
   const handleCanvasMouseMove = (e) => {
     if (!canvasRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    setMousePos({ x, y });
+    const screenX = e.clientX - rect.left;
+    const screenY = e.clientY - rect.top;
+
+    // Convert mouse screen position to world coordinates
+    const worldX = (screenX - pan.x) / zoom;
+    const worldY = (screenY - pan.y) / zoom;
+    setMousePos({ x: worldX, y: worldY });
+
+    if (isPanning) {
+      setPan({
+        x: Math.round(e.clientX - panStartRef.current.x),
+        y: Math.round(e.clientY - panStartRef.current.y)
+      });
+      return;
+    }
 
     if (draggingNodeId) {
       setNodes((prev) =>
@@ -1014,14 +1105,49 @@ export default function App() {
           n.id === draggingNodeId
             ? {
                 ...n,
-                x: Math.max(16, Math.min(rect.width - 190, x - dragOffset.x)),
-                y: Math.max(16, Math.min(rect.height - 110, y - dragOffset.y))
+                x: Math.round(worldX - dragOffset.x),
+                y: Math.round(worldY - dragOffset.y)
               }
             : n
         )
       );
     }
   };
+
+  const fitView = useCallback(() => {
+    if (!canvasRef.current || nodes.length === 0) {
+      setPan({ x: 0, y: 0 });
+      setZoom(1);
+      return;
+    }
+    const rect = canvasRef.current.getBoundingClientRect();
+    const minX = Math.min(...nodes.map((n) => n.x));
+    const maxX = Math.max(...nodes.map((n) => n.x + 180));
+    const minY = Math.min(...nodes.map((n) => n.y));
+    const maxY = Math.max(...nodes.map((n) => n.y + 110));
+
+    const graphWidth = maxX - minX;
+    const graphHeight = maxY - minY;
+    const padding = 70;
+
+    const scaleX = (rect.width - padding * 2) / Math.max(1, graphWidth);
+    const scaleY = (rect.height - padding * 2) / Math.max(1, graphHeight);
+    const targetZoom = Math.max(0.4, Math.min(1.15, +(Math.min(scaleX, scaleY)).toFixed(2)));
+
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+
+    setZoom(targetZoom);
+    setPan({
+      x: Math.round(rect.width / 2 - centerX * targetZoom),
+      y: Math.round(rect.height / 2 - centerY * targetZoom)
+    });
+  }, [nodes]);
+
+  const resetView = useCallback(() => {
+    setPan({ x: 0, y: 0 });
+    setZoom(1);
+  }, []);
 
   const triggerManualChaos = () => {
     const healthyNodes = nodes.filter((n) => n.type !== 'SOURCE' && !n.crashed);
@@ -1384,22 +1510,25 @@ export default function App() {
         {/* CENTER: INTERACTIVE ARCHITECTURE GRAPH CANVAS */}
         <main
           ref={canvasRef}
+          onMouseDown={handleCanvasMouseDown}
           onMouseMove={handleCanvasMouseMove}
-          onMouseUp={() => setDraggingNodeId(null)}
-          onClick={() => {
-            setSelectedNodeId(null);
-            setConnectingFromId(null);
+          onMouseUp={() => {
+            setIsPanning(false);
+            setDraggingNodeId(null);
           }}
-          className="lg:col-span-7 relative bg-slate-950 overflow-hidden cursor-crosshair min-h-[480px]"
+          className={`lg:col-span-7 relative bg-slate-950 overflow-hidden select-none min-h-[520px] ${
+            isPanning ? 'cursor-grabbing' : 'cursor-grab'
+          }`}
           style={{
             backgroundImage:
-              'radial-gradient(circle, rgba(99, 102, 241, 0.14) 1px, transparent 1px)',
-            backgroundSize: '24px 24px'
+              'radial-gradient(circle, rgba(99, 102, 241, 0.16) 1.2px, transparent 1.2px)',
+            backgroundSize: `${24 * zoom}px ${24 * zoom}px`,
+            backgroundPosition: `${pan.x}px ${pan.y}px`
           }}
         >
           {/* Quick Helper Banner inside Canvas */}
-          <div className="absolute top-3 left-3 right-3 flex flex-wrap items-center justify-between gap-2 pointer-events-none z-20">
-            <div className="bg-slate-900/90 backdrop-blur border border-slate-800 px-3 py-1.5 rounded-lg text-xs text-slate-300 flex items-center gap-2 pointer-events-auto">
+          <div className="absolute top-3 left-3 right-3 flex flex-wrap items-center justify-between gap-2 pointer-events-none z-30">
+            <div className="bg-slate-900/90 backdrop-blur border border-slate-800 px-3 py-1.5 rounded-lg text-xs text-slate-300 flex items-center gap-2 pointer-events-auto shadow-md">
               <Share2 className="w-3.5 h-3.5 text-indigo-400" />
               <span>
                 {connectingFromId ? (
@@ -1407,13 +1536,13 @@ export default function App() {
                     Now click any node&apos;s LEFT input port (or node body) to connect wire...
                   </span>
                 ) : (
-                  'Drag nodes to arrange • Click a node’s RIGHT port then another node’s LEFT port to wire • Click any wire to delete'
+                  'Drag canvas to pan anywhere • Scroll/pinch to zoom • Drag nodes to reposition • Wire via ports'
                 )}
               </span>
             </div>
 
             {currentLevel.id === 6 && (
-              <div className="bg-slate-900/90 backdrop-blur border border-slate-800 px-3 py-1.5 rounded-lg text-xs text-slate-300 flex items-center gap-2 pointer-events-auto">
+              <div className="bg-slate-900/90 backdrop-blur border border-slate-800 px-3 py-1.5 rounded-lg text-xs text-slate-300 flex items-center gap-2 pointer-events-auto shadow-md">
                 <span>Sandbox Peak RPS:</span>
                 <input
                   type="range"
@@ -1429,296 +1558,363 @@ export default function App() {
             )}
           </div>
 
-          {/* SVG WIRES & ANIMATED TRAFFIC PARTICLES */}
-          <svg className="absolute inset-0 w-full h-full pointer-events-none z-10">
-            <defs>
-              <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-                <feGaussianBlur stdDeviation="2.5" result="blur" />
-                <feComposite in="SourceGraphic" in2="blur" operator="over" />
-              </filter>
-            </defs>
+          {/* FLOATING CANVAS HUD CONTROLS (BOTTOM-RIGHT) */}
+          <div className="absolute bottom-3 right-3 flex items-center gap-1 z-30 pointer-events-auto bg-slate-900/95 backdrop-blur-md border border-slate-800 p-1 rounded-xl shadow-2xl">
+            <button
+              onClick={() => setZoom((z) => Math.min(2.5, +(z + 0.15).toFixed(2)))}
+              className="w-7 h-7 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 flex items-center justify-center transition"
+              title="Zoom In (+)"
+            >
+              <ZoomIn className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={resetView}
+              className="px-2 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-[11px] font-mono text-slate-200 transition font-medium"
+              title="Click to reset zoom to 100%"
+            >
+              {Math.round(zoom * 100)}%
+            </button>
+            <button
+              onClick={() => setZoom((z) => Math.max(0.35, +(z - 0.15).toFixed(2)))}
+              className="w-7 h-7 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 flex items-center justify-center transition"
+              title="Zoom Out (-)"
+            >
+              <ZoomOut className="w-3.5 h-3.5" />
+            </button>
+            <div className="w-px h-4 bg-slate-700 mx-0.5" />
+            <button
+              onClick={fitView}
+              className="w-7 h-7 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 flex items-center justify-center transition"
+              title="Fit & Center Graph in View"
+            >
+              <Maximize2 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={resetView}
+              className="w-7 h-7 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 flex items-center justify-center transition"
+              title="Reset View to Origin (0,0)"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+            </button>
+          </div>
 
-            {/* Active Connection Preview Wire */}
-            {connectingFromId && (() => {
-              const srcNode = nodes.find((n) => n.id === connectingFromId);
-              if (!srcNode) return null;
-              const x1 = srcNode.x + 176;
-              const y1 = srcNode.y + 44;
-              const x2 = mousePos.x;
-              const y2 = mousePos.y;
-              return (
-                <path
-                  d={`M ${x1} ${y1} C ${x1 + 60} ${y1}, ${x2 - 60} ${y2}, ${x2} ${y2}`}
-                  fill="none"
-                  stroke="#818cf8"
-                  strokeWidth="2.5"
-                  strokeDasharray="6 4"
-                />
-              );
-            })()}
+          {/* FLOATING STATUS (BOTTOM-LEFT) */}
+          <div className="absolute bottom-3 left-3 z-30 pointer-events-none flex items-center gap-2">
+            <div className="bg-slate-900/85 backdrop-blur border border-slate-800 px-2.5 py-1 rounded-lg text-[10px] text-slate-400 font-mono flex items-center gap-2 shadow-lg">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Canvas: ({Math.round(pan.x)}, {Math.round(pan.y)})</span>
+              <span className="hidden sm:inline text-slate-500">• Pan anywhere</span>
+            </div>
+          </div>
 
-            {/* Connected Edges */}
-            {edges.map((edge) => {
-              const src = nodes.find((n) => n.id === edge.source);
-              const tgt = nodes.find((n) => n.id === edge.target);
-              if (!src || !tgt) return null;
+          {/* GRAPH WORLD CONTAINER (TRANSFORMED BY PAN & ZOOM) */}
+          <div
+            className="absolute inset-0 origin-top-left pointer-events-none"
+            style={{
+              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+              transformOrigin: '0 0'
+            }}
+          >
+            {/* SVG WIRES & ANIMATED TRAFFIC PARTICLES */}
+            <svg
+              className="overflow-visible absolute inset-0 pointer-events-none z-10"
+              style={{ width: '1px', height: '1px' }}
+            >
+              <defs>
+                <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feGaussianBlur stdDeviation="2.5" result="blur" />
+                  <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                </filter>
+              </defs>
 
-              const x1 = src.x + 176;
-              const y1 = src.y + 44;
-              const x2 = tgt.x;
-              const y2 = tgt.y + 44;
-              const dx = Math.max(50, Math.abs(x2 - x1) * 0.5);
-              const pathD = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
-
-              const flow = evaluation.edgeFlows[edge.id] || { read: 0, write: 0, bot: 0, total: 0 };
-              const hasTraffic = flow.total > 5;
-              const animDuration = Math.max(0.45, 2.2 - Math.min(1.6, flow.total / 6000));
-
-              return (
-                <g key={edge.id} className="pointer-events-auto group">
-                  {/* Invisible wider stroke for easy clicking to delete edge */}
+              {/* Active Connection Preview Wire */}
+              {connectingFromId && (() => {
+                const srcNode = nodes.find((n) => n.id === connectingFromId);
+                if (!srcNode) return null;
+                const x1 = srcNode.x + 176;
+                const y1 = srcNode.y + 44;
+                const x2 = mousePos.x;
+                const y2 = mousePos.y;
+                return (
                   <path
-                    d={pathD}
+                    d={`M ${x1} ${y1} C ${x1 + 60} ${y1}, ${x2 - 60} ${y2}, ${x2} ${y2}`}
                     fill="none"
-                    stroke="transparent"
-                    strokeWidth="16"
-                    className="cursor-pointer"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteEdge(edge.id);
-                    }}
+                    stroke="#818cf8"
+                    strokeWidth="2.5"
+                    strokeDasharray="6 4"
                   />
+                );
+              })()}
 
-                  {/* Base Wire */}
-                  <path
-                    d={pathD}
-                    fill="none"
-                    stroke={hasTraffic ? '#475569' : '#1e293b'}
-                    strokeWidth={hasTraffic ? '3' : '2'}
-                    className="group-hover:stroke-rose-500 transition-colors"
-                  />
+              {/* Connected Edges */}
+              {edges.map((edge) => {
+                const src = nodes.find((n) => n.id === edge.source);
+                const tgt = nodes.find((n) => n.id === edge.target);
+                if (!src || !tgt) return null;
 
-                  {/* Animated Read Packet (Blue) */}
-                  {flow.read > 5 && (
-                    <circle r="4" fill="#38bdf8" filter="url(#glow)">
-                      <animateMotion
-                        dur={`${animDuration}s`}
-                        repeatCount="indefinite"
-                        path={pathD}
-                      />
-                    </circle>
-                  )}
+                const x1 = src.x + 176;
+                const y1 = src.y + 44;
+                const x2 = tgt.x;
+                const y2 = tgt.y + 44;
+                const dx = Math.max(50, Math.abs(x2 - x1) * 0.5);
+                const pathD = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
 
-                  {/* Animated Write Packet (Orange) */}
-                  {flow.write > 5 && (
-                    <circle r="4" fill="#fbbf24" filter="url(#glow)">
-                      <animateMotion
-                        dur={`${animDuration * 1.15}s`}
-                        begin="0.25s"
-                        repeatCount="indefinite"
-                        path={pathD}
-                      />
-                    </circle>
-                  )}
+                const flow = evaluation.edgeFlows[edge.id] || { read: 0, write: 0, bot: 0, total: 0 };
+                const hasTraffic = flow.total > 5;
+                const animDuration = Math.max(0.45, 2.2 - Math.min(1.6, flow.total / 6000));
 
-                  {/* Animated Bot Packet (Red) */}
-                  {flow.bot > 5 && (
-                    <circle r="4.5" fill="#f43f5e" filter="url(#glow)">
-                      <animateMotion
-                        dur={`${animDuration * 0.85}s`}
-                        begin="0.1s"
-                        repeatCount="indefinite"
-                        path={pathD}
-                      />
-                    </circle>
-                  )}
-
-                  {/* RPS Flow Label on Wire */}
-                  {hasTraffic && (
-                    <g transform={`translate(${(x1 + x2) / 2}, ${(y1 + y2) / 2 - 8})`}>
-                      <rect
-                        x="-28"
-                        y="-10"
-                        width="56"
-                        height="16"
-                        rx="4"
-                        fill="#0f172a"
-                        stroke="#334155"
-                        strokeWidth="1"
-                      />
-                      <text
-                        textAnchor="middle"
-                        y="1"
-                        fill="#94a3b8"
-                        fontSize="9"
-                        fontWeight="bold"
-                      >
-                        {Math.round(flow.total) >= 1000
-                          ? `${(flow.total / 1000).toFixed(1)}k/s`
-                          : `${Math.round(flow.total)}/s`}
-                      </text>
-                    </g>
-                  )}
-                </g>
-              );
-            })}
-          </svg>
-
-          {/* INFRASTRUCTURE NODES ON CANVAS */}
-          {nodes.map((node) => {
-            const spec = COMPONENT_CATALOG[node.type];
-            const m = evaluation.nodeMetrics[node.id] || {
-              totalIn: 0,
-              utilization: 0,
-              effectiveLatency: spec.baseLatency,
-              capacity: spec.baseCapacity,
-              isCrashed: false
-            };
-            const Icon = spec.icon;
-            const isSelected = selectedNodeId === node.id;
-            const isConnectingSource = connectingFromId === node.id;
-            const utilPct = Math.round(m.utilization * 100);
-
-            let statusColor = 'border-slate-700/90';
-            if (m.isCrashed) {
-              statusColor = 'border-rose-600 ring-2 ring-rose-600/50 animate-pulse';
-            } else if (m.utilization > 1.0) {
-              statusColor = 'border-rose-500 ring-2 ring-rose-500/40';
-            } else if (m.utilization > 0.78) {
-              statusColor = 'border-amber-500';
-            } else if (isSelected) {
-              statusColor = 'border-indigo-400 ring-2 ring-indigo-500/30';
-            }
-
-            return (
-              <div
-                key={node.id}
-                style={{ left: node.x, top: node.y, width: 176 }}
-                onMouseDown={(e) => {
-                  e.stopPropagation();
-                  if (connectingFromId && connectingFromId !== node.id && node.type !== 'SOURCE') {
-                    handlePortClick(e, node.id, 'in');
-                    return;
-                  }
-                  setSelectedNodeId(node.id);
-                  const rect = canvasRef.current.getBoundingClientRect();
-                  setDraggingNodeId(node.id);
-                  setDragOffset({
-                    x: e.clientX - rect.left - node.x,
-                    y: e.clientY - rect.top - node.y
-                  });
-                }}
-                onClick={(e) => e.stopPropagation()}
-                className={`absolute z-20 bg-slate-900/95 backdrop-blur rounded-xl border ${statusColor} p-2.5 shadow-xl transition-shadow cursor-grab active:cursor-grabbing`}
-              >
-                {/* Left Input Port */}
-                {node.type !== 'SOURCE' && (
-                  <button
-                    onClick={(e) => handlePortClick(e, node.id, 'in')}
-                    title="Input Port (Click to finish wire connection)"
-                    className={`w-4 h-4 rounded-full border-2 absolute -left-2 top-10 transition-transform hover:scale-125 ${
-                      connectingFromId && connectingFromId !== node.id
-                        ? 'bg-amber-400 border-white scale-125 animate-bounce'
-                        : 'bg-slate-800 border-slate-400 hover:border-indigo-400'
-                    }`}
-                  />
-                )}
-
-                {/* Right Output Port */}
-                <button
-                  onClick={(e) => handlePortClick(e, node.id, 'out')}
-                  title="Output Port (Click to start drawing wire)"
-                  className={`w-4 h-4 rounded-full border-2 absolute -right-2 top-10 transition-transform hover:scale-125 ${
-                    isConnectingSource
-                      ? 'bg-indigo-400 border-white scale-125'
-                      : 'bg-indigo-600 border-slate-200 hover:bg-indigo-400'
-                  }`}
-                />
-
-                {/* Node Header */}
-                <div className="flex items-center justify-between gap-1.5">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div
-                      className={`w-7 h-7 rounded-lg bg-gradient-to-br ${spec.color} flex items-center justify-center shrink-0`}
-                    >
-                      <Icon className="w-4 h-4 text-white" />
-                    </div>
-                    <div className="truncate">
-                      <div className="text-xs font-bold text-white truncate">{spec.name}</div>
-                      <div className="text-[10px] text-slate-400">
-                        {node.type === 'SOURCE' ? 'Entry Point' : `$${m.cost}/hr`}
-                      </div>
-                    </div>
-                  </div>
-
-                  {node.type !== 'SOURCE' && (
-                    <button
+                return (
+                  <g key={edge.id} className="pointer-events-auto group">
+                    {/* Invisible wider stroke for easy clicking to delete edge */}
+                    <path
+                      d={pathD}
+                      fill="none"
+                      stroke="transparent"
+                      strokeWidth="16"
+                      className="cursor-pointer"
                       onClick={(e) => {
                         e.stopPropagation();
-                        deleteNode(node.id);
+                        deleteEdge(edge.id);
                       }}
-                      className="text-slate-500 hover:text-rose-400 p-0.5 transition"
-                      title="Remove Node"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
+                    />
 
-                {/* Live Node Metrics Footer */}
-                {m.isCrashed ? (
-                  <div className="mt-2 bg-rose-950/90 border border-rose-600/50 rounded-lg px-2 py-1 flex items-center justify-between text-[10px] text-rose-300 font-bold">
-                    <span>NODE CRASHED</span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setNodes((prev) =>
-                          prev.map((n) => (n.id === node.id ? { ...n, crashed: false } : n))
-                        );
-                      }}
-                      className="underline hover:text-white"
-                    >
-                      Reboot
-                    </button>
-                  </div>
-                ) : (
-                  <div className="mt-2 pt-1.5 border-t border-slate-800/90 space-y-1">
-                    <div className="flex items-center justify-between text-[10px]">
-                      <span className="text-slate-400">
-                        {Math.round(m.totalIn).toLocaleString()} RPS
-                      </span>
-                      <span
-                        className={`font-semibold ${
-                          utilPct > 100
-                            ? 'text-rose-400'
-                            : utilPct > 78
-                            ? 'text-amber-400'
-                            : 'text-emerald-400'
-                        }`}
-                      >
-                        {node.type === 'SOURCE' ? 'Active' : `${utilPct}% Load`}
-                      </span>
-                    </div>
+                    {/* Base Wire */}
+                    <path
+                      d={pathD}
+                      fill="none"
+                      stroke={hasTraffic ? '#475569' : '#1e293b'}
+                      strokeWidth={hasTraffic ? '3' : '2'}
+                      className="group-hover:stroke-rose-500 transition-colors"
+                    />
 
-                    {node.type !== 'SOURCE' && (
-                      <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full transition-all duration-200 ${
-                            utilPct > 100
-                              ? 'bg-rose-500'
-                              : utilPct > 78
-                              ? 'bg-amber-400'
-                              : 'bg-emerald-500'
-                          }`}
-                          style={{ width: `${Math.min(100, utilPct)}%` }}
+                    {/* Animated Read Packet (Blue) */}
+                    {flow.read > 5 && (
+                      <circle r="4" fill="#38bdf8" filter="url(#glow)">
+                        <animateMotion
+                          dur={`${animDuration}s`}
+                          repeatCount="indefinite"
+                          path={pathD}
                         />
+                      </circle>
+                    )}
+
+                    {/* Animated Write Packet (Orange) */}
+                    {flow.write > 5 && (
+                      <circle r="4" fill="#fbbf24" filter="url(#glow)">
+                        <animateMotion
+                          dur={`${animDuration * 1.15}s`}
+                          begin="0.25s"
+                          repeatCount="indefinite"
+                          path={pathD}
+                        />
+                      </circle>
+                    )}
+
+                    {/* Animated Bot Packet (Red) */}
+                    {flow.bot > 5 && (
+                      <circle r="4.5" fill="#f43f5e" filter="url(#glow)">
+                        <animateMotion
+                          dur={`${animDuration * 0.85}s`}
+                          begin="0.1s"
+                          repeatCount="indefinite"
+                          path={pathD}
+                        />
+                      </circle>
+                    )}
+
+                    {/* RPS Flow Label on Wire */}
+                    {hasTraffic && (
+                      <g transform={`translate(${(x1 + x2) / 2}, ${(y1 + y2) / 2 - 8})`}>
+                        <rect
+                          x="-28"
+                          y="-10"
+                          width="56"
+                          height="16"
+                          rx="4"
+                          fill="#0f172a"
+                          stroke="#334155"
+                          strokeWidth="1"
+                        />
+                        <text
+                          textAnchor="middle"
+                          y="1"
+                          fill="#94a3b8"
+                          fontSize="9"
+                          fontWeight="bold"
+                        >
+                          {Math.round(flow.total) >= 1000
+                            ? `${(flow.total / 1000).toFixed(1)}k/s`
+                            : `${Math.round(flow.total)}/s`}
+                        </text>
+                      </g>
+                    )}
+                  </g>
+                );
+              })}
+            </svg>
+
+            {/* INFRASTRUCTURE NODES ON CANVAS */}
+            <div className="absolute inset-0 pointer-events-none">
+              {nodes.map((node) => {
+                const spec = COMPONENT_CATALOG[node.type];
+                const m = evaluation.nodeMetrics[node.id] || {
+                  totalIn: 0,
+                  utilization: 0,
+                  effectiveLatency: spec.baseLatency,
+                  capacity: spec.baseCapacity,
+                  isCrashed: false
+                };
+                const Icon = spec.icon;
+                const isSelected = selectedNodeId === node.id;
+                const isConnectingSource = connectingFromId === node.id;
+                const utilPct = Math.round(m.utilization * 100);
+
+                let statusColor = 'border-slate-700/90';
+                if (m.isCrashed) {
+                  statusColor = 'border-rose-600 ring-2 ring-rose-600/50 animate-pulse';
+                } else if (m.utilization > 1.0) {
+                  statusColor = 'border-rose-500 ring-2 ring-rose-500/40';
+                } else if (m.utilization > 0.78) {
+                  statusColor = 'border-amber-500';
+                } else if (isSelected) {
+                  statusColor = 'border-indigo-400 ring-2 ring-indigo-500/30';
+                }
+
+                return (
+                  <div
+                    key={node.id}
+                    style={{ left: node.x, top: node.y, width: 176 }}
+                    onMouseDown={(e) => {
+                      e.stopPropagation();
+                      if (connectingFromId && connectingFromId !== node.id && node.type !== 'SOURCE') {
+                        handlePortClick(e, node.id, 'in');
+                        return;
+                      }
+                      setSelectedNodeId(node.id);
+                      const rect = canvasRef.current.getBoundingClientRect();
+                      const screenX = e.clientX - rect.left;
+                      const screenY = e.clientY - rect.top;
+                      const worldX = (screenX - pan.x) / zoom;
+                      const worldY = (screenY - pan.y) / zoom;
+                      setDraggingNodeId(node.id);
+                      setDragOffset({
+                        x: worldX - node.x,
+                        y: worldY - node.y
+                      });
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    className={`no-pan pointer-events-auto absolute z-20 bg-slate-900/95 backdrop-blur rounded-xl border ${statusColor} p-2.5 shadow-xl transition-shadow cursor-grab active:cursor-grabbing`}
+                  >
+                    {/* Left Input Port */}
+                    {node.type !== 'SOURCE' && (
+                      <button
+                        onClick={(e) => handlePortClick(e, node.id, 'in')}
+                        title="Input Port (Click to finish wire connection)"
+                        className={`w-4 h-4 rounded-full border-2 absolute -left-2 top-10 transition-transform hover:scale-125 ${
+                          connectingFromId && connectingFromId !== node.id
+                            ? 'bg-amber-400 border-white scale-125 animate-bounce'
+                            : 'bg-slate-800 border-slate-400 hover:border-indigo-400'
+                        }`}
+                      />
+                    )}
+
+                    {/* Right Output Port */}
+                    <button
+                      onClick={(e) => handlePortClick(e, node.id, 'out')}
+                      title="Output Port (Click to start drawing wire)"
+                      className={`w-4 h-4 rounded-full border-2 absolute -right-2 top-10 transition-transform hover:scale-125 ${
+                        isConnectingSource
+                          ? 'bg-indigo-400 border-white scale-125'
+                          : 'bg-indigo-600 border-slate-200 hover:bg-indigo-400'
+                      }`}
+                    />
+
+                    {/* Node Header */}
+                    <div className="flex items-center justify-between gap-1.5">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div
+                          className={`w-7 h-7 rounded-lg bg-gradient-to-br ${spec.color} flex items-center justify-center shrink-0`}
+                        >
+                          <Icon className="w-4 h-4 text-white" />
+                        </div>
+                        <div className="truncate">
+                          <div className="text-xs font-bold text-white truncate">{spec.name}</div>
+                          <div className="text-[10px] text-slate-400">
+                            {node.type === 'SOURCE' ? 'Entry Point' : `$${m.cost}/hr`}
+                          </div>
+                        </div>
+                      </div>
+
+                      {node.type !== 'SOURCE' && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteNode(node.id);
+                          }}
+                          className="text-slate-500 hover:text-rose-400 p-0.5 transition"
+                          title="Remove Node"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Live Node Metrics Footer */}
+                    {m.isCrashed ? (
+                      <div className="mt-2 bg-rose-950/90 border border-rose-600/50 rounded-lg px-2 py-1 flex items-center justify-between text-[10px] text-rose-300 font-bold">
+                        <span>NODE CRASHED</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setNodes((prev) =>
+                              prev.map((n) => (n.id === node.id ? { ...n, crashed: false } : n))
+                            );
+                          }}
+                          className="underline hover:text-white"
+                        >
+                          Reboot
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="mt-2 pt-1.5 border-t border-slate-800/90 space-y-1">
+                        <div className="flex items-center justify-between text-[10px]">
+                          <span className="text-slate-400">
+                            {Math.round(m.totalIn).toLocaleString()} RPS
+                          </span>
+                          <span
+                            className={`font-semibold ${
+                              utilPct > 100
+                                ? 'text-rose-400'
+                                : utilPct > 78
+                                ? 'text-amber-400'
+                                : 'text-emerald-400'
+                            }`}
+                          >
+                            {node.type === 'SOURCE' ? 'Active' : `${utilPct}% Load`}
+                          </span>
+                        </div>
+
+                        {node.type !== 'SOURCE' && (
+                          <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full transition-all duration-200 ${
+                                utilPct > 100
+                                  ? 'bg-rose-500'
+                                  : utilPct > 78
+                                  ? 'bg-amber-400'
+                                  : 'bg-emerald-500'
+                              }`}
+                              style={{ width: `${Math.min(100, utilPct)}%` }}
+                            />
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
-                )}
-              </div>
-            );
-          })}
+                );
+              })}
+            </div>
+          </div>
         </main>
 
         {/* RIGHT SIDEBAR: NODE CONFIGURATOR & LIVE ARCHITECTURE MENTOR */}
