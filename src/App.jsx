@@ -1,723 +1,919 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
-  Server, Database, Shield, Globe, Cpu, Layers, Activity, Zap, Play, Pause,
-  RotateCcw, AlertTriangle, CheckCircle2, HelpCircle, Github, Plus, Trash2,
-  Settings, Award, Terminal, Flame, ChevronRight, Copy, Check, Download,
-  FastForward, Eye, Sliders, Share2, Lock, Unlock, Box, HardDrive, Network,
-  ArrowRight, Sparkles, Info, X, RefreshCw, ZoomIn, ZoomOut, Maximize2, Move
+  Play, Pause, RotateCcw, Trash2, Shield, Cpu, Database,
+  Zap, Award, AlertTriangle, CheckCircle2, DollarSign, Heart,
+  Activity, Wrench, ArrowUpCircle, BookOpen, Sparkles, Flame,
+  Code, Clock, Copy, Check, Terminal, HelpCircle, Layers
 } from 'lucide-react';
 
 // ============================================================================
-// 1. COMPONENT CATALOG & REALISTIC SYSTEM DESIGN SPECS
+// 1. TRAFFIC TYPES (Color-Coded Packets with Class 10 + Pro Modes)
 // ============================================================================
-const COMPONENT_CATALOG = {
-  SOURCE: {
-    type: 'SOURCE',
-    name: 'Internet Traffic',
-    category: 'Entry',
-    icon: Globe,
-    color: 'from-sky-500 to-blue-600',
-    borderColor: 'border-sky-500',
-    textColor: 'text-sky-400',
-    baseCost: 0,
-    baseCapacity: 100000,
-    baseLatency: 5,
-    description: 'Incoming user requests (Read, Write, and potential Bot/DDoS traffic).',
-    isRemovable: false,
+const TRAFFIC_TYPES = {
+  STATIC: {
+    id: 'STATIC',
+    kidName: 'Photos & Videos',
+    proName: 'STATIC Media (CDN/S3)',
+    color: '#22c55e', // Green
+    badgeClass: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40',
+    reward: 0.6,
+    emoji: '🖼️',
+    hint: 'Resolved at the edge by a CDN (95%) or stored in Object Storage.'
   },
-  WAF: {
-    type: 'WAF',
-    name: 'WAF & Rate Limiter',
-    category: 'Edge',
-    icon: Shield,
-    color: 'from-rose-500 to-red-600',
-    borderColor: 'border-rose-500',
-    textColor: 'text-rose-400',
-    baseCost: 45,
-    baseCapacity: 25000,
-    baseLatency: 4,
-    description: 'Blocks 98% of malicious Bot/DDoS traffic and rate-limits abusive spikes.',
-    configOptions: {
-      mode: { label: 'Protection Mode', values: ['Standard', 'Strict AI Shield'], costMult: [1, 1.4] }
-    }
+  READ: {
+    id: 'READ',
+    kidName: 'Profile / Feed Read',
+    proName: 'DB READ (SELECT)',
+    color: '#3b82f6', // Blue
+    badgeClass: 'bg-blue-500/15 text-blue-300 border-blue-500/40',
+    reward: 0.9,
+    emoji: '📖',
+    hint: '75% absorbed by Redis Cache; remainder goes to Read Replicas or DB.'
   },
-  CDN: {
-    type: 'CDN',
-    name: 'Cloud CDN Edge',
-    category: 'Edge',
-    icon: Zap,
-    color: 'from-amber-500 to-orange-600',
-    borderColor: 'border-amber-500',
-    textColor: 'text-amber-400',
-    baseCost: 60,
-    baseCapacity: 30000,
-    baseLatency: 6,
-    description: 'Caches static media & edge reads. Offloads 70% of Read traffic at ultra-low 6ms latency.',
-    configOptions: {
-      hitRatio: { label: 'Edge Cache Policy', values: ['Standard (65%)', 'Aggressive (80%)'], hitRate: [0.65, 0.80], costMult: [1, 1.35] }
-    }
+  WRITE: {
+    id: 'WRITE',
+    kidName: 'New Order / Save',
+    proName: 'DB WRITE (INSERT/TX)',
+    color: '#f97316', // Orange
+    badgeClass: 'bg-orange-500/15 text-orange-300 border-orange-500/40',
+    reward: 1.4,
+    emoji: '✍️',
+    hint: 'Must reach a persistent SQL Master or NoSQL Database (buffered by Kafka Queue).'
   },
-  LB: {
-    type: 'LB',
-    name: 'Load Balancer',
-    category: 'Routing',
-    icon: Network,
-    color: 'from-indigo-500 to-purple-600',
-    borderColor: 'border-indigo-500',
-    textColor: 'text-indigo-400',
-    baseCost: 50,
-    baseCapacity: 25000,
-    baseLatency: 5,
-    description: 'Distributes incoming traffic across multiple healthy downstream instances.',
-    configOptions: {
-      algorithm: { label: 'Routing Algorithm', values: ['Round Robin', 'Least Connections'], costMult: [1, 1.1] }
-    }
+  SEARCH: {
+    id: 'SEARCH',
+    kidName: 'Search Query',
+    proName: 'Full-Text SEARCH',
+    color: '#06b6d4', // Cyan
+    badgeClass: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/40',
+    reward: 1.3,
+    emoji: '🔍',
+    hint: '3x faster on Elasticsearch Index; heavy latency penalty on SQL DB.'
   },
-  WEB: {
-    type: 'WEB',
-    name: 'API / Web Server',
-    category: 'Compute',
-    icon: Server,
-    color: 'from-emerald-500 to-teal-600',
-    borderColor: 'border-emerald-500',
-    textColor: 'text-emerald-400',
-    baseCost: 65,
-    baseCapacity: 2200,
-    baseLatency: 18,
-    description: 'Stateless application server executing business logic. Scale horizontally or vertically.',
-    configOptions: {
-      tier: { label: 'Instance Size', values: ['t3.medium (1x)', 'c6i.xlarge (2.5x)', 'c6i.4xlarge (5x)'], capMult: [1, 2.5, 5], costMult: [1, 2.1, 4.0] }
-    }
+  MALICIOUS: {
+    id: 'MALICIOUS',
+    kidName: 'Hacker DDoS Bot',
+    proName: 'DDoS / Bot Attack',
+    color: '#ef4444', // Red
+    badgeClass: 'bg-red-500/15 text-red-300 border-red-500/40',
+    reward: 0.5,
+    emoji: '👾',
+    hint: 'Must be filtered at the perimeter by a WAF / Firewall!'
   },
-  CACHE: {
-    type: 'CACHE',
-    name: 'Redis Cache Cluster',
-    category: 'Data',
-    icon: Layers,
-    color: 'from-red-500 to-rose-600',
-    borderColor: 'border-red-500',
-    textColor: 'text-red-400',
-    baseCost: 75,
-    baseCapacity: 15000,
-    baseLatency: 3,
-    description: 'In-memory key-value store. Intercepts 75%+ of database Read queries in 3ms.',
-    configOptions: {
-      eviction: { label: 'Cache Strategy', values: ['LRU (75% Hit)', 'Semantic + LRU (88% Hit)'], hitRate: [0.75, 0.88], costMult: [1, 1.5] }
-    }
-  },
-  QUEUE: {
-    type: 'QUEUE',
-    name: 'Kafka Message Queue',
-    category: 'Async',
-    icon: Activity,
-    color: 'from-fuchsia-500 to-pink-600',
-    borderColor: 'border-fuchsia-500',
-    textColor: 'text-fuchsia-400',
-    baseCost: 85,
-    baseCapacity: 22000,
-    baseLatency: 8,
-    description: 'Decouples heavy Write spikes! Buffers and smooths bursts by 65% for downstream Workers/DBs.',
-    configOptions: {
-      partitions: { label: 'Broker Partitions', values: ['8 Partitions (1x)', '32 Partitions (2x)'], capMult: [1, 2], costMult: [1, 1.6] }
-    }
-  },
-  WORKER: {
-    type: 'WORKER',
-    name: 'Async Worker Pool',
-    category: 'Compute',
-    icon: Cpu,
-    color: 'from-cyan-500 to-blue-600',
-    borderColor: 'border-cyan-500',
-    textColor: 'text-cyan-400',
-    baseCost: 70,
-    baseCapacity: 4500,
-    baseLatency: 15,
-    description: 'Consumes jobs from Kafka Queue and writes batches safely into the Database.',
-    configOptions: {
-      tier: { label: 'Pool Concurrency', values: ['4 Workers (1x)', '12 Workers (2.5x)'], capMult: [1, 2.5], costMult: [1, 2.0] }
-    }
-  },
-  SQL: {
-    type: 'SQL',
-    name: 'PostgreSQL Primary',
-    category: 'Data',
-    icon: Database,
-    color: 'from-blue-500 to-indigo-600',
-    borderColor: 'border-blue-500',
-    textColor: 'text-blue-400',
-    baseCost: 95,
-    baseCapacity: 1600,
-    baseLatency: 28,
-    description: 'ACID relational database for persistent Reads & Writes. Vulnerable to high uncached loads.',
-    configOptions: {
-      scaling: {
-        label: 'Topology Mode',
-        values: ['Single Node (1x)', '+2 Read Replicas (2.6x)', 'Sharded Cluster (5.5x)'],
-        capMult: [1, 2.6, 5.5],
-        costMult: [1, 2.1, 3.8],
-        latencyMult: [1, 0.85, 0.7]
-      }
-    }
-  },
-  VECTOR_AI: {
-    type: 'VECTOR_AI',
-    name: 'Vector DB + GPU Node',
-    category: 'AI / ML',
-    icon: Sparkles,
-    color: 'from-violet-500 to-purple-600',
-    borderColor: 'border-violet-500',
-    textColor: 'text-violet-400',
-    baseCost: 190,
-    baseCapacity: 4500,
-    baseLatency: 42,
-    description: 'Handles AI embeddings & RAG LLM inference. Required for AI-enabled traffic waves.',
-    configOptions: {
-      batching: {
-        label: 'Inference Engine',
-        values: ['Standard vLLM (1x)', 'TensorRT + FP8 Batching (2.5x)'],
-        capMult: [1, 2.5],
-        costMult: [1, 1.75],
-        latencyMult: [1, 0.65]
-      }
-    }
+  AI_PROMPT: {
+    id: 'AI_PROMPT',
+    kidName: 'AI Chat Prompt',
+    proName: 'LLM GPU Inference',
+    color: '#d946ef', // Fuchsia
+    badgeClass: 'bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/40',
+    reward: 2.2,
+    emoji: '🤖',
+    hint: 'Requires an AI GPU Inference Cluster (or Semantic Cache).'
   }
 };
 
 // ============================================================================
-// 2. CAMPAIGN LEVELS & ARCHITECTURAL SCENARIOS
+// 2. INFRASTRUCTURE COMPONENT CATALOG (Includes Base Latency & Saturation)
+// ============================================================================
+const SERVICE_CATALOG = {
+  INTERNET: {
+    type: 'INTERNET',
+    category: 'SOURCE',
+    proName: 'Client Traffic Generator',
+    kidName: '🌍 Live App Users',
+    cost: 0,
+    upkeep: 0,
+    baseCap: 999,
+    baseLatencyMs: 5,
+    color: '#64748b',
+    emoji: '🌍',
+    kidDesc: 'Students and users clicking buttons on your app!',
+    proDesc: 'External ingress traffic source.'
+  },
+  FIREWALL: {
+    type: 'FIREWALL',
+    category: 'EDGE',
+    proName: 'WAF & DDoS Shield',
+    kidName: '🛡️ Security Bouncer (WAF)',
+    cost: 40,
+    upkeep: 4,
+    baseCap: 40,
+    baseLatencyMs: 4,
+    color: '#ef4444',
+    emoji: '🛡️',
+    kidDesc: 'Stands at the front gate! Blocks Red Hacker Bots (👾) and lets real users inside.',
+    proDesc: 'Edge Web Application Firewall. Drops malicious DDoS packets.'
+  },
+  CDN: {
+    type: 'CDN',
+    category: 'EDGE',
+    proName: 'Cloud Edge CDN',
+    kidName: '⚡ Fast Photo Booth (CDN)',
+    cost: 60,
+    upkeep: 5,
+    baseCap: 55,
+    baseLatencyMs: 6,
+    color: '#22c55e',
+    emoji: '⚡',
+    kidDesc: 'Serves Green Photos & Videos (🖼️) right at the door in 6ms so your servers relax!',
+    proDesc: 'Edge Content Delivery Network. Terminates 95% of STATIC media requests.'
+  },
+  LOAD_BALANCER: {
+    type: 'LOAD_BALANCER',
+    category: 'EDGE',
+    proName: 'NGINX Load Balancer',
+    kidName: '🚦 Traffic Cop (Balancer)',
+    cost: 50,
+    upkeep: 6,
+    baseCap: 50,
+    baseLatencyMs: 5,
+    color: '#6366f1',
+    emoji: '🚦',
+    kidDesc: 'Splits incoming traffic evenly across multiple App Servers so none overheat.',
+    proDesc: 'L7 Reverse Proxy distributing requests across stateless compute nodes.'
+  },
+  COMPUTE: {
+    type: 'COMPUTE',
+    category: 'COMPUTE',
+    proName: 'Stateless API Server',
+    kidName: '💻 App Worker (Server)',
+    cost: 60,
+    upkeep: 10,
+    baseCap: 15,
+    baseLatencyMs: 18,
+    color: '#3b82f6',
+    emoji: '💻',
+    kidDesc: 'Runs your core app code and routes queries to caches, queues, or databases.',
+    proDesc: 'Application compute instance. Executes business logic and downstream routing.'
+  },
+  QUEUE: {
+    type: 'QUEUE',
+    category: 'ASYNC',
+    proName: 'Kafka Message Queue',
+    kidName: '🎟️ Waiting Line (Queue)',
+    cost: 45,
+    upkeep: 4,
+    baseCap: 60,
+    baseLatencyMs: 10,
+    color: '#eab308',
+    emoji: '🎟️',
+    kidDesc: 'Smooths out sudden Orange Write spikes (✍️) by holding orders in an orderly line!',
+    proDesc: 'Asynchronous pub/sub event buffer that prevents database lockups.'
+  },
+  CACHE: {
+    type: 'CACHE',
+    category: 'DATA',
+    proName: 'Redis Memory Cache',
+    kidName: '🧠 Sticky-Note Cache',
+    cost: 60,
+    upkeep: 8,
+    baseCap: 40,
+    baseLatencyMs: 3,
+    color: '#ec4899',
+    emoji: '🧠',
+    kidDesc: 'Remembers popular Blue Read answers (📖) in 3ms! Saves 75% of database work.',
+    proDesc: 'In-memory key-value store. 75% cache hit ratio with ultra-low 3ms latency.'
+  },
+  STORAGE: {
+    type: 'STORAGE',
+    category: 'DATA',
+    proName: 'S3 Object Storage',
+    kidName: '📦 Photo Locker (S3)',
+    cost: 35,
+    upkeep: 4,
+    baseCap: 30,
+    baseLatencyMs: 25,
+    color: '#10b981',
+    emoji: '📦',
+    kidDesc: 'Giant vault for Green Photos & Videos (🖼️) that miss the CDN.',
+    proDesc: 'Durable blob storage for static assets and media uploads.'
+  },
+  SQL_DB: {
+    type: 'SQL_DB',
+    category: 'DATA',
+    proName: 'PostgreSQL Master DB',
+    kidName: '🗄️ Master Notebook (SQL)',
+    cost: 120,
+    upkeep: 18,
+    baseCap: 14,
+    baseLatencyMs: 42,
+    color: '#8b5cf6',
+    emoji: '🗄️',
+    kidDesc: 'Saves Orange Orders (✍️) and answers Blue Reads (📖). Reliable, but slow under heavy load!',
+    proDesc: 'ACID Relational Database. Handles READ, WRITE, and fallback SEARCH.'
+  },
+  READ_REPLICA: {
+    type: 'READ_REPLICA',
+    category: 'DATA',
+    proName: 'SQL Read Replica',
+    kidName: '📑 Photocopy Book (Replica)',
+    cost: 85,
+    upkeep: 10,
+    baseCap: 22,
+    baseLatencyMs: 24,
+    color: '#60a5fa',
+    emoji: '📑',
+    kidDesc: 'Extra copy of the database that only answers Blue Reads (📖). Cannot take Orange Writes!',
+    proDesc: 'Asynchronous Read-Only DB Replica to scale SELECT queries horizontally.'
+  },
+  NOSQL_DB: {
+    type: 'NOSQL_DB',
+    category: 'DATA',
+    proName: 'DynamoDB NoSQL',
+    kidName: '🚀 Turbo Vault (NoSQL)',
+    cost: 95,
+    upkeep: 12,
+    baseCap: 28,
+    baseLatencyMs: 14,
+    color: '#f97316',
+    emoji: '🚀',
+    kidDesc: 'Super fast at Orange Writes (✍️) and Blue Reads (📖), but cannot do Cyan Searches (🔍)!',
+    proDesc: 'Partitioned key-value/document store for high-throughput writes & reads.'
+  },
+  SEARCH_ENGINE: {
+    type: 'SEARCH_ENGINE',
+    category: 'DATA',
+    proName: 'Elasticsearch Cluster',
+    kidName: '🔍 Smart Index (Search)',
+    cost: 110,
+    upkeep: 14,
+    baseCap: 25,
+    baseLatencyMs: 16,
+    color: '#06b6d4',
+    emoji: '🔍',
+    kidDesc: 'Built specifically to answer Cyan Search Bar queries (🔍) in 16ms!',
+    proDesc: 'Inverted-index search engine. 3x faster than SQL LIKE queries.'
+  },
+  GPU_CLUSTER: {
+    type: 'GPU_CLUSTER',
+    category: 'COMPUTE',
+    proName: 'H100 GPU Inference Node',
+    kidName: '🤖 AI GPU Super-Brain',
+    cost: 210,
+    upkeep: 28,
+    baseCap: 16,
+    baseLatencyMs: 65,
+    color: '#d946ef',
+    emoji: '🤖',
+    kidDesc: 'High-powered AI brain that answers Purple AI Chat Prompts (🤖)!',
+    proDesc: 'Batched LLM token generation cluster for AI inference.'
+  }
+};
+
+// ============================================================================
+// 3. 5 PROGRESSIVE LEVELS (Combining SLA Latency Targets + School Analogies)
 // ============================================================================
 const CAMPAIGN_LEVELS = [
   {
     id: 1,
-    title: 'Level 1: The Garage Startup',
-    subtitle: 'Vertical Scaling & Basic Caching',
-    brief: 'Your MVP social app just got featured on Hacker News! Traffic is ramping up to 800 RPS. A single default Web Server and SQL Database will buckle under the read load. Upgrade your tier or add a Redis Cache between your Web Server and SQL DB.',
-    targetRps: 800,
-    readRatio: 0.85,
-    writeRatio: 0.15,
-    botRatio: 0.0,
-    requiresAI: false,
-    chaosEnabled: false,
-    maxLatencyMs: 120,
-    minUptimePct: 99.0,
-    maxBudgetHr: 260,
-    allowedComponents: ['WEB', 'CACHE', 'SQL', 'LB'],
-    hints: [
-      'A default SQL Database can handle 1,600 RPS, wait—why is latency spiking? Because as load passes 50% capacity, database disk I/O queues up exponentially!',
-      'Place a Redis Cache between your Web Server and PostgreSQL Primary (Web -> Cache -> SQL) so 75% of read requests never touch disk.',
-      'Or upgrade your Web Server instance size if CPU saturation rises.'
-    ],
+    chapter: 'Tier 1: The Garage Startup',
+    title: 'Level 1: First Homework App',
+    concept: 'Client → Stateless Server → Relational DB',
+    kidStory: 'You launched a homework tracker for your school! Wire your App Worker (💻) to the Master Notebook (🗄️ SQL DB) and survive 25 requests while keeping response latency under 180ms.',
+    schoolAnalogy: 'The App Worker (💻) is like a waiter taking orders, and the SQL Database (🗄️) is the kitchen cooking the food!',
+    startBudget: 260,
+    targetProcessed: 25,
+    maxLatencySla: 180,
+    baseRps: 6,
+    trafficMix: { READ: 70, WRITE: 30 },
+    unlockedTools: ['COMPUTE', 'SQL_DB'],
     initialNodes: [
-      { id: 'src-1', type: 'SOURCE', x: 70, y: 210, config: {} },
-      { id: 'web-1', type: 'WEB', x: 360, y: 210, config: { tier: 0 } },
-      { id: 'sql-1', type: 'SQL', x: 670, y: 210, config: { scaling: 0 } }
+      { id: 'src', type: 'INTERNET', x: 55, y: 200, tier: 1, health: 100 },
+      { id: 'n1', type: 'COMPUTE', x: 300, y: 200, tier: 1, health: 100 },
+      { id: 'n2', type: 'SQL_DB', x: 560, y: 200, tier: 1, health: 100 }
     ],
-    initialEdges: [
-      { id: 'e1', source: 'src-1', target: 'web-1' },
-      { id: 'e2', source: 'web-1', target: 'sql-1' }
-    ]
+    initialEdges: [{ id: 'e1', from: 'src', to: 'n1' }],
+    hint: 'Click "🔗 Wire" on the App Worker (💻), then click the Master Notebook (🗄️) to connect them. Hit START WAVE!'
   },
   {
     id: 2,
-    title: 'Level 2: The Viral Blog Post',
-    subtitle: 'Edge Offloading with CDNs & In-Memory Cache',
-    brief: 'A major tech influencer linked to your site! You are facing 3,500 RPS with 90% static & read-heavy traffic, and your SLA requires sub-80ms P99 latency on a tight $280/hr budget. Offload traffic at the edge before it melts your origin servers.',
-    targetRps: 3500,
-    readRatio: 0.90,
-    writeRatio: 0.10,
-    botRatio: 0.0,
-    requiresAI: false,
-    chaosEnabled: false,
-    maxLatencyMs: 80,
-    minUptimePct: 99.0,
-    maxBudgetHr: 280,
-    allowedComponents: ['CDN', 'LB', 'WEB', 'CACHE', 'SQL'],
-    hints: [
-      'Insert a Cloud CDN Edge right after Internet Traffic (Internet -> CDN -> Web Server). It intercepts up to 80% of read requests in 6ms!',
-      'Combine a CDN upstream with a Redis Cache before your SQL Database so almost zero read queries hit the database.',
-      'Watch your hourly budget ($280/hr limit)—1 CDN + 1 Web Server + 1 Redis Cache + 1 SQL DB costs only $290, or skip Redis and use Aggressive CDN + upgraded Web Server!'
-    ],
+    chapter: 'Tier 1: Edge Offloading',
+    title: 'Level 2: Viral School Meme Post',
+    concept: 'CDN Edge Offloading & Object Storage',
+    kidStory: 'A funny school meme went viral! 60% of traffic is now Green Photos & Videos (🖼️). SQL Databases CANNOT store media files! Add a Fast Photo Booth (⚡ CDN) at the front door to keep P99 latency under 110ms.',
+    schoolAnalogy: 'Instead of making every student walk to the principal’s office for the exam schedule, pin a giant poster at the school gate (⚡ CDN)!',
+    startBudget: 320,
+    targetProcessed: 45,
+    maxLatencySla: 110,
+    baseRps: 12,
+    trafficMix: { STATIC: 60, READ: 30, WRITE: 10 },
+    unlockedTools: ['CDN', 'COMPUTE', 'STORAGE', 'SQL_DB'],
     initialNodes: [
-      { id: 'src-1', type: 'SOURCE', x: 60, y: 220, config: {} },
-      { id: 'web-1', type: 'WEB', x: 420, y: 220, config: { tier: 0 } },
-      { id: 'sql-1', type: 'SQL', x: 730, y: 220, config: { scaling: 0 } }
+      { id: 'src', type: 'INTERNET', x: 50, y: 200, tier: 1, health: 100 },
+      { id: 'n1', type: 'COMPUTE', x: 340, y: 245, tier: 1, health: 100 },
+      { id: 'n2', type: 'SQL_DB', x: 590, y: 245, tier: 1, health: 100 }
     ],
     initialEdges: [
-      { id: 'e1', source: 'src-1', target: 'web-1' },
-      { id: 'e2', source: 'web-1', target: 'sql-1' }
-    ]
+      { id: 'e1', from: 'src', to: 'n1' },
+      { id: 'e2', from: 'n1', to: 'n2' }
+    ],
+    hint: 'Place a "⚡ Fast Photo Booth (CDN)" and a "📦 Photo Locker (S3)". Wire Internet → CDN → App Worker, and App Worker → Photo Locker!'
   },
   {
     id: 3,
-    title: 'Level 3: Flash Sale Checkout',
-    subtitle: 'Horizontal Scaling, Load Balancing & Read Replicas',
-    brief: 'Black Friday Flash Sale! 8,000 RPS is incoming with a heavy 35% checkout Write ratio. A single Web Server and single SQL node will crash immediately. Use a Load Balancer, multiple Web Servers, Redis Cache, and Database Read Replicas/Sharding.',
-    targetRps: 8000,
-    readRatio: 0.65,
-    writeRatio: 0.35,
-    botRatio: 0.0,
-    requiresAI: false,
-    chaosEnabled: false,
-    maxLatencyMs: 150,
-    minUptimePct: 99.0,
-    maxBudgetHr: 550,
-    allowedComponents: ['CDN', 'LB', 'WEB', 'CACHE', 'SQL'],
-    hints: [
-      'Connect Internet Traffic -> CDN -> Load Balancer -> 2 (or more) Web Servers.',
-      'Point your Web Servers to a Redis Cache, and connect the Redis Cache to your SQL Database.',
-      'Because 35% of 8,000 RPS (2,800 RPS) are Writes that bypass cache, click your SQL Database and upgrade Topology Mode to "+2 Read Replicas" or "Sharded Cluster"!'
-    ],
+    chapter: 'Tier 2: Horizontal Scale & Caching',
+    title: 'Level 3: Exam Results Stampede',
+    concept: 'In-Memory Redis Caching & Read Replicas',
+    kidStory: 'Exam results are out! 80% of requests are Blue Reads (📖) at 18 req/sec. A single SQL Database maxes out at 14 req/sec and its latency spikes! Place a Sticky-Note Cache (🧠) in front of your database.',
+    schoolAnalogy: 'A Memory Cache (🧠) is like writing the top 10 math formulas on a sticky note on your desk so you answer in 3ms instead of searching a 500-page textbook!',
+    startBudget: 360,
+    targetProcessed: 70,
+    maxLatencySla: 95,
+    baseRps: 18,
+    trafficMix: { READ: 80, WRITE: 20 },
+    unlockedTools: ['CDN', 'LOAD_BALANCER', 'COMPUTE', 'CACHE', 'READ_REPLICA', 'SQL_DB'],
     initialNodes: [
-      { id: 'src-1', type: 'SOURCE', x: 50, y: 220, config: {} },
-      { id: 'lb-1', type: 'LB', x: 260, y: 220, config: { algorithm: 0 } },
-      { id: 'web-1', type: 'WEB', x: 480, y: 130, config: { tier: 0 } },
-      { id: 'sql-1', type: 'SQL', x: 760, y: 220, config: { scaling: 0 } }
+      { id: 'src', type: 'INTERNET', x: 50, y: 200, tier: 1, health: 100 },
+      { id: 'n1', type: 'COMPUTE', x: 280, y: 200, tier: 2, health: 100 },
+      { id: 'n2', type: 'SQL_DB', x: 580, y: 200, tier: 1, health: 100 }
     ],
     initialEdges: [
-      { id: 'e1', source: 'src-1', target: 'lb-1' },
-      { id: 'e2', source: 'lb-1', target: 'web-1' },
-      { id: 'e3', source: 'web-1', target: 'sql-1' }
-    ]
+      { id: 'e1', from: 'src', to: 'n1' },
+      { id: 'e2', from: 'n1', to: 'n2' }
+    ],
+    hint: 'Add a "🧠 Sticky-Note Cache" and wire App Worker → Cache → SQL DB. The Cache absorbs 75% of Blue Reads in just 3ms!'
   },
   {
     id: 4,
-    title: 'Level 4: Ticketmaster Drop Spike',
-    subtitle: 'WAF Bot Mitigation & Async Kafka Write Queues',
-    brief: 'A stadium concert ticket drop just triggered 15,000 RPS! Worse: 15% of traffic is malicious scalper bots, and 60% of legitimate traffic is concurrent ticket reservation Writes. Filter the bots at the edge and buffer writes using Kafka + Workers!',
-    targetRps: 15000,
-    readRatio: 0.30,
-    writeRatio: 0.55,
-    botRatio: 0.15,
-    requiresAI: false,
-    chaosEnabled: false,
-    maxLatencyMs: 180,
-    minUptimePct: 99.0,
-    maxBudgetHr: 750,
-    allowedComponents: ['WAF', 'CDN', 'LB', 'WEB', 'CACHE', 'QUEUE', 'WORKER', 'SQL'],
-    hints: [
-      'Unfiltered Red Bot traffic causes instant 15% packet errors! Put a WAF & Rate Limiter directly after Internet Traffic.',
-      'To survive 8,250 Write RPS without bankrupting yourself on SQL clusters, route Web Servers -> Kafka Message Queue -> Async Worker Pool -> SQL Database (Sharded).',
-      'Kafka smooths heavy write bursts by 65%, allowing downstream Workers and SQL to process reservations smoothly.'
-    ],
+    chapter: 'Tier 3: Security & Async Queues',
+    title: 'Level 4: Rival School DDoS & Ticket Drop',
+    concept: 'WAF Perimeter Defense, Search Index & Write Buffering',
+    kidStory: 'A rival school launched Red DDoS Bots (👾) right during your fest ticket sale! Block the bots at the gate with a Security Bouncer (🛡️ WAF), and route Cyan Searches (🔍) to a Smart Index.',
+    schoolAnalogy: 'A Firewall (🛡️) is the school gate guard checking ID cards so pranksters cannot jam the hallways!',
+    startBudget: 490,
+    targetProcessed: 95,
+    maxLatencySla: 140,
+    baseRps: 24,
+    trafficMix: { MALICIOUS: 25, READ: 30, WRITE: 25, SEARCH: 20 },
+    unlockedTools: ['FIREWALL', 'LOAD_BALANCER', 'COMPUTE', 'QUEUE', 'CACHE', 'SEARCH_ENGINE', 'NOSQL_DB', 'SQL_DB'],
     initialNodes: [
-      { id: 'src-1', type: 'SOURCE', x: 40, y: 220, config: {} },
-      { id: 'lb-1', type: 'LB', x: 270, y: 220, config: { algorithm: 0 } },
-      { id: 'web-1', type: 'WEB', x: 490, y: 220, config: { tier: 1 } },
-      { id: 'sql-1', type: 'SQL', x: 760, y: 220, config: { scaling: 1 } }
+      { id: 'src', type: 'INTERNET', x: 45, y: 210, tier: 1, health: 100 },
+      { id: 'c1', type: 'COMPUTE', x: 350, y: 210, tier: 2, health: 100 },
+      { id: 'db1', type: 'SQL_DB', x: 620, y: 210, tier: 2, health: 100 }
     ],
-    initialEdges: [
-      { id: 'e1', source: 'src-1', target: 'lb-1' },
-      { id: 'e2', source: 'lb-1', target: 'web-1' },
-      { id: 'e3', source: 'web-1', target: 'sql-1' }
-    ]
+    initialEdges: [],
+    hint: 'Wire Internet → Security Bouncer (🛡️) → App Worker (💻). Then wire App Worker to Cache (🧠), Smart Index (🔍), and SQL DB (🗄️)!'
   },
   {
     id: 5,
-    title: 'Level 5: Global AI Search Launch',
-    subtitle: 'RAG Vector Pipelines, Semantic Cache & Chaos Engineering',
-    brief: 'The final boss! 20,000 RPS global launch of your AI Search engine. Every query requires both SQL storage AND Vector DB + GPU Inference, while Chaos Monkey will randomly crash one of your Web Servers mid-wave! Build a fault-tolerant architecture.',
-    targetRps: 20000,
-    readRatio: 0.65,
-    writeRatio: 0.25,
-    botRatio: 0.10,
-    requiresAI: true,
-    chaosEnabled: true,
-    maxLatencyMs: 250,
-    minUptimePct: 99.0,
-    maxBudgetHr: 1200,
-    allowedComponents: ['WAF', 'CDN', 'LB', 'WEB', 'CACHE', 'QUEUE', 'WORKER', 'SQL', 'VECTOR_AI'],
-    hints: [
-      'You MUST include at least one Vector DB + GPU Node connected downstream from your Web Servers (or Cache) to serve AI queries.',
-      'Chaos Monkey will strike at 50% wave progress and disable a Web Server! Make sure your Load Balancer routes to at least 2 (ideally 3) Web Servers so traffic fails over cleanly.',
-      'Enable "Semantic + LRU (88% Hit)" on your Redis Cache and "TensorRT + FP8 Batching" on your Vector DB + GPU Node.'
-    ],
+    chapter: 'Tier 4: The AI & Chaos Wave',
+    title: 'Level 5: Global AI Tutor Launch',
+    concept: 'GPU Inference Routing & High Availability',
+    kidStory: 'Your app now features a live AI Study Tutor! Route Purple AI Prompts (🤖) to an AI GPU Super-Brain while defending against hackers, caching reads, and surviving a Chaos Monkey test!',
+    schoolAnalogy: 'Standard computers do basic arithmetic, but AI Chatbots need a dedicated Science Super-Lab (🤖 GPU Cluster) to generate answers!',
+    startBudget: 780,
+    targetProcessed: 130,
+    maxLatencySla: 165,
+    baseRps: 30,
+    trafficMix: { AI_PROMPT: 30, READ: 25, STATIC: 20, WRITE: 15, MALICIOUS: 10 },
+    unlockedTools: Object.keys(SERVICE_CATALOG).filter(k => k !== 'INTERNET'),
     initialNodes: [
-      { id: 'src-1', type: 'SOURCE', x: 40, y: 230, config: {} },
-      { id: 'waf-1', type: 'WAF', x: 200, y: 230, config: { mode: 0 } },
-      { id: 'lb-1', type: 'LB', x: 370, y: 230, config: { algorithm: 1 } },
-      { id: 'web-1', type: 'WEB', x: 550, y: 140, config: { tier: 1 } },
-      { id: 'web-2', type: 'WEB', x: 550, y: 320, config: { tier: 1 } },
-      { id: 'sql-1', type: 'SQL', x: 800, y: 230, config: { scaling: 1 } }
+      { id: 'src', type: 'INTERNET', x: 45, y: 210, tier: 1, health: 100 }
     ],
-    initialEdges: [
-      { id: 'e1', source: 'src-1', target: 'waf-1' },
-      { id: 'e2', source: 'waf-1', target: 'lb-1' },
-      { id: 'e3', source: 'lb-1', target: 'web-1' },
-      { id: 'e4', source: 'lb-1', target: 'web-2' },
-      { id: 'e5', source: 'web-1', target: 'sql-1' },
-      { id: 'e6', source: 'web-2', target: 'sql-1' }
-    ]
-  },
-  {
-    id: 6,
-    title: 'Sandbox Mode: Unlimited Architect',
-    subtitle: 'Free-Form Distributed Systems Playground',
-    brief: 'Experiment freely with any cloud architecture, test 25,000+ RPS spikes, toggle Chaos Monkey at will, and observe how caching, sharding, and message queues affect P99 latency.',
-    targetRps: 12000,
-    readRatio: 0.70,
-    writeRatio: 0.20,
-    botRatio: 0.10,
-    requiresAI: false,
-    chaosEnabled: false,
-    maxLatencyMs: 200,
-    minUptimePct: 99.0,
-    maxBudgetHr: 2500,
-    allowedComponents: ['WAF', 'CDN', 'LB', 'WEB', 'CACHE', 'QUEUE', 'WORKER', 'SQL', 'VECTOR_AI'],
-    hints: [
-      'In Sandbox mode, you can customize incoming traffic RPS or trigger Chaos Monkey manually anytime.',
-      'Try comparing synchronous DB writes vs Kafka Queue + Worker Pool under extreme load!'
-    ],
-    initialNodes: [
-      { id: 'src-1', type: 'SOURCE', x: 50, y: 220, config: {} },
-      { id: 'cdn-1', type: 'CDN', x: 230, y: 220, config: { hitRatio: 1 } },
-      { id: 'lb-1', type: 'LB', x: 410, y: 220, config: { algorithm: 1 } },
-      { id: 'web-1', type: 'WEB', x: 590, y: 140, config: { tier: 1 } },
-      { id: 'web-2', type: 'WEB', x: 590, y: 300, config: { tier: 1 } },
-      { id: 'cache-1', type: 'CACHE', x: 770, y: 220, config: { eviction: 1 } },
-      { id: 'sql-1', type: 'SQL', x: 940, y: 220, config: { scaling: 2 } }
-    ],
-    initialEdges: [
-      { id: 'e1', source: 'src-1', target: 'cdn-1' },
-      { id: 'e2', source: 'cdn-1', target: 'lb-1' },
-      { id: 'e3', source: 'lb-1', target: 'web-1' },
-      { id: 'e4', source: 'lb-1', target: 'web-2' },
-      { id: 'e5', source: 'web-1', target: 'cache-1' },
-      { id: 'e6', source: 'web-2', target: 'cache-1' },
-      { id: 'e7', source: 'cache-1', target: 'sql-1' }
-    ]
+    initialEdges: [],
+    hint: 'Build a complete pipeline: Internet → Security Bouncer (🛡️) → CDN (⚡) → Load Balancer (🚦) → App Workers (💻) → GPU Brain (🤖) + Cache (🧠) + SQL/NoSQL DB!'
   }
 ];
 
 // ============================================================================
-// 3. CORE GRAPH SIMULATION & TELEMETRY ENGINE
+// 4. GRAPH ROUTING SOLVER
 // ============================================================================
-function getNodeEffectiveStats(node) {
-  const spec = COMPONENT_CATALOG[node.type];
-  if (!spec) return { cost: 0, capacity: 1000, latency: 10, hitRate: 0 };
-
-  let cost = spec.baseCost;
-  let capacity = spec.baseCapacity;
-  let latency = spec.baseLatency;
-  let hitRate = 0;
-
-  if (node.type === 'CDN') {
-    const idx = node.config?.hitRatio || 0;
-    hitRate = spec.configOptions.hitRatio.hitRate[idx];
-    cost *= spec.configOptions.hitRatio.costMult[idx];
-  } else if (node.type === 'WAF') {
-    const idx = node.config?.mode || 0;
-    cost *= spec.configOptions.mode.costMult[idx];
-  } else if (node.type === 'LB') {
-    const idx = node.config?.algorithm || 0;
-    cost *= spec.configOptions.algorithm.costMult[idx];
-  } else if (node.type === 'WEB') {
-    const idx = node.config?.tier || 0;
-    capacity *= spec.configOptions.tier.capMult[idx];
-    cost *= spec.configOptions.tier.costMult[idx];
-  } else if (node.type === 'CACHE') {
-    const idx = node.config?.eviction || 0;
-    hitRate = spec.configOptions.eviction.hitRate[idx];
-    cost *= spec.configOptions.eviction.costMult[idx];
-  } else if (node.type === 'QUEUE') {
-    const idx = node.config?.partitions || 0;
-    capacity *= spec.configOptions.partitions.capMult[idx];
-    cost *= spec.configOptions.partitions.costMult[idx];
-  } else if (node.type === 'WORKER') {
-    const idx = node.config?.tier || 0;
-    capacity *= spec.configOptions.tier.capMult[idx];
-    cost *= spec.configOptions.tier.costMult[idx];
-  } else if (node.type === 'SQL') {
-    const idx = node.config?.scaling || 0;
-    capacity *= spec.configOptions.scaling.capMult[idx];
-    cost *= spec.configOptions.scaling.costMult[idx];
-    latency *= spec.configOptions.scaling.latencyMult[idx];
-  } else if (node.type === 'VECTOR_AI') {
-    const idx = node.config?.batching || 0;
-    capacity *= spec.configOptions.batching.capMult[idx];
-    cost *= spec.configOptions.batching.costMult[idx];
-    latency *= spec.configOptions.batching.latencyMult[idx];
-  }
-
-  return {
-    cost: Math.round(cost),
-    capacity: Math.round(capacity),
-    latency: Math.round(latency),
-    hitRate
-  };
+function canNodeResolveTraffic(nodeType, trafficType) {
+  if (trafficType === 'MALICIOUS') return nodeType === 'FIREWALL';
+  if (trafficType === 'STATIC') return nodeType === 'CDN' || nodeType === 'STORAGE';
+  if (trafficType === 'READ') return ['CACHE', 'READ_REPLICA', 'SQL_DB', 'NOSQL_DB'].includes(nodeType);
+  if (trafficType === 'WRITE') return ['SQL_DB', 'NOSQL_DB'].includes(nodeType);
+  if (trafficType === 'SEARCH') return ['SEARCH_ENGINE', 'SQL_DB'].includes(nodeType);
+  if (trafficType === 'AI_PROMPT') return nodeType === 'GPU_CLUSTER';
+  return false;
 }
 
-function evaluateArchitecture(nodes, edges, incomingRps, level) {
-  const nodeMetrics = {};
-  const edgeFlows = {};
-  let totalHourlyCost = 0;
+function canPathResolve(startNodeId, trafficType, nodesMap, edges, visited = new Set()) {
+  if (visited.has(startNodeId)) return false;
+  visited.add(startNodeId);
+  const node = nodesMap.get(startNodeId);
+  if (!node || node.health <= 0) return false;
+  if (canNodeResolveTraffic(node.type, trafficType)) return true;
 
-  nodes.forEach((n) => {
-    const stats = getNodeEffectiveStats(n);
-    totalHourlyCost += stats.cost;
-    nodeMetrics[n.id] = {
-      inRead: 0,
-      inWrite: 0,
-      inBot: 0,
-      totalIn: 0,
-      processed: 0,
-      dropped: 0,
-      utilization: 0,
-      effectiveLatency: stats.latency,
-      capacity: stats.capacity,
-      cost: stats.cost,
-      hitRate: stats.hitRate,
-      isCrashed: Boolean(n.crashed)
-    };
-  });
-
-  edges.forEach((e) => {
-    edgeFlows[e.id] = { read: 0, write: 0, bot: 0, total: 0 };
-  });
-
-  const sourceNode = nodes.find((n) => n.type === 'SOURCE');
-  if (!sourceNode) {
-    return {
-      nodeMetrics,
-      edgeFlows,
-      totalHourlyCost,
-      p99Latency: 0,
-      droppedRps: incomingRps,
-      uptimePct: 0,
-      diagnostics: ['Missing Internet Traffic source node!']
-    };
+  const outEdges = edges.filter(e => e.from === startNodeId);
+  for (const edge of outEdges) {
+    if (canPathResolve(edge.to, trafficType, nodesMap, edges, new Set(visited))) {
+      return true;
+    }
   }
+  return false;
+}
 
-  // Seed traffic at SOURCE
-  const initialRead = incomingRps * level.readRatio;
-  const initialWrite = incomingRps * level.writeRatio;
-  const initialBot = incomingRps * (level.botRatio || 0);
+export default function App() {
+  // Mode & Level State
+  const [gameMode, setGameMode] = useState('CAMPAIGN'); // 'CAMPAIGN' | 'SURVIVAL' | 'SANDBOX'
+  const [currentLevelIdx, setCurrentLevelIdx] = useState(0);
+  const currentLevel = CAMPAIGN_LEVELS[currentLevelIdx];
 
-  nodeMetrics[sourceNode.id].inRead = initialRead;
-  nodeMetrics[sourceNode.id].inWrite = initialWrite;
-  nodeMetrics[sourceNode.id].inBot = initialBot;
+  // Topology State
+  const [nodes, setNodes] = useState(CAMPAIGN_LEVELS[0].initialNodes);
+  const [edges, setEdges] = useState(CAMPAIGN_LEVELS[0].initialEdges);
+  const [selectedNodeId, setSelectedNodeId] = useState('n1');
+  const [connectingFromId, setConnectingFromId] = useState(null);
 
-  // Traverse graph in bounded BFS topological passes (supports up to 8 hops)
-  let frontier = [sourceNode.id];
-  const visitedDepth = { [sourceNode.id]: 0 };
+  // Telemetry, SLA & Economy State (Best of V1 + V2)
+  const [isRunning, setIsRunning] = useState(false);
+  const [money, setMoney] = useState(CAMPAIGN_LEVELS[0].startBudget);
+  const [reputation, setReputation] = useState(100);
+  const [p99Latency, setP99Latency] = useState(42);
+  const [processedCount, setProcessedCount] = useState(0);
+  const [kidFriendlyMode, setKidFriendlyMode] = useState(true);
+  const [autoRepair, setAutoRepair] = useState(false);
 
-  while (frontier.length > 0) {
-    const nextFrontier = [];
+  // Custom Sandbox / Survival Sliders
+  const [customRps, setCustomRps] = useState(16);
+  const [customMix] = useState({
+    STATIC: 20, READ: 35, WRITE: 20, SEARCH: 10, MALICIOUS: 10, AI_PROMPT: 5
+  });
 
-    for (const nodeId of frontier) {
-      const node = nodes.find((n) => n.id === nodeId);
-      const m = nodeMetrics[nodeId];
-      if (!node || !m) continue;
+  // Feedback, Modals & GitHub Export Tabs
+  const [failureBadges, setFailureBadges] = useState([]);
+  const [coachMessage, setCoachMessage] = useState({
+    type: 'info',
+    title: '👋 Welcome to ArchQuest x CloudDefender!',
+    text: CAMPAIGN_LEVELS[0].hint
+  });
+  const [levelStatus, setLevelStatus] = useState('PLAYING'); // 'PLAYING' | 'WON' | 'LOST'
+  const [earnedStars, setEarnedStars] = useState(3);
+  const [showGuideModal, setShowGuideModal] = useState(false);
+  const [showGithubModal, setShowGithubModal] = useState(false);
+  const [githubTab, setGithubTab] = useState('COMMANDS');
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [activeToolbarTab, setActiveToolbarTab] = useState('ALL');
 
-      if (m.isCrashed) {
-        m.totalIn = m.inRead + m.inWrite + m.inBot;
-        m.dropped = m.totalIn;
-        m.processed = 0;
-        m.utilization = 1.0;
-        continue;
-      }
+  // Dragging refs
+  const svgRef = useRef(null);
+  const draggingNodeRef = useRef(null);
+  const dragOffsetRef = useRef({ x: 0, y: 0 });
 
-      let curRead = m.inRead;
-      let curWrite = m.inWrite;
-      let curBot = m.inBot;
-      const totalIncoming = curRead + curWrite + curBot;
-      m.totalIn = totalIncoming;
+  // Reset or Switch Level/Mode
+  const loadScenario = (mode, levelIndex = 0) => {
+    setIsRunning(false);
+    setConnectingFromId(null);
+    setFailureBadges([]);
+    setProcessedCount(0);
+    setReputation(100);
+    setP99Latency(38);
+    setLevelStatus('PLAYING');
 
-      if (totalIncoming <= 0.1) continue;
-
-      // Check capacity & overload drops
-      let passRatio = 1.0;
-      if (totalIncoming > m.capacity) {
-        m.dropped += totalIncoming - m.capacity;
-        passRatio = m.capacity / totalIncoming;
-      }
-
-      curRead *= passRatio;
-      curWrite *= passRatio;
-      curBot *= passRatio;
-      m.processed = curRead + curWrite + curBot;
-      m.utilization = totalIncoming / m.capacity;
-
-      // Exponential queuing latency curve as utilization nears 100%
-      const clampedUtil = Math.min(1.35, m.utilization);
-      const saturationPenalty =
-        clampedUtil < 0.55
-          ? 1 + clampedUtil * 0.25
-          : 1 + Math.pow((clampedUtil - 0.45) * 2.1, 2.6);
-      m.effectiveLatency = Math.round(m.effectiveLatency * saturationPenalty);
-
-      // Apply component transformation rules
-      let outRead = curRead;
-      let outWrite = curWrite;
-      let outBot = curBot;
-
-      if (node.type === 'WAF') {
-        // Blocks 98% of malicious Bot/DDoS traffic cleanly
-        outBot = curBot * 0.02;
-      } else if (node.type === 'CDN') {
-        // Offloads hitRate % of Read traffic at edge
-        outRead = curRead * (1 - m.hitRate);
-      } else if (node.type === 'CACHE') {
-        // Offloads hitRate % of Read traffic in memory
-        outRead = curRead * (1 - m.hitRate);
-      } else if (node.type === 'QUEUE') {
-        // Buffers and smooths burst write spikes by 65% for downstream consumers
-        outWrite = curWrite * 0.35;
-      }
-
-      // Find outgoing edges to healthy/connected targets
-      const outEdges = edges.filter((e) => e.source === nodeId);
-      if (outEdges.length === 0) continue;
-
-      // If Load Balancer or multiple targets, split traffic across healthy targets first
-      const healthyEdges = outEdges.filter((e) => {
-        const targetNode = nodes.find((n) => n.id === e.target);
-        return targetNode && !targetNode.crashed;
+    if (mode === 'CAMPAIGN') {
+      const lvl = CAMPAIGN_LEVELS[levelIndex];
+      setNodes(lvl.initialNodes.map(n => ({ ...n, handledRps: 0, dropReason: null, nodeLatency: 0 })));
+      setEdges(lvl.initialEdges.map(e => ({ ...e, flowRps: 0 })));
+      setMoney(lvl.startBudget);
+      setSelectedNodeId(lvl.initialNodes[1]?.id || 'src');
+      setCoachMessage({
+        type: 'info',
+        title: `🎯 ${lvl.title} (${lvl.concept})`,
+        text: lvl.hint
       });
-
-      const activeEdges = healthyEdges.length > 0 ? healthyEdges : outEdges;
-      const splitCount = activeEdges.length;
-
-      activeEdges.forEach((edge) => {
-        const rFlow = outRead / splitCount;
-        const wFlow = outWrite / splitCount;
-        const bFlow = outBot / splitCount;
-
-        edgeFlows[edge.id] = {
-          read: rFlow,
-          write: wFlow,
-          bot: bFlow,
-          total: rFlow + wFlow + bFlow
-        };
-
-        const targetM = nodeMetrics[edge.target];
-        if (targetM && (visitedDepth[nodeId] || 0) < 7) {
-          targetM.inRead += rFlow;
-          targetM.inWrite += wFlow;
-          targetM.inBot += bFlow;
-          if (!nextFrontier.includes(edge.target)) {
-            nextFrontier.push(edge.target);
-            visitedDepth[edge.target] = (visitedDepth[nodeId] || 0) + 1;
-          }
-        }
+    } else if (mode === 'SURVIVAL') {
+      setNodes([
+        { id: 'src', type: 'INTERNET', x: 50, y: 210, tier: 1, health: 100, handledRps: 0 },
+        { id: 'fw1', type: 'FIREWALL', x: 230, y: 210, tier: 1, health: 100, handledRps: 0 },
+        { id: 'c1', type: 'COMPUTE', x: 420, y: 210, tier: 1, health: 100, handledRps: 0 },
+        { id: 'db1', type: 'SQL_DB', x: 630, y: 210, tier: 1, health: 100, handledRps: 0 }
+      ]);
+      setEdges([
+        { id: 'e1', from: 'src', to: 'fw1', flowRps: 0 },
+        { id: 'e2', from: 'fw1', to: 'c1', flowRps: 0 },
+        { id: 'e3', from: 'c1', to: 'db1', flowRps: 0 }
+      ]);
+      setMoney(520);
+      setCustomRps(12);
+      setCoachMessage({
+        type: 'info',
+        title: '🔥 Endless Survival Mode',
+        text: 'RPS ramps up every tick! Watch your P99 latency, repair degraded servers, and survive!'
+      });
+    } else {
+      setNodes([{ id: 'src', type: 'INTERNET', x: 55, y: 210, tier: 1, health: 100, handledRps: 0 }]);
+      setEdges([]);
+      setMoney(9999);
+      setCustomRps(22);
+      setCoachMessage({
+        type: 'info',
+        title: '🧪 Free Sandbox Architect Lab',
+        text: 'Infinite budget ($9,999) and all 12 cloud components unlocked! Test Chaos Monkey strikes and latency curves.'
       });
     }
+  };
 
-    frontier = nextFrontier;
-  }
-
-  // Validate architectural completeness & calculate end-to-end SLA metrics
-  const diagnostics = [];
-  let architecturalDrops = 0;
-
-  const webNodes = nodes.filter((n) => n.type === 'WEB' && !n.crashed);
-  const sqlNodes = nodes.filter((n) => n.type === 'SQL' && !n.crashed);
-  const aiNodes = nodes.filter((n) => n.type === 'VECTOR_AI' && !n.crashed);
-
-  const totalWebProcessed = webNodes.reduce((acc, n) => acc + (nodeMetrics[n.id]?.processed || 0), 0);
-  const totalSqlIn = sqlNodes.reduce((acc, n) => acc + (nodeMetrics[n.id]?.totalIn || 0), 0);
-  const totalAiIn = aiNodes.reduce((acc, n) => acc + (nodeMetrics[n.id]?.totalIn || 0), 0);
-
-  if (totalWebProcessed < incomingRps * 0.1) {
-    architecturalDrops += incomingRps * 0.9;
-    diagnostics.push('CRITICAL: Traffic is not reaching any active API / Web Server! Connect Internet Traffic -> Web Server.');
-  }
-
-  if (totalSqlIn < 1 && incomingRps > 10) {
-    architecturalDrops += incomingRps * 0.5;
-    diagnostics.push('CRITICAL: No requests are reaching a PostgreSQL Database! Persistent writes and uncached reads are failing.');
-  }
-
-  if (level.requiresAI && totalAiIn < 1 && incomingRps > 10) {
-    architecturalDrops += incomingRps * 0.35;
-    diagnostics.push('CRITICAL: Level 5 requires a "Vector DB + GPU Node" connected downstream to process AI RAG queries!');
-  }
-
-  // Check if unfiltered Bot traffic reached Web/DB tiers
-  const unfilteredBotsAtWeb = webNodes.reduce((acc, n) => acc + (nodeMetrics[n.id]?.inBot || 0), 0);
-  if (unfilteredBotsAtWeb > incomingRps * 0.03) {
-    architecturalDrops += unfilteredBotsAtWeb * 0.85;
-    diagnostics.push('SECURITY ALERT: Malicious Bot/DDoS packets are hitting your Web Servers! Place a WAF & Rate Limiter at the edge.');
-  }
-
-  // Sum overloaded node drops
-  const capacityDrops = Object.values(nodeMetrics).reduce((acc, m) => acc + m.dropped, 0);
-  const totalDroppedRps = Math.min(incomingRps, capacityDrops + architecturalDrops);
-  const uptimePct = incomingRps > 0 ? Math.max(0, ((incomingRps - totalDroppedRps) / incomingRps) * 100) : 100;
-
-  // Compute weighted P99 Latency across active tiers
-  let p99Latency = 12; // Base network RTT
-  const activeTierTypes = ['WAF', 'CDN', 'LB', 'WEB', 'CACHE', 'QUEUE', 'WORKER', 'SQL', 'VECTOR_AI'];
-  activeTierTypes.forEach((tType) => {
-    const tierNodes = nodes.filter((n) => n.type === tType && nodeMetrics[n.id]?.totalIn > 1);
-    if (tierNodes.length > 0) {
-      const avgTierLatency =
-        tierNodes.reduce((acc, n) => acc + nodeMetrics[n.id].effectiveLatency, 0) / tierNodes.length;
-      const avgWeight =
-        tierNodes.reduce((acc, n) => acc + Math.min(1, nodeMetrics[n.id].totalIn / Math.max(1, incomingRps)), 0) /
-        tierNodes.length;
-      p99Latency += avgTierLatency * Math.max(0.25, avgWeight);
-    }
-  });
-
-  p99Latency = Math.round(p99Latency);
-
-  // Generate helpful Root-Cause Diagnostics for overloaded or suboptimal nodes
-  nodes.forEach((n) => {
-    const m = nodeMetrics[n.id];
-    const spec = COMPONENT_CATALOG[n.type];
-    if (!m || !spec) return;
-
-    if (m.isCrashed) {
-      diagnostics.push(`CHAOS OUTAGE: "${spec.name}" crashed! Traffic must fail over via a Load Balancer to redundant nodes.`);
-    } else if (m.utilization > 1.0) {
-      const pct = Math.round(m.utilization * 100);
-      if (n.type === 'SQL') {
-        diagnostics.push(
-          `BOTTLENECK: ${spec.name} is overloaded at ${pct}% capacity! Add a Redis Cache upstream for reads, a Kafka Queue for writes, or enable Read Replicas/Sharding.`
-        );
-      } else if (n.type === 'WEB') {
-        diagnostics.push(
-          `BOTTLENECK: ${spec.name} is at ${pct}% capacity! Add a Load Balancer with more Web Servers, upgrade Instance Size, or offload reads with a CDN.`
-        );
-      } else {
-        diagnostics.push(`BOTTLENECK: ${spec.name} is overloaded at ${pct}%! Upgrade its configuration or add parallel instances.`);
-      }
-    } else if (m.utilization > 0.78) {
-      diagnostics.push(
-        `HIGH LATENCY WARNING: ${spec.name} is at ${Math.round(m.utilization * 100)}% load, causing queuing latency (${m.effectiveLatency}ms).`
-      );
-    }
-  });
-
-  if (totalHourlyCost > level.maxBudgetHr) {
-    diagnostics.push(
-      `BUDGET EXCEEDED: Current architecture costs $${totalHourlyCost}/hr (SLA limit: $${level.maxBudgetHr}/hr). Downsize over-provisioned tiers.`
+  // Chaos Monkey Feature (from V1!)
+  const triggerChaosMonkey = () => {
+    const breakable = nodes.filter(n => n.type !== 'INTERNET' && n.health > 0);
+    if (breakable.length === 0) return;
+    const victim = breakable[Math.floor(Math.random() * breakable.length)];
+    const spec = SERVICE_CATALOG[victim.type];
+    setNodes(prev =>
+      prev.map(n =>
+        n.id === victim.id
+          ? { ...n, health: 0, dropReason: '🐒 CHAOS MONKEY CRASH! Click 🔧 Fix or route around!' }
+          : n
+      )
     );
-  }
-
-  if (diagnostics.length === 0 && incomingRps > 50) {
-    diagnostics.push('ALL SYSTEMS NOMINAL: Traffic flow, P99 latency, and resource saturation are well within SLA targets.');
-  }
-
-  return {
-    nodeMetrics,
-    edgeFlows,
-    totalHourlyCost,
-    p99Latency,
-    droppedRps: Math.round(totalDroppedRps),
-    uptimePct: Number(uptimePct.toFixed(2)),
-    diagnostics
+    setCoachMessage({
+      type: 'error',
+      title: '🐒 Chaos Monkey Struck!',
+      text: `Chaos Monkey took down "${kidFriendlyMode ? spec.kidName : spec.proName}"! Repair it immediately or use redundant nodes!`
+    });
   };
-}
 
-// ============================================================================
-// 4. GITHUB REPOSITORY EXPORT GENERATOR
-// ============================================================================
-const GITHUB_FILES = {
-  'package.json': `{
-  "name": "archquest-system-design-simulator",
+  // ============================================================================
+  // 5. SIMULATION ENGINE (Combines V1 Latency Math + V2 Packet Flow & Economy)
+  // ============================================================================
+  useEffect(() => {
+    if (!isRunning || levelStatus !== 'PLAYING') return;
+
+    const timer = setInterval(() => {
+      const activeRps = gameMode === 'CAMPAIGN' ? currentLevel.baseRps : customRps;
+      const activeMix = gameMode === 'CAMPAIGN' ? currentLevel.trafficMix : customMix;
+
+      if (gameMode === 'SURVIVAL') {
+        setCustomRps(prev => Math.min(95, +(prev + 0.35).toFixed(1)));
+      }
+
+      const nodesMap = new Map();
+      nodes.forEach(n => {
+        const spec = SERVICE_CATALOG[n.type];
+        const tierMult = n.tier === 1 ? 1 : n.tier === 2 ? 1.75 : 2.6;
+        nodesMap.set(n.id, {
+          ...n,
+          capacity: Math.round(spec.baseCap * tierMult),
+          inFlows: { STATIC: 0, READ: 0, WRITE: 0, SEARCH: 0, MALICIOUS: 0, AI_PROMPT: 0 },
+          handledRps: 0,
+          droppedRps: 0,
+          nodeLatency: spec.baseLatencyMs,
+          dropReason: null
+        });
+      });
+
+      const edgeFlows = new Map();
+      edges.forEach(e => edgeFlows.set(e.id, { total: 0, byType: {} }));
+
+      const srcNode = nodesMap.get('src');
+      if (srcNode) {
+        Object.entries(activeMix).forEach(([tType, pct]) => {
+          if (pct > 0) srcNode.inFlows[tType] = (activeRps * pct) / 100;
+        });
+      }
+
+      let tickMoneyEarned = 0;
+      let tickRequestsSucceeded = 0;
+      let tickRequestsFailed = 0;
+      let tickMaliciousLeaked = 0;
+      let weightedLatencySum = 0;
+      let newBadges = [];
+
+      const processedNodes = new Set();
+      let queue = ['src'];
+
+      for (let hop = 0; hop < 7; hop++) {
+        const nextQueue = [];
+        for (const nodeId of queue) {
+          if (processedNodes.has(nodeId)) continue;
+          const node = nodesMap.get(nodeId);
+          if (!node) continue;
+          processedNodes.add(nodeId);
+
+          const totalIncoming = Object.values(node.inFlows).reduce((a, b) => a + b, 0);
+          if (totalIncoming <= 0.05) continue;
+
+          if (node.type !== 'INTERNET' && node.health <= 0) {
+            node.droppedRps += totalIncoming;
+            node.dropReason = '💥 CRASHED! Click 🔧 Fix!';
+            tickRequestsFailed += totalIncoming;
+            newBadges.push({ nodeId: node.id, x: node.x, y: node.y, text: '💥 CRASHED! Needs Repair!' });
+            continue;
+          }
+
+          // V1 Exponential Saturation Latency Curve: Base / (1 - (Load/Cap)^2)
+          const spec = SERVICE_CATALOG[node.type];
+          const loadRatio = node.type === 'INTERNET' ? 0.1 : Math.min(0.94, totalIncoming / node.capacity);
+          const actualNodeLatency = Math.round(
+            spec.baseLatencyMs * (1 / (1 - Math.pow(loadRatio, 2) * 0.78))
+          );
+          node.nodeLatency = actualNodeLatency;
+
+          let capacityFactor = 1;
+          if (node.type !== 'INTERNET' && totalIncoming > node.capacity) {
+            const overflow = totalIncoming - node.capacity;
+            capacityFactor = node.capacity / totalIncoming;
+            node.droppedRps += overflow;
+            node.dropReason = `🔥 Overloaded (${Math.round(totalIncoming)}/${node.capacity} RPS)`;
+            tickRequestsFailed += overflow;
+            newBadges.push({
+              nodeId: node.id,
+              x: node.x,
+              y: node.y,
+              text: `🔥 Bottleneck! (${Math.round(totalIncoming)}/${node.capacity}/s)`
+            });
+          }
+
+          node.handledRps = totalIncoming * capacityFactor;
+          weightedLatencySum += actualNodeLatency * (node.handledRps / Math.max(1, activeRps));
+
+          Object.entries(node.inFlows).forEach(([tType, rawAmount]) => {
+            let amount = rawAmount * capacityFactor;
+            if (amount <= 0.05) return;
+            const tSpec = TRAFFIC_TYPES[tType];
+
+            // Edge & Cache Interceptions
+            if (node.type === 'FIREWALL' && tType === 'MALICIOUS') {
+              tickMoneyEarned += amount * tSpec.reward;
+              tickRequestsSucceeded += amount;
+              return;
+            }
+            if (node.type === 'CDN' && tType === 'STATIC') {
+              const hit = amount * 0.95;
+              tickMoneyEarned += hit * tSpec.reward * 1.1;
+              tickRequestsSucceeded += hit;
+              amount *= 0.05;
+            }
+            if (node.type === 'CACHE' && tType === 'READ') {
+              const hit = amount * 0.75;
+              tickMoneyEarned += hit * tSpec.reward * 1.2;
+              tickRequestsSucceeded += hit;
+              amount *= 0.25;
+            }
+
+            // Terminal Storage / DB / AI Resolution
+            const isTerminal =
+              (node.type === 'STORAGE' && tType === 'STATIC') ||
+              (node.type === 'READ_REPLICA' && tType === 'READ') ||
+              (node.type === 'SQL_DB' && ['READ', 'WRITE', 'SEARCH'].includes(tType)) ||
+              (node.type === 'NOSQL_DB' && ['READ', 'WRITE'].includes(tType)) ||
+              (node.type === 'SEARCH_ENGINE' && tType === 'SEARCH') ||
+              (node.type === 'GPU_CLUSTER' && tType === 'AI_PROMPT');
+
+            if (isTerminal) {
+              // SQL DB gets extra latency penalty on full-text SEARCH
+              if (node.type === 'SQL_DB' && tType === 'SEARCH') {
+                weightedLatencySum += 45;
+              }
+              tickMoneyEarned += amount * tSpec.reward;
+              tickRequestsSucceeded += amount;
+              return;
+            }
+
+            if (tType === 'MALICIOUS' && node.type !== 'INTERNET' && node.type !== 'FIREWALL') {
+              tickMaliciousLeaked += amount;
+              node.dropReason = '👾 DDoS Hit! Add Security Bouncer (WAF)!';
+              newBadges.push({ nodeId: node.id, x: node.x, y: node.y, text: '👾 Hacker Bot Leaked!' });
+              return;
+            }
+
+            const outEdges = edges.filter(e => e.from === node.id);
+            if (outEdges.length === 0) {
+              node.droppedRps += amount;
+              tickRequestsFailed += amount;
+              let msg = `Missing route for ${tSpec.emoji} ${kidFriendlyMode ? tSpec.kidName : tSpec.proName}`;
+              if (node.type === 'SQL_DB' && tType === 'STATIC') {
+                msg = '🗄️ SQL DB cannot store Photos! Add CDN or Photo Locker.';
+              } else if (node.type === 'READ_REPLICA' && tType === 'WRITE') {
+                msg = '📑 Read Replica cannot take Orange Writes!';
+              } else if (node.type === 'SQL_DB' && tType === 'AI_PROMPT') {
+                msg = '🗄️ SQL DB cannot run AI! Add an AI GPU Brain.';
+              }
+              node.dropReason = msg;
+              newBadges.push({ nodeId: node.id, x: node.x, y: node.y, text: msg });
+              return;
+            }
+
+            const smartEdges = outEdges.filter(e => canPathResolve(e.to, tType, nodesMap, edges));
+            const targetEdges = smartEdges.length > 0 ? smartEdges : outEdges;
+            const splitAmount = amount / targetEdges.length;
+
+            targetEdges.forEach(edge => {
+              const targetNode = nodesMap.get(edge.to);
+              if (targetNode) {
+                targetNode.inFlows[tType] = (targetNode.inFlows[tType] || 0) + splitAmount;
+                const ef = edgeFlows.get(edge.id);
+                if (ef) {
+                  ef.total += splitAmount;
+                  ef.byType[tType] = (ef.byType[tType] || 0) + splitAmount;
+                }
+                if (!nextQueue.includes(targetNode.id)) nextQueue.push(targetNode.id);
+              }
+            });
+          });
+        }
+        queue = nextQueue;
+      }
+
+      // Upkeep & Wear
+      let totalUpkeepPerTick = 0;
+      nodesMap.forEach(n => {
+        if (n.type === 'INTERNET') return;
+        const spec = SERVICE_CATALOG[n.type];
+        totalUpkeepPerTick += ((spec.upkeep * (1 + (n.tier - 1) * 0.4)) / 60) * 0.6;
+        const util = n.handledRps / Math.max(1, n.capacity);
+        const wear = util > 0.85 ? 2.0 : util > 0.45 ? 0.6 : 0.15;
+        let nextHp = Math.max(0, n.health - wear);
+        if (autoRepair && nextHp < 75 && money > 15) {
+          nextHp = 100;
+          totalUpkeepPerTick += spec.cost * 0.1;
+        }
+        n.health = +nextHp.toFixed(1);
+      });
+
+      const computedP99 = Math.max(12, Math.round(weightedLatencySum + (tickRequestsFailed > 0 ? 65 : 0)));
+      setP99Latency(computedP99);
+
+      setNodes(Array.from(nodesMap.values()));
+      setEdges(prev =>
+        prev.map(e => {
+          const ef = edgeFlows.get(e.id) || { total: 0, byType: {} };
+          let dominantType = 'READ';
+          let maxVal = 0;
+          Object.entries(ef.byType).forEach(([k, v]) => {
+            if (v > maxVal) {
+              maxVal = v;
+              dominantType = k;
+            }
+          });
+          return { ...e, flowRps: ef.total, dominantType };
+        })
+      );
+
+      setFailureBadges(newBadges.slice(0, 4));
+
+      const netCashDelta = (tickMoneyEarned - totalUpkeepPerTick) * 0.45;
+      const newCompleted = Math.round(tickRequestsSucceeded * 0.35);
+
+      setMoney(prev => +(prev + netCashDelta).toFixed(1));
+      setProcessedCount(prev => {
+        const updated = prev + newCompleted;
+        if (gameMode === 'CAMPAIGN' && updated >= currentLevel.targetProcessed) {
+          const stars =
+            computedP99 <= currentLevel.maxLatencySla && reputation >= 90
+              ? 3
+              : computedP99 <= currentLevel.maxLatencySla * 1.25
+                ? 2
+                : 1;
+          setEarnedStars(stars);
+          setLevelStatus('WON');
+          setIsRunning(false);
+          setCoachMessage({
+            type: 'success',
+            title: `🏆 Level ${currentLevel.id} Cleared (${stars}/3 Stars)!`,
+            text: `P99 Latency: ${computedP99}ms (Target <${currentLevel.maxLatencySla}ms). You mastered ${currentLevel.concept}!`
+          });
+        }
+        return updated;
+      });
+
+      setReputation(prev => {
+        let repDelta =
+          tickRequestsSucceeded > 0 && tickRequestsFailed === 0 && tickMaliciousLeaked === 0
+            ? 0.4
+            : -(tickRequestsFailed / Math.max(5, activeRps)) * 3.0 - tickMaliciousLeaked * 1.8;
+        const nextRep = Math.max(0, Math.min(100, +(prev + repDelta).toFixed(1)));
+        if (gameMode !== 'SANDBOX' && (nextRep <= 0 || money < -250)) {
+          setLevelStatus('LOST');
+          setIsRunning(false);
+        }
+        return nextRep;
+      });
+    }, 600);
+
+    return () => clearInterval(timer);
+  }, [isRunning, nodes, edges, gameMode, currentLevel, customRps, customMix, autoRepair, money, levelStatus, kidFriendlyMode, reputation]);
+
+  // ============================================================================
+  // 6. NODE ACTIONS & DRAGGING
+  // ============================================================================
+  const handleAddService = (serviceType) => {
+    const spec = SERVICE_CATALOG[serviceType];
+    if (gameMode !== 'SANDBOX' && money < spec.cost) {
+      setCoachMessage({
+        type: 'warning',
+        title: '💰 Insufficient Cloud Budget',
+        text: `You need $${spec.cost} to deploy ${kidFriendlyMode ? spec.kidName : spec.proName}.`
+      });
+      return;
+    }
+    const newId = `n_${Date.now().toString().slice(-4)}`;
+    const offset = (nodes.length % 5) * 30;
+    if (gameMode !== 'SANDBOX') setMoney(prev => +(prev - spec.cost).toFixed(1));
+    setNodes(prev => [
+      ...prev,
+      {
+        id: newId,
+        type: serviceType,
+        x: 270 + offset,
+        y: 100 + offset,
+        tier: 1,
+        health: 100,
+        handledRps: 0,
+        nodeLatency: spec.baseLatencyMs
+      }
+    ]);
+    setSelectedNodeId(newId);
+  };
+
+  const handleUpgradeNode = (nodeId) => {
+    const node = nodes.find(n => n.id === nodeId);
+    if (!node || node.tier >= 3) return;
+    const spec = SERVICE_CATALOG[node.type];
+    const cost = Math.round(spec.cost * 0.8 * node.tier);
+    if (gameMode !== 'SANDBOX' && money < cost) return;
+    if (gameMode !== 'SANDBOX') setMoney(prev => +(prev - cost).toFixed(1));
+    setNodes(prev => prev.map(n => (n.id === nodeId ? { ...n, tier: n.tier + 1, health: 100 } : n)));
+  };
+
+  const handleRepairNode = (nodeId) => {
+    const node = nodes.find(n => n.id === nodeId);
+    if (!node) return;
+    const spec = SERVICE_CATALOG[node.type];
+    const cost = Math.max(5, Math.round(spec.cost * 0.15));
+    if (gameMode !== 'SANDBOX' && money < cost) return;
+    if (gameMode !== 'SANDBOX') setMoney(prev => +(prev - cost).toFixed(1));
+    setNodes(prev => prev.map(n => (n.id === nodeId ? { ...n, health: 100, dropReason: null } : n)));
+  };
+
+  const handleDeleteNode = (nodeId) => {
+    if (nodeId === 'src') return;
+    const node = nodes.find(n => n.id === nodeId);
+    if (node && gameMode !== 'SANDBOX') {
+      setMoney(prev => +(prev + SERVICE_CATALOG[node.type].cost * 0.5).toFixed(1));
+    }
+    setNodes(prev => prev.filter(n => n.id !== nodeId));
+    setEdges(prev => prev.filter(e => e.from !== nodeId && e.to !== nodeId));
+    setSelectedNodeId('src');
+  };
+
+  const handleNodeClick = (nodeId, e) => {
+    e.stopPropagation();
+    if (connectingFromId) {
+      if (connectingFromId !== nodeId && nodeId !== 'src') {
+        const exists = edges.some(ed => ed.from === connectingFromId && ed.to === nodeId);
+        if (!exists) {
+          setEdges(prev => [...prev, { id: `e_${Date.now()}`, from: connectingFromId, to: nodeId, flowRps: 0 }]);
+        }
+      }
+      setConnectingFromId(null);
+    } else {
+      setSelectedNodeId(nodeId);
+    }
+  };
+
+  const handleMouseDownNode = (nodeId, e) => {
+    e.stopPropagation();
+    if (connectingFromId || !svgRef.current) return;
+    const node = nodes.find(n => n.id === nodeId);
+    if (!node) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    draggingNodeRef.current = nodeId;
+    dragOffsetRef.current = { x: e.clientX - rect.left - node.x, y: e.clientY - rect.top - node.y };
+    setSelectedNodeId(nodeId);
+  };
+
+  const handleMouseMoveCanvas = (e) => {
+    if (!draggingNodeRef.current || !svgRef.current) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const nx = Math.max(15, Math.min(rect.width - 175, e.clientX - rect.left - dragOffsetRef.current.x));
+    const ny = Math.max(15, Math.min(rect.height - 105, e.clientY - rect.top - dragOffsetRef.current.y));
+    setNodes(prev => prev.map(n => (n.id === draggingNodeRef.current ? { ...n, x: nx, y: ny } : n)));
+  };
+
+  const selectedNode = useMemo(
+    () => nodes.find(n => n.id === selectedNodeId) || nodes[0],
+    [nodes, selectedNodeId]
+  );
+
+  const availableServices = useMemo(() => {
+    return Object.keys(SERVICE_CATALOG)
+      .filter(k => k !== 'INTERNET')
+      .filter(k => activeToolbarTab === 'ALL' || SERVICE_CATALOG[k].category === activeToolbarTab);
+  }, [activeToolbarTab]);
+
+  const activeTrafficMix = gameMode === 'CAMPAIGN' ? currentLevel.trafficMix : customMix;
+
+  const githubFiles = {
+    COMMANDS: `# 1. Scaffold a clean Vite + React project
+npm create vite@latest archquest-cloud-defender -- --template react
+cd archquest-cloud-defender
+
+# 2. Install Lucide Icons & Tailwind CSS
+npm install lucide-react tailwindcss @tailwindcss/vite
+
+# 3. Replace src/App.jsx with this canvas code, then push to GitHub:
+git init
+git add .
+git commit -m "feat: ArchQuest x CloudDefender System Design Game"
+git branch -M main
+git remote add origin https://github.com/YOUR_USERNAME/archquest-cloud-defender.git
+git push -u origin main`,
+    PACKAGE: `{
+  "name": "archquest-cloud-defender",
   "private": true,
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -725,1566 +921,752 @@ const GITHUB_FILES = {
     "preview": "vite preview"
   },
   "dependencies": {
-    "lucide-react": "^0.454.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "lucide-react": "^1.16.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.3.3",
-    "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.47",
-    "tailwindcss": "^3.4.14",
-    "vite": "^5.4.10"
+    "@tailwindcss/vite": "^4.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "tailwindcss": "^4.0.0",
+    "vite": "^6.0.0"
   }
 }`,
-  'README.md': `# ArchQuest: Interactive System Design Simulator
+    README: `# 🏰 ArchQuest x CloudDefender: System Design Game
 
-Learn distributed systems and cloud architecture by playing an interactive wave-defense simulation game!
+An original interactive System Design & Cloud Architecture game built with React, SVG particle telemetry, and Tailwind CSS.
 
-## Features
-- **5 Progressive Campaign Levels + Unlimited Sandbox Mode**:
-  1. *The Garage Startup* (Vertical Scaling & In-Memory Caching)
-  2. *The Viral Blog Post* (CDN Edge Offloading & Latency SLAs)
-  3. *Flash Sale Checkout* (Load Balancing, Horizontal Scaling & DB Read Replicas)
-  4. *Ticketmaster Drop Spike* (WAF Bot Mitigation & Async Kafka Write Queues)
-  5. *Global AI Search Launch* (Vector DB + GPU RAG Pipelines & Chaos Monkey Failover)
-- **Real-Time Graph Simulation Engine**: Computes live RPS flow, saturation queuing curves, P99 latency, and packet drops.
-- **Root-Cause Architecture Mentor**: Live diagnostics explaining *why* bottlenecks occur and how to fix them.
-
-## Quick Start
-\`\`\`bash
-npm install
-npm run dev
-\`\`\``,
-  'git-commands.sh': `# 1. Create a new directory and initialize Git
-mkdir archquest-simulator && cd archquest-simulator
-git init
-
-# 2. Install dependencies (after placing package.json and src/App.jsx)
-npm install
-
-# 3. Stage, commit, and push to your GitHub repository
-git add .
-git commit -m "feat: initial commit of ArchQuest System Design Simulator"
-git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/archquest-simulator.git
-git push -u origin main`
-};
-
-// ============================================================================
-// 5. MAIN REACT APPLICATION COMPONENT
-// ============================================================================
-export default function App() {
-  // Current Level & Game State
-  const [currentLevelIdx, setCurrentLevelIdx] = useState(0);
-  const currentLevel = CAMPAIGN_LEVELS[currentLevelIdx];
-
-  const [nodes, setNodes] = useState(currentLevel.initialNodes);
-  const [edges, setEdges] = useState(currentLevel.initialEdges);
-  const [selectedNodeId, setSelectedNodeId] = useState(null);
-  const [connectingFromId, setConnectingFromId] = useState(null);
-
-  // Simulation Wave State
-  const [isRunning, setIsRunning] = useState(false);
-  const [simSpeed, setSimSpeed] = useState(1);
-  const [waveProgress, setWaveProgress] = useState(0); // 0 to 100%
-  const [chaosActive, setChaosActive] = useState(false);
-  const [sandboxRps, setSandboxRps] = useState(12000);
-  const [completedLevels, setCompletedLevels] = useState({});
-  const [postMortemModal, setPostMortemModal] = useState(null);
-  const [showGithubModal, setShowGithubModal] = useState(false);
-  const [showHintsModal, setShowHintsModal] = useState(false);
-  const [copiedTab, setCopiedTab] = useState(null);
-  const [activeGithubTab, setActiveGithubTab] = useState('git-commands.sh');
-
-  // Telemetry History for Live Mini-Charts
-  const [telemetryHistory, setTelemetryHistory] = useState([]);
-  const waveStatsRef = useRef({ peakLatency: 0, minUptime: 100, ticks: 0, slaBreaches: 0 });
-
-  // Canvas Infinite Pan, Zoom & Drag State
-  const canvasRef = useRef(null);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
-  const [isPanning, setIsPanning] = useState(false);
-  const panStartRef = useRef({ x: 0, y: 0 });
-  const [draggingNodeId, setDraggingNodeId] = useState(null);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-
-  // Global mouseup listener to reliably release drag and pan anywhere on screen
-  useEffect(() => {
-    const handleGlobalMouseUp = () => {
-      setIsPanning(false);
-      setDraggingNodeId(null);
-    };
-    window.addEventListener('mouseup', handleGlobalMouseUp);
-    return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
-  }, []);
-
-  // Non-passive wheel listener for smooth infinite pan and pinch/ctrl-wheel zoom
-  useEffect(() => {
-    const canvasEl = canvasRef.current;
-    if (!canvasEl) return;
-
-    const handleWheelNative = (e) => {
-      e.preventDefault();
-      const rect = canvasEl.getBoundingClientRect();
-      const mouseScreenX = e.clientX - rect.left;
-      const mouseScreenY = e.clientY - rect.top;
-
-      if (e.ctrlKey || e.metaKey) {
-        // Pinch-zoom or Ctrl+scroll zoom centered at mouse pointer
-        const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
-        setZoom((currentZoom) => {
-          const newZoom = Math.max(0.35, Math.min(2.5, +(currentZoom * zoomFactor).toFixed(3)));
-          setPan((currentPan) => {
-            const worldX = (mouseScreenX - currentPan.x) / currentZoom;
-            const worldY = (mouseScreenY - currentPan.y) / currentZoom;
-            return {
-              x: Math.round(mouseScreenX - worldX * newZoom),
-              y: Math.round(mouseScreenY - worldY * newZoom)
-            };
-          });
-          return newZoom;
-        });
-      } else {
-        // 2-finger trackpad scroll or mousewheel pan
-        setPan((prev) => ({
-          x: Math.round(prev.x - e.deltaX),
-          y: Math.round(prev.y - e.deltaY)
-        }));
-      }
-    };
-
-    canvasEl.addEventListener('wheel', handleWheelNative, { passive: false });
-    return () => canvasEl.removeEventListener('wheel', handleWheelNative);
-  }, []);
-
-  // Load level when switched
-  const selectLevel = useCallback((idx) => {
-    const lvl = CAMPAIGN_LEVELS[idx];
-    setCurrentLevelIdx(idx);
-    setNodes(JSON.parse(JSON.stringify(lvl.initialNodes)));
-    setEdges(JSON.parse(JSON.stringify(lvl.initialEdges)));
-    setSelectedNodeId(null);
-    setConnectingFromId(null);
-    setIsRunning(false);
-    setWaveProgress(0);
-    setChaosActive(lvl.chaosEnabled);
-    setPostMortemModal(null);
-    setTelemetryHistory([]);
-    setPan({ x: 0, y: 0 });
-    setZoom(1);
-    waveStatsRef.current = { peakLatency: 0, minUptime: 100, ticks: 0, slaBreaches: 0 };
-  }, []);
-
-  // Calculate current live RPS based on wave progress (ramps from 25% to 100% of target)
-  const targetPeakRps = currentLevel.id === 6 ? sandboxRps : currentLevel.targetRps;
-  const currentLiveRps = useMemo(() => {
-    if (!isRunning && waveProgress === 0) {
-      // Preview at 35% load while designing so user gets instant visual feedback
-      return Math.round(targetPeakRps * 0.35);
-    }
-    const rampFactor = 0.25 + 0.75 * Math.min(1, waveProgress / 75);
-    const jitter = isRunning ? 1 + Math.sin(waveProgress * 0.4) * 0.03 : 1;
-    return Math.round(targetPeakRps * rampFactor * jitter);
-  }, [isRunning, waveProgress, targetPeakRps]);
-
-  // Run Graph Evaluation Engine
-  const evaluation = useMemo(() => {
-    return evaluateArchitecture(nodes, edges, currentLiveRps, currentLevel);
-  }, [nodes, edges, currentLiveRps, currentLevel]);
-
-  // Simulation Tick Loop
-  useEffect(() => {
-    if (!isRunning) return;
-
-    const intervalMs = Math.round(300 / simSpeed);
-    const timer = setInterval(() => {
-      setWaveProgress((prev) => {
-        const next = prev + 1.2;
-
-        // Trigger Chaos Monkey around 50% wave progress if enabled
-        if (chaosActive && prev < 48 && next >= 48) {
-          setNodes((currNodes) => {
-            const webCandidates = currNodes.filter((n) => n.type === 'WEB' && !n.crashed);
-            if (webCandidates.length > 0) {
-              const victim = webCandidates[Math.floor(Math.random() * webCandidates.length)];
-              return currNodes.map((n) => (n.id === victim.id ? { ...n, crashed: true } : n));
-            }
-            return currNodes;
-          });
-        }
-
-        if (next >= 100) {
-          setIsRunning(false);
-          return 100;
-        }
-        return next;
-      });
-    }, intervalMs);
-
-    return () => clearInterval(timer);
-  }, [isRunning, simSpeed, chaosActive]);
-
-  // Record Telemetry & Handle Wave Completion
-  useEffect(() => {
-    if (!isRunning && waveProgress < 100) return;
-
-    waveStatsRef.current.ticks += 1;
-    waveStatsRef.current.peakLatency = Math.max(waveStatsRef.current.peakLatency, evaluation.p99Latency);
-    waveStatsRef.current.minUptime = Math.min(waveStatsRef.current.minUptime, evaluation.uptimePct);
-
-    const latencyOk = evaluation.p99Latency <= currentLevel.maxLatencyMs;
-    const uptimeOk = evaluation.uptimePct >= currentLevel.minUptimePct;
-    const budgetOk = evaluation.totalHourlyCost <= currentLevel.maxBudgetHr;
-
-    if (!latencyOk || !uptimeOk || !budgetOk) {
-      waveStatsRef.current.slaBreaches += 1;
-    }
-
-    setTelemetryHistory((prev) => [
-      ...prev.slice(-29),
-      {
-        rps: currentLiveRps,
-        latency: evaluation.p99Latency,
-        uptime: evaluation.uptimePct
-      }
-    ]);
-
-    if (waveProgress >= 100 && !postMortemModal) {
-      const passedUptime = evaluation.uptimePct >= currentLevel.minUptimePct;
-      const passedLatency = evaluation.p99Latency <= currentLevel.maxLatencyMs;
-      const passedBudget = evaluation.totalHourlyCost <= currentLevel.maxBudgetHr;
-
-      let stars = 0;
-      if (passedUptime && passedLatency && passedBudget) {
-        stars = 3;
-      } else if (passedUptime && (passedLatency || passedBudget)) {
-        stars = 2;
-      } else if (evaluation.uptimePct >= 90) {
-        stars = 1;
-      }
-
-      if (stars >= 2) {
-        setCompletedLevels((prev) => ({
-          ...prev,
-          [currentLevel.id]: Math.max(prev[currentLevel.id] || 0, stars)
-        }));
-      }
-
-      setPostMortemModal({
-        stars,
-        passedUptime,
-        passedLatency,
-        passedBudget,
-        finalRps: targetPeakRps,
-        finalLatency: evaluation.p99Latency,
-        finalUptime: evaluation.uptimePct,
-        finalCost: evaluation.totalHourlyCost
-      });
-    }
-  }, [waveProgress, isRunning, evaluation, currentLevel, currentLiveRps, targetPeakRps, postMortemModal]);
-
-  // ============================================================================
-  // 6. INTERACTIVE CANVAS & NODE ACTIONS
-  // ============================================================================
-  const addComponentNode = (type) => {
-    const spec = COMPONENT_CATALOG[type];
-    if (!spec) return;
-
-    const defaultConfig = {};
-    if (spec.configOptions) {
-      Object.keys(spec.configOptions).forEach((k) => {
-        defaultConfig[k] = 0;
-      });
-    }
-
-    // Stagger position cleanly on canvas, adapting to current pan/zoom viewport
-    const countOfType = nodes.filter((n) => n.type === type).length;
-    const columnMap = {
-      WAF: 190,
-      CDN: 240,
-      LB: 370,
-      WEB: 540,
-      CACHE: 710,
-      QUEUE: 690,
-      WORKER: 830,
-      SQL: 880,
-      VECTOR_AI: 880
-    };
-
-    let spawnX = (columnMap[type] || 450) + (countOfType % 2) * 30;
-    let spawnY = 110 + ((countOfType * 115) % 340);
-
-    // If canvas has been panned away from origin, spawn near current viewport center
-    if (canvasRef.current && (Math.abs(pan.x) > 60 || Math.abs(pan.y) > 60 || zoom !== 1)) {
-      const rect = canvasRef.current.getBoundingClientRect();
-      spawnX = Math.round((-pan.x + rect.width / 2) / zoom - 88 + (countOfType % 3) * 25);
-      spawnY = Math.round((-pan.y + rect.height / 2) / zoom - 55 + (countOfType % 3) * 25);
-    }
-
-    const newNode = {
-      id: `${type.toLowerCase()}-${Date.now().toString().slice(-4)}`,
-      type,
-      x: spawnX,
-      y: spawnY,
-      config: defaultConfig,
-      crashed: false
-    };
-
-    setNodes((prev) => [...prev, newNode]);
-    setSelectedNodeId(newNode.id);
-  };
-
-  const deleteNode = (nodeId) => {
-    const node = nodes.find((n) => n.id === nodeId);
-    if (!node || node.type === 'SOURCE') return;
-    setNodes((prev) => prev.filter((n) => n.id !== nodeId));
-    setEdges((prev) => prev.filter((e) => e.source !== nodeId && e.target !== nodeId));
-    if (selectedNodeId === nodeId) setSelectedNodeId(null);
-    if (connectingFromId === nodeId) setConnectingFromId(null);
-  };
-
-  const deleteEdge = (edgeId) => {
-    setEdges((prev) => prev.filter((e) => e.id !== edgeId));
-  };
-
-  const handlePortClick = (e, nodeId, portType) => {
-    e.stopPropagation();
-    if (portType === 'out') {
-      setConnectingFromId(connectingFromId === nodeId ? null : nodeId);
-    } else if (portType === 'in' && connectingFromId && connectingFromId !== nodeId) {
-      const exists = edges.some((ed) => ed.source === connectingFromId && ed.target === nodeId);
-      if (!exists) {
-        setEdges((prev) => [
-          ...prev,
-          { id: `e-${Date.now()}`, source: connectingFromId, target: nodeId }
-        ]);
-      }
-      setConnectingFromId(null);
-    }
-  };
-
-  const handleCanvasMouseDown = (e) => {
-    // If clicking on a button, input, port or node card, don't start canvas panning
-    if (e.target.closest('.no-pan') || e.target.closest('button') || e.target.closest('input')) {
-      return;
-    }
-    setIsPanning(true);
-    panStartRef.current = {
-      x: e.clientX - pan.x,
-      y: e.clientY - pan.y
-    };
-    setSelectedNodeId(null);
-    setConnectingFromId(null);
-  };
-
-  const handleCanvasMouseMove = (e) => {
-    if (!canvasRef.current) return;
-    const rect = canvasRef.current.getBoundingClientRect();
-    const screenX = e.clientX - rect.left;
-    const screenY = e.clientY - rect.top;
-
-    // Convert mouse screen position to world coordinates
-    const worldX = (screenX - pan.x) / zoom;
-    const worldY = (screenY - pan.y) / zoom;
-    setMousePos({ x: worldX, y: worldY });
-
-    if (isPanning) {
-      setPan({
-        x: Math.round(e.clientX - panStartRef.current.x),
-        y: Math.round(e.clientY - panStartRef.current.y)
-      });
-      return;
-    }
-
-    if (draggingNodeId) {
-      setNodes((prev) =>
-        prev.map((n) =>
-          n.id === draggingNodeId
-            ? {
-                ...n,
-                x: Math.round(worldX - dragOffset.x),
-                y: Math.round(worldY - dragOffset.y)
-              }
-            : n
-        )
-      );
-    }
-  };
-
-  const fitView = useCallback(() => {
-    if (!canvasRef.current || nodes.length === 0) {
-      setPan({ x: 0, y: 0 });
-      setZoom(1);
-      return;
-    }
-    const rect = canvasRef.current.getBoundingClientRect();
-    const minX = Math.min(...nodes.map((n) => n.x));
-    const maxX = Math.max(...nodes.map((n) => n.x + 180));
-    const minY = Math.min(...nodes.map((n) => n.y));
-    const maxY = Math.max(...nodes.map((n) => n.y + 110));
-
-    const graphWidth = maxX - minX;
-    const graphHeight = maxY - minY;
-    const padding = 70;
-
-    const scaleX = (rect.width - padding * 2) / Math.max(1, graphWidth);
-    const scaleY = (rect.height - padding * 2) / Math.max(1, graphHeight);
-    const targetZoom = Math.max(0.4, Math.min(1.15, +(Math.min(scaleX, scaleY)).toFixed(2)));
-
-    const centerX = (minX + maxX) / 2;
-    const centerY = (minY + maxY) / 2;
-
-    setZoom(targetZoom);
-    setPan({
-      x: Math.round(rect.width / 2 - centerX * targetZoom),
-      y: Math.round(rect.height / 2 - centerY * targetZoom)
-    });
-  }, [nodes]);
-
-  const resetView = useCallback(() => {
-    setPan({ x: 0, y: 0 });
-    setZoom(1);
-  }, []);
-
-  const triggerManualChaos = () => {
-    const healthyNodes = nodes.filter((n) => n.type !== 'SOURCE' && !n.crashed);
-    if (healthyNodes.length === 0) {
-      // Restore all crashed nodes
-      setNodes((prev) => prev.map((n) => ({ ...n, crashed: false })));
-      return;
-    }
-    const victim = healthyNodes[Math.floor(Math.random() * healthyNodes.length)];
-    setNodes((prev) => prev.map((n) => (n.id === victim.id ? { ...n, crashed: true } : n)));
-  };
-
-  const resetWave = () => {
-    setIsRunning(false);
-    setWaveProgress(0);
-    setPostMortemModal(null);
-    setNodes((prev) => prev.map((n) => ({ ...n, crashed: false })));
-    setTelemetryHistory([]);
-    waveStatsRef.current = { peakLatency: 0, minUptime: 100, ticks: 0, slaBreaches: 0 };
-  };
-
-  const selectedNode = nodes.find((n) => n.id === selectedNodeId);
-  const selectedSpec = selectedNode ? COMPONENT_CATALOG[selectedNode.type] : null;
-  const selectedMetrics = selectedNode ? evaluation.nodeMetrics[selectedNode.id] : null;
-
-  const copyToClipboard = (text, tabKey) => {
-    navigator.clipboard.writeText(text);
-    setCopiedTab(tabKey);
-    setTimeout(() => setCopiedTab(null), 2000);
+### ✨ Key Features
+- **Dual Persona Toggle:** Switch seamlessly between **Class 10 Simple Mode** (School Analogies) and **Pro Cloud Architect Mode** (P99 Latency SLAs, Redis, Kafka, WAF, H100 GPUs).
+- **Live Telemetry & Exponential Latency Math:** Real-time calculation of node saturation, P99 latency (ms), cache hit ratios, and health degradation.
+- **Chaos Monkey Fault Injection:** Test high-availability topologies by randomly crashing active nodes mid-wave.`
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans select-none overflow-x-hidden">
-      {/* ====================================================================
-          TOP NAVIGATION BAR & LEVEL SELECTOR
-      ==================================================================== */}
-      <header className="bg-slate-900/95 border-b border-slate-800 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 z-30">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans select-none overflow-hidden">
+      {/* =================================================================== */}
+      {/* TOP TELEMETRY & NAVIGATION HEADER (Merged V1 + V2)                  */}
+      {/* =================================================================== */}
+      <header className="bg-slate-900/95 border-b border-slate-800 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 z-20">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-            <Network className="w-6 h-6 text-white" />
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-indigo-500/20 text-xl">
+            ⚡
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="font-bold text-lg tracking-tight text-white">ArchQuest</h1>
-              <span className="text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                System Design Simulator
+              <h1 className="font-extrabold text-base tracking-tight text-white">
+                ArchQuest <span className="text-indigo-400">×</span> CloudDefender
+              </h1>
+              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                100% Original Hybrid UI
               </span>
             </div>
-            <p className="text-xs text-slate-400 hidden sm:block">
-              Learn scalable distributed systems by surviving live traffic waves
+            <p className="text-xs text-slate-400">
+              Interactive System Design & Tower-Defense Simulator
             </p>
+          </div>
+
+          {/* Mode Switcher */}
+          <div className="hidden lg:flex bg-slate-950 p-1 rounded-xl border border-slate-800 ml-2">
+            {[
+              { id: 'CAMPAIGN', label: '🎓 Campaign (5 Levels)' },
+              { id: 'SURVIVAL', label: '🔥 Survival Wave' },
+              { id: 'SANDBOX', label: '🧪 Sandbox Lab' }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setGameMode(tab.id);
+                  loadScenario(tab.id, currentLevelIdx);
+                }}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${gameMode === tab.id ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                  }`}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Campaign Level Pills */}
-        <div className="flex items-center gap-1.5 bg-slate-950/90 p-1.5 rounded-xl border border-slate-800 overflow-x-auto max-w-full">
-          {CAMPAIGN_LEVELS.map((lvl, idx) => {
-            const isSelected = idx === currentLevelIdx;
-            const stars = completedLevels[lvl.id] || 0;
-            return (
-              <button
-                key={lvl.id}
-                onClick={() => selectLevel(idx)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 whitespace-nowrap ${
-                  isSelected
-                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/70'
-                }`}
-              >
-                <span>{lvl.id === 6 ? 'Sandbox' : `Lvl ${lvl.id}`}</span>
-                {stars > 0 && (
-                  <span className="text-amber-400 font-bold text-[10px]">
-                    {'★'.repeat(stars)}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+        {/* Live SLA & Economy Metrics (From V1 + V2) */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Budget */}
+          <div className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1 flex items-center gap-2">
+            <DollarSign className="w-4 h-4 text-emerald-400" />
+            <div>
+              <div className="text-[10px] uppercase text-slate-400 font-semibold">Budget</div>
+              <div className="text-xs font-extrabold text-emerald-400">${money.toFixed(0)}</div>
+            </div>
+          </div>
 
-        {/* Action Buttons: Hints & Export to GitHub */}
-        <div className="flex items-center gap-2">
+          {/* P99 Latency SLA (Brought back from V1!) */}
+          <div className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1 flex items-center gap-2">
+            <Clock className="w-4 h-4 text-cyan-400" />
+            <div>
+              <div className="text-[10px] uppercase text-slate-400 font-semibold">
+                P99 Latency {gameMode === 'CAMPAIGN' && `(SLA <${currentLevel.maxLatencySla}ms)`}
+              </div>
+              <div
+                className={`text-xs font-extrabold ${gameMode === 'CAMPAIGN' && p99Latency > currentLevel.maxLatencySla
+                  ? 'text-red-400 animate-pulse'
+                  : 'text-cyan-300'
+                  }`}
+              >
+                {p99Latency} ms
+              </div>
+            </div>
+          </div>
+
+          {/* Reputation / Uptime SLA */}
+          <div className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1 flex items-center gap-2">
+            <Heart className="w-4 h-4 text-rose-400" />
+            <div>
+              <div className="text-[10px] uppercase text-slate-400 font-semibold">SLA Uptime</div>
+              <div className="text-xs font-extrabold text-rose-300">{reputation}%</div>
+            </div>
+          </div>
+
+          {/* Class 10 vs Pro Engineer Toggle */}
           <button
-            onClick={() => setShowHintsModal(true)}
-            className="px-3 py-2 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 text-xs font-medium flex items-center gap-1.5 transition"
+            onClick={() => setKidFriendlyMode(!kidFriendlyMode)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 ${kidFriendlyMode
+              ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
+              : 'bg-indigo-500/15 border-indigo-500/40 text-indigo-300'
+              }`}
           >
-            <HelpCircle className="w-4 h-4" />
-            <span>Architecture Hints</span>
+            <Sparkles className="w-3.5 h-3.5" />
+            {kidFriendlyMode ? 'UI: Class 10 Simple' : 'UI: Pro Engineer'}
+          </button>
+
+          {/* Chaos Monkey Button (Brought back from V1!) */}
+          <button
+            onClick={triggerChaosMonkey}
+            className="px-2.5 py-1.5 rounded-xl bg-orange-500/15 hover:bg-orange-500/25 text-orange-300 border border-orange-500/30 text-xs font-bold flex items-center gap-1"
+            title="Test Fault Tolerance: Randomly crash a server!"
+          >
+            🐒 Chaos
+          </button>
+
+          {/* Start / Pause Wave */}
+          <button
+            onClick={() => setIsRunning(!isRunning)}
+            className={`px-4 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-lg transition-all ${isRunning
+              ? 'bg-amber-500 hover:bg-amber-600 text-slate-950'
+              : 'bg-emerald-500 hover:bg-emerald-600 text-slate-950'
+              }`}
+          >
+            {isRunning ? <Pause className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+            {isRunning ? 'PAUSE' : 'START WAVE'}
+          </button>
+
+          <button
+            onClick={() => loadScenario(gameMode, currentLevelIdx)}
+            className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
+            title="Reset Level"
+          >
+            <RotateCcw className="w-4 h-4" />
           </button>
 
           <button
             onClick={() => setShowGithubModal(true)}
-            className="px-3.5 py-2 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-lg shadow-emerald-600/20 transition"
+            className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 text-xs font-bold flex items-center gap-1.5"
           >
-            <Github className="w-4 h-4" />
-            <span>Export for GitHub</span>
+            <Code className="w-3.5 h-3.5 text-indigo-400" />
+            Export GitHub
           </button>
         </div>
       </header>
 
-      {/* ====================================================================
-          MISSION BRIEF & LIVE SLA TELEMETRY BAR
-      ==================================================================== */}
-      <div className="bg-slate-900/60 border-b border-slate-800/80 px-4 py-3 grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
-        {/* Level Brief */}
-        <div className="lg:col-span-5 flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-bold text-white">{currentLevel.title}</span>
-            <span className="text-xs text-indigo-400 font-medium">— {currentLevel.subtitle}</span>
-          </div>
-          <p className="text-xs text-slate-300 leading-relaxed">{currentLevel.brief}</p>
+      {/* =================================================================== */}
+      {/* SUB-BAR: CAMPAIGN LEVEL STEPPER & COLORED PACKET MIX                */}
+      {/* =================================================================== */}
+      <div className="bg-slate-900/60 border-b border-slate-800/80 px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {gameMode === 'CAMPAIGN' ? (
+            CAMPAIGN_LEVELS.map((lvl, idx) => (
+              <button
+                key={lvl.id}
+                onClick={() => {
+                  setCurrentLevelIdx(idx);
+                  loadScenario('CAMPAIGN', idx);
+                }}
+                className={`px-2.5 py-1 rounded-lg font-bold transition-all ${currentLevelIdx === idx
+                  ? 'bg-indigo-600 text-white shadow'
+                  : 'bg-slate-800/80 text-slate-400 hover:text-slate-200'
+                  }`}
+              >
+                L{lvl.id}: {lvl.title.split(':')[1]}
+              </button>
+            ))
+          ) : (
+            <div className="flex items-center gap-3">
+              <span className="font-bold text-slate-300">Ingress Traffic: {customRps} RPS</span>
+              <input
+                type="range"
+                min="5"
+                max="85"
+                value={customRps}
+                onChange={e => setCustomRps(+e.target.value)}
+                className="w-28 accent-indigo-500"
+              />
+            </div>
+          )}
         </div>
 
-        {/* Live Telemetry Gauges */}
-        <div className="lg:col-span-4 grid grid-cols-4 gap-2">
-          {/* RPS Gauge */}
-          <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-2.5">
-            <div className="text-[10px] uppercase tracking-wider text-slate-400 flex items-center justify-between">
-              <span>Traffic Load</span>
-              <Activity className="w-3.5 h-3.5 text-sky-400" />
-            </div>
-            <div className="text-base font-bold text-white mt-0.5">
-              {currentLiveRps.toLocaleString()}{' '}
-              <span className="text-[10px] font-normal text-slate-400">RPS</span>
-            </div>
-            <div className="text-[10px] text-slate-400">
-              Peak Goal: {targetPeakRps.toLocaleString()}
-            </div>
-          </div>
-
-          {/* Latency Gauge */}
-          <div
-            className={`bg-slate-950/90 border rounded-xl p-2.5 ${
-              evaluation.p99Latency > currentLevel.maxLatencyMs
-                ? 'border-rose-500/60 bg-rose-950/20'
-                : 'border-slate-800'
-            }`}
-          >
-            <div className="text-[10px] uppercase tracking-wider text-slate-400 flex items-center justify-between">
-              <span>P99 Latency</span>
-              <Zap className="w-3.5 h-3.5 text-amber-400" />
-            </div>
-            <div
-              className={`text-base font-bold mt-0.5 ${
-                evaluation.p99Latency > currentLevel.maxLatencyMs
-                  ? 'text-rose-400'
-                  : 'text-emerald-400'
-              }`}
-            >
-              {evaluation.p99Latency} <span className="text-[10px] font-normal">ms</span>
-            </div>
-            <div className="text-[10px] text-slate-400">SLA: &lt; {currentLevel.maxLatencyMs}ms</div>
-          </div>
-
-          {/* Uptime / Non-Dropped Gauge */}
-          <div
-            className={`bg-slate-950/90 border rounded-xl p-2.5 ${
-              evaluation.uptimePct < currentLevel.minUptimePct
-                ? 'border-rose-500/60 bg-rose-950/20'
-                : 'border-slate-800'
-            }`}
-          >
-            <div className="text-[10px] uppercase tracking-wider text-slate-400 flex items-center justify-between">
-              <span>Availability</span>
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-            </div>
-            <div
-              className={`text-base font-bold mt-0.5 ${
-                evaluation.uptimePct < currentLevel.minUptimePct
-                  ? 'text-rose-400'
-                  : 'text-emerald-400'
-              }`}
-            >
-              {evaluation.uptimePct}%
-            </div>
-            <div className="text-[10px] text-slate-400">
-              Drops: {evaluation.droppedRps.toLocaleString()} RPS
-            </div>
-          </div>
-
-          {/* Cloud Cost Gauge */}
-          <div
-            className={`bg-slate-950/90 border rounded-xl p-2.5 ${
-              evaluation.totalHourlyCost > currentLevel.maxBudgetHr
-                ? 'border-rose-500/60 bg-rose-950/20'
-                : 'border-slate-800'
-            }`}
-          >
-            <div className="text-[10px] uppercase tracking-wider text-slate-400 flex items-center justify-between">
-              <span>Cloud Cost</span>
-              <Sliders className="w-3.5 h-3.5 text-indigo-400" />
-            </div>
-            <div
-              className={`text-base font-bold mt-0.5 ${
-                evaluation.totalHourlyCost > currentLevel.maxBudgetHr
-                  ? 'text-rose-400'
-                  : 'text-white'
-              }`}
-            >
-              ${evaluation.totalHourlyCost}
-              <span className="text-[10px] font-normal text-slate-400">/hr</span>
-            </div>
-            <div className="text-[10px] text-slate-400">Budget: ${currentLevel.maxBudgetHr}/hr</div>
-          </div>
-        </div>
-
-        {/* Simulation Wave Controls */}
-        <div className="lg:col-span-3 flex flex-col gap-2 bg-slate-950/90 p-2.5 rounded-xl border border-slate-800">
-          <div className="flex items-center justify-between gap-1.5">
-            <button
-              onClick={() => {
-                if (waveProgress >= 100) resetWave();
-                setIsRunning((prev) => !prev);
-              }}
-              className={`flex-1 py-1.5 px-3 rounded-lg font-semibold text-xs flex items-center justify-center gap-1.5 shadow transition ${
-                isRunning
-                  ? 'bg-amber-600 hover:bg-amber-500 text-white'
-                  : 'bg-indigo-600 hover:bg-indigo-500 text-white'
-              }`}
-            >
-              {isRunning ? (
-                <>
-                  <Pause className="w-3.5 h-3.5" /> Pause Wave
-                </>
-              ) : (
-                <>
-                  <Play className="w-3.5 h-3.5" /> {waveProgress > 0 && waveProgress < 100 ? 'Resume' : 'Start Stress Test'}
-                </>
-              )}
-            </button>
-
-            <button
-              onClick={() => setSimSpeed((s) => (s === 1 ? 2 : 1))}
-              title="Toggle Simulation Speed"
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border transition ${
-                simSpeed === 2
-                  ? 'bg-purple-600/30 border-purple-500 text-purple-300'
-                  : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'
-              }`}
-            >
-              {simSpeed}x
-            </button>
-
-            <button
-              onClick={triggerManualChaos}
-              title="Chaos Monkey: Inject or Recover Random Node Failure"
-              className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 flex items-center gap-1 transition"
-            >
-              <Flame className="w-3.5 h-3.5" />
-              <span className="hidden xl:inline">Chaos</span>
-            </button>
-
-            <button
-              onClick={resetWave}
-              title="Reset Wave"
-              className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 transition"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          {/* Wave Progress Bar */}
-          <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden flex items-center">
-            <div
-              className="bg-gradient-to-r from-sky-500 via-indigo-500 to-emerald-500 h-full transition-all duration-200"
-              style={{ width: `${waveProgress}%` }}
-            />
-          </div>
-          <div className="flex justify-between text-[10px] text-slate-400">
-            <span>
-              {isRunning
-                ? `Stress Testing Wave (${Math.round(waveProgress)}%)`
-                : waveProgress === 0
-                ? 'Design Mode (Previewing 35% Load)'
-                : 'Wave Paused / Complete'}
-            </span>
-            <span>
-              R:{Math.round(currentLevel.readRatio * 100)}% W:{Math.round(currentLevel.writeRatio * 100)}%
-              {currentLevel.botRatio > 0 ? ` Bot:${Math.round(currentLevel.botRatio * 100)}%` : ''}
-            </span>
-          </div>
+        {/* Packet Color Legend */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-slate-400 font-semibold mr-1">Traffic Mix:</span>
+          {Object.entries(activeTrafficMix).map(([tType, pct]) => {
+            if (!pct) return null;
+            const spec = TRAFFIC_TYPES[tType];
+            return (
+              <span
+                key={tType}
+                className={`px-2 py-0.5 rounded-full text-[11px] font-bold border flex items-center gap-1 ${spec.badgeClass}`}
+                title={spec.hint}
+              >
+                <span>{spec.emoji}</span>
+                <span>{kidFriendlyMode ? spec.kidName : spec.id}: {pct}%</span>
+              </span>
+            );
+          })}
         </div>
       </div>
 
-      {/* ====================================================================
-          MAIN WORKSPACE: PALETTE + INTERACTIVE GRAPH CANVAS + INSPECTOR
-      ==================================================================== */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 min-h-[540px] relative">
-        {/* LEFT SIDEBAR: INFRASTRUCTURE COMPONENT PALETTE */}
-        <aside className="lg:col-span-2 bg-slate-900/90 border-r border-slate-800 p-3 flex flex-col justify-between overflow-y-auto">
+      {/* =================================================================== */}
+      {/* 3-COLUMN HYBRID WORKSPACE                                           */}
+      {/* =================================================================== */}
+      <div className="flex-1 grid grid-cols-12 overflow-hidden">
+        {/* LEFT COLUMN: MISSION BRIEF & COMPONENT PALETTE (3 Cols) */}
+        <aside className="col-span-3 bg-slate-900/80 border-r border-slate-800 flex flex-col overflow-y-auto p-3 gap-3">
+          {gameMode === 'CAMPAIGN' && (
+            <div className="bg-gradient-to-br from-indigo-950/80 to-slate-900 border border-indigo-500/30 rounded-2xl p-3.5 shadow">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-300 bg-indigo-500/20 px-2 py-0.5 rounded">
+                  {currentLevel.chapter}
+                </span>
+                <span className="text-xs font-extrabold text-amber-300">
+                  {processedCount}/{currentLevel.targetProcessed} reqs
+                </span>
+              </div>
+              <h2 className="font-extrabold text-sm text-white mt-1.5">{currentLevel.title}</h2>
+              <p className="text-xs text-slate-300 mt-1 leading-relaxed">{currentLevel.kidStory}</p>
+              <div className="mt-2.5 pt-2 border-t border-indigo-500/20 text-[11px] text-amber-200/90">
+                <strong>💡 School Analogy:</strong> {currentLevel.schoolAnalogy}
+              </div>
+            </div>
+          )}
+
+          {/* Component Palette */}
           <div>
-            <div className="flex items-center justify-between mb-2.5">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                Cloud Components
-              </span>
-              <span className="text-[10px] text-slate-500">Click to add</span>
+            <div className="grid grid-cols-5 gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 mb-2 text-[10px] font-bold">
+              {[
+                { id: 'ALL', label: 'All' },
+                { id: 'EDGE', label: 'Edge' },
+                { id: 'COMPUTE', label: 'Compute' },
+                { id: 'ASYNC', label: 'Queue' },
+                { id: 'DATA', label: 'Data' }
+              ].map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => setActiveToolbarTab(t.id)}
+                  className={`py-1 rounded-lg transition-all ${activeToolbarTab === t.id ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                >
+                  {t.label}
+                </button>
+              ))}
             </div>
 
             <div className="space-y-2">
-              {Object.values(COMPONENT_CATALOG)
-                .filter((item) => item.type !== 'SOURCE')
-                .map((item) => {
-                  const Icon = item.icon;
-                  const isAllowed = currentLevel.allowedComponents.includes(item.type);
-                  return (
-                    <button
-                      key={item.type}
-                      disabled={!isAllowed}
-                      onClick={() => addComponentNode(item.type)}
-                      className={`w-full text-left p-2.5 rounded-xl border transition-all flex items-start gap-2.5 group ${
-                        isAllowed
-                          ? 'bg-slate-950/90 hover:bg-slate-800/90 border-slate-800 hover:border-indigo-500/50 cursor-pointer'
-                          : 'bg-slate-950/30 border-slate-900 opacity-40 cursor-not-allowed'
+              {availableServices.map(key => {
+                const service = SERVICE_CATALOG[key];
+                const isUnlocked = gameMode !== 'CAMPAIGN' || currentLevel.unlockedTools.includes(key);
+                return (
+                  <button
+                    key={key}
+                    disabled={!isUnlocked}
+                    onClick={() => handleAddService(key)}
+                    className={`w-full text-left p-2.5 rounded-xl border transition-all flex items-start gap-2.5 ${isUnlocked
+                      ? 'bg-slate-950/90 hover:bg-slate-800/90 border-slate-800 hover:border-indigo-500/50 cursor-pointer'
+                      : 'bg-slate-950/30 border-slate-900 opacity-40 cursor-not-allowed'
                       }`}
+                  >
+                    <div
+                      className="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0"
+                      style={{ backgroundColor: `${service.color}20`, border: `1px solid ${service.color}55` }}
                     >
-                      <div
-                        className={`w-8 h-8 rounded-lg bg-gradient-to-br ${item.color} flex items-center justify-center shrink-0 shadow`}
-                      >
-                        <Icon className="w-4 h-4 text-white" />
+                      {isUnlocked ? service.emoji : '🔒'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-xs text-slate-100 truncate">
+                          {kidFriendlyMode ? service.kidName : service.proName}
+                        </span>
+                        <span className="text-xs font-extrabold text-emerald-400">${service.cost}</span>
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-semibold text-slate-200 group-hover:text-white truncate">
-                            {item.name}
-                          </span>
-                          {!isAllowed && <Lock className="w-3 h-3 text-slate-500 shrink-0" />}
-                        </div>
-                        <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-400">
-                          <span className="text-emerald-400 font-medium">${item.baseCost}/hr</span>
-                          <span>•</span>
-                          <span>{(item.baseCapacity / 1000).toFixed(1)}k RPS</span>
-                          <span>•</span>
-                          <span>{item.baseLatency}ms</span>
-                        </div>
+                      <p className="text-[11px] text-slate-400 leading-snug mt-0.5">
+                        {kidFriendlyMode ? service.kidDesc : service.proDesc}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1.5 text-[10px] text-slate-400 font-semibold">
+                        <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800">
+                          Cap: {service.baseCap}/s
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-cyan-300">
+                          ~{service.baseLatencyMs}ms
+                        </span>
                       </div>
-                    </button>
-                  );
-                })}
-            </div>
-          </div>
-
-          {/* Legend */}
-          <div className="mt-4 pt-3 border-t border-slate-800 space-y-1.5 text-[11px] text-slate-400">
-            <div className="font-semibold text-slate-300 mb-1">Packet Flow Legend</div>
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-sky-400 inline-block shadow shadow-sky-400" />
-              <span>Blue: Read / Static Queries</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block shadow shadow-amber-400" />
-              <span>Orange: Persistent DB Writes</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block shadow shadow-rose-500" />
-              <span>Red: Malicious DDoS / Bots</span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </aside>
 
-        {/* CENTER: INTERACTIVE ARCHITECTURE GRAPH CANVAS */}
-        <main
-          ref={canvasRef}
-          onMouseDown={handleCanvasMouseDown}
-          onMouseMove={handleCanvasMouseMove}
-          onMouseUp={() => {
-            setIsPanning(false);
-            setDraggingNodeId(null);
-          }}
-          className={`lg:col-span-7 relative bg-slate-950 overflow-hidden select-none min-h-[520px] ${
-            isPanning ? 'cursor-grabbing' : 'cursor-grab'
-          }`}
-          style={{
-            backgroundImage:
-              'radial-gradient(circle, rgba(99, 102, 241, 0.16) 1.2px, transparent 1.2px)',
-            backgroundSize: `${24 * zoom}px ${24 * zoom}px`,
-            backgroundPosition: `${pan.x}px ${pan.y}px`
-          }}
-        >
-          {/* Quick Helper Banner inside Canvas */}
-          <div className="absolute top-3 left-3 right-3 flex flex-wrap items-center justify-between gap-2 pointer-events-none z-30">
-            <div className="bg-slate-900/90 backdrop-blur border border-slate-800 px-3 py-1.5 rounded-lg text-xs text-slate-300 flex items-center gap-2 pointer-events-auto shadow-md">
-              <Share2 className="w-3.5 h-3.5 text-indigo-400" />
-              <span>
-                {connectingFromId ? (
-                  <span className="text-amber-300 font-semibold">
-                    Now click any node&apos;s LEFT input port (or node body) to connect wire...
-                  </span>
-                ) : (
-                  'Drag canvas to pan anywhere • Scroll/pinch to zoom • Drag nodes to reposition • Wire via ports'
-                )}
-              </span>
-            </div>
-
-            {currentLevel.id === 6 && (
-              <div className="bg-slate-900/90 backdrop-blur border border-slate-800 px-3 py-1.5 rounded-lg text-xs text-slate-300 flex items-center gap-2 pointer-events-auto shadow-md">
-                <span>Sandbox Peak RPS:</span>
-                <input
-                  type="range"
-                  min={1000}
-                  max={35000}
-                  step={1000}
-                  value={sandboxRps}
-                  onChange={(e) => setSandboxRps(Number(e.target.value))}
-                  className="w-24 accent-indigo-500"
-                />
-                <span className="font-bold text-indigo-400">{sandboxRps.toLocaleString()}</span>
+        {/* CENTER COLUMN: INTERACTIVE SVG ARCHITECTURE CANVAS (6 Cols) */}
+        <main className="col-span-6 relative bg-slate-950 flex flex-col overflow-hidden">
+          {/* Live AI Mentor Banner */}
+          <div
+            className={`mx-3 mt-3 px-3.5 py-2 rounded-xl border flex items-center justify-between gap-3 z-10 ${coachMessage.type === 'error'
+              ? 'bg-red-950/80 border-red-500/50 text-red-200'
+              : coachMessage.type === 'warning'
+                ? 'bg-amber-950/80 border-amber-500/50 text-amber-200'
+                : coachMessage.type === 'success'
+                  ? 'bg-emerald-950/80 border-emerald-500/50 text-emerald-200'
+                  : 'bg-slate-900/90 border-slate-700/80 text-slate-200'
+              }`}
+          >
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-base">🧑‍🏫</span>
+              <div>
+                <span className="font-extrabold mr-1.5">{coachMessage.title}</span>
+                <span className="text-slate-300">{coachMessage.text}</span>
               </div>
+            </div>
+            {connectingFromId && (
+              <button
+                onClick={() => setConnectingFromId(null)}
+                className="px-2.5 py-1 rounded-lg bg-amber-400 text-slate-950 font-extrabold text-xs shrink-0 animate-bounce"
+              >
+                Click Target Node (or Cancel)
+              </button>
             )}
           </div>
 
-          {/* FLOATING CANVAS HUD CONTROLS (BOTTOM-RIGHT) */}
-          <div className="absolute bottom-3 right-3 flex items-center gap-1 z-30 pointer-events-auto bg-slate-900/95 backdrop-blur-md border border-slate-800 p-1 rounded-xl shadow-2xl">
-            <button
-              onClick={() => setZoom((z) => Math.min(2.5, +(z + 0.15).toFixed(2)))}
-              className="w-7 h-7 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 flex items-center justify-center transition"
-              title="Zoom In (+)"
-            >
-              <ZoomIn className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={resetView}
-              className="px-2 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-[11px] font-mono text-slate-200 transition font-medium"
-              title="Click to reset zoom to 100%"
-            >
-              {Math.round(zoom * 100)}%
-            </button>
-            <button
-              onClick={() => setZoom((z) => Math.max(0.35, +(z - 0.15).toFixed(2)))}
-              className="w-7 h-7 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 flex items-center justify-center transition"
-              title="Zoom Out (-)"
-            >
-              <ZoomOut className="w-3.5 h-3.5" />
-            </button>
-            <div className="w-px h-4 bg-slate-700 mx-0.5" />
-            <button
-              onClick={fitView}
-              className="w-7 h-7 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 flex items-center justify-center transition"
-              title="Fit & Center Graph in View"
-            >
-              <Maximize2 className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={resetView}
-              className="w-7 h-7 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 flex items-center justify-center transition"
-              title="Reset View to Origin (0,0)"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          {/* FLOATING STATUS (BOTTOM-LEFT) */}
-          <div className="absolute bottom-3 left-3 z-30 pointer-events-none flex items-center gap-2">
-            <div className="bg-slate-900/85 backdrop-blur border border-slate-800 px-2.5 py-1 rounded-lg text-[10px] text-slate-400 font-mono flex items-center gap-2 shadow-lg">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Canvas: ({Math.round(pan.x)}, {Math.round(pan.y)})</span>
-              <span className="hidden sm:inline text-slate-500">• Pan anywhere</span>
-            </div>
-          </div>
-
-          {/* GRAPH WORLD CONTAINER (TRANSFORMED BY PAN & ZOOM) */}
-          <div
-            className="absolute inset-0 origin-top-left pointer-events-none"
-            style={{
-              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-              transformOrigin: '0 0'
-            }}
-          >
-            {/* SVG WIRES & ANIMATED TRAFFIC PARTICLES */}
+          <div className="flex-1 relative">
             <svg
-              className="overflow-visible absolute inset-0 pointer-events-none z-10"
-              style={{ width: '1px', height: '1px' }}
+              ref={svgRef}
+              onMouseMove={handleMouseMoveCanvas}
+              onMouseUp={() => {
+                draggingNodeRef.current = null;
+              }}
+              onClick={() => setConnectingFromId(null)}
+              className="w-full h-full cursor-crosshair"
+              style={{
+                backgroundImage:
+                  'radial-gradient(circle at 1px 1px, rgba(148, 163, 184, 0.14) 1px, transparent 0)',
+                backgroundSize: '28px 28px'
+              }}
             >
               <defs>
-                <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-                  <feGaussianBlur stdDeviation="2.5" result="blur" />
-                  <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                </filter>
+                <marker
+                  id="arrow"
+                  viewBox="0 0 10 10"
+                  refX="6"
+                  refY="5"
+                  markerWidth="6"
+                  markerHeight="6"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M 0 1 L 10 5 L 0 9 z" fill="#64748b" />
+                </marker>
               </defs>
 
-              {/* Active Connection Preview Wire */}
-              {connectingFromId && (() => {
-                const srcNode = nodes.find((n) => n.id === connectingFromId);
-                if (!srcNode) return null;
-                const x1 = srcNode.x + 176;
-                const y1 = srcNode.y + 44;
-                const x2 = mousePos.x;
-                const y2 = mousePos.y;
-                return (
-                  <path
-                    d={`M ${x1} ${y1} C ${x1 + 60} ${y1}, ${x2 - 60} ${y2}, ${x2} ${y2}`}
-                    fill="none"
-                    stroke="#818cf8"
-                    strokeWidth="2.5"
-                    strokeDasharray="6 4"
-                  />
-                );
-              })()}
+              {/* Wires & Animated Packet Particles */}
+              {edges.map(edge => {
+                const fromNode = nodes.find(n => n.id === edge.from);
+                const toNode = nodes.find(n => n.id === edge.to);
+                if (!fromNode || !toNode) return null;
 
-              {/* Connected Edges */}
-              {edges.map((edge) => {
-                const src = nodes.find((n) => n.id === edge.source);
-                const tgt = nodes.find((n) => n.id === edge.target);
-                if (!src || !tgt) return null;
+                const x1 = fromNode.x + 156;
+                const y1 = fromNode.y + 44;
+                const x2 = toNode.x;
+                const y2 = toNode.y + 44;
+                const cx1 = x1 + Math.max(40, (x2 - x1) * 0.45);
+                const cx2 = x2 - Math.max(40, (x2 - x1) * 0.45);
+                const pathData = `M ${x1} ${y1} C ${cx1} ${y1}, ${cx2} ${y2}, ${x2} ${y2}`;
 
-                const x1 = src.x + 176;
-                const y1 = src.y + 44;
-                const x2 = tgt.x;
-                const y2 = tgt.y + 44;
-                const dx = Math.max(50, Math.abs(x2 - x1) * 0.5);
-                const pathD = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
-
-                const flow = evaluation.edgeFlows[edge.id] || { read: 0, write: 0, bot: 0, total: 0 };
-                const hasTraffic = flow.total > 5;
-                const animDuration = Math.max(0.45, 2.2 - Math.min(1.6, flow.total / 6000));
+                const activeRpsOnEdge = edge.flowRps || 0;
+                const domType = edge.dominantType || 'READ';
+                const packetColor = TRAFFIC_TYPES[domType]?.color || '#3b82f6';
 
                 return (
-                  <g key={edge.id} className="pointer-events-auto group">
-                    {/* Invisible wider stroke for easy clicking to delete edge */}
+                  <g key={edge.id}>
                     <path
-                      d={pathD}
+                      d={pathData}
                       fill="none"
-                      stroke="transparent"
-                      strokeWidth="16"
-                      className="cursor-pointer"
-                      onClick={(e) => {
+                      stroke={activeRpsOnEdge > 0.2 ? packetColor : '#334155'}
+                      strokeOpacity={activeRpsOnEdge > 0.2 ? 0.55 : 0.7}
+                      strokeWidth={activeRpsOnEdge > 10 ? 4 : 2.5}
+                      markerEnd="url(#arrow)"
+                    />
+                    {isRunning && activeRpsOnEdge > 0.2 && (
+                      <>
+                        <circle r="5" fill={packetColor}>
+                          <animateMotion
+                            dur={`${Math.max(0.4, 1.7 - activeRpsOnEdge * 0.04)}s`}
+                            repeatCount="indefinite"
+                            path={pathData}
+                          />
+                        </circle>
+                        <circle r="4" fill={packetColor} opacity="0.75">
+                          <animateMotion
+                            dur={`${Math.max(0.4, 1.7 - activeRpsOnEdge * 0.04)}s`}
+                            begin="0.45s"
+                            repeatCount="indefinite"
+                            path={pathData}
+                          />
+                        </circle>
+                      </>
+                    )}
+                    <g
+                      transform={`translate(${(x1 + x2) / 2}, ${(y1 + y2) / 2 - 8})`}
+                      className="cursor-pointer group"
+                      onClick={e => {
                         e.stopPropagation();
-                        deleteEdge(edge.id);
+                        setEdges(prev => prev.filter(ed => ed.id !== edge.id));
                       }}
-                    />
-
-                    {/* Base Wire */}
-                    <path
-                      d={pathD}
-                      fill="none"
-                      stroke={hasTraffic ? '#475569' : '#1e293b'}
-                      strokeWidth={hasTraffic ? '3' : '2'}
-                      className="group-hover:stroke-rose-500 transition-colors"
-                    />
-
-                    {/* Animated Read Packet (Blue) */}
-                    {flow.read > 5 && (
-                      <circle r="4" fill="#38bdf8" filter="url(#glow)">
-                        <animateMotion
-                          dur={`${animDuration}s`}
-                          repeatCount="indefinite"
-                          path={pathD}
-                        />
-                      </circle>
-                    )}
-
-                    {/* Animated Write Packet (Orange) */}
-                    {flow.write > 5 && (
-                      <circle r="4" fill="#fbbf24" filter="url(#glow)">
-                        <animateMotion
-                          dur={`${animDuration * 1.15}s`}
-                          begin="0.25s"
-                          repeatCount="indefinite"
-                          path={pathD}
-                        />
-                      </circle>
-                    )}
-
-                    {/* Animated Bot Packet (Red) */}
-                    {flow.bot > 5 && (
-                      <circle r="4.5" fill="#f43f5e" filter="url(#glow)">
-                        <animateMotion
-                          dur={`${animDuration * 0.85}s`}
-                          begin="0.1s"
-                          repeatCount="indefinite"
-                          path={pathD}
-                        />
-                      </circle>
-                    )}
-
-                    {/* RPS Flow Label on Wire */}
-                    {hasTraffic && (
-                      <g transform={`translate(${(x1 + x2) / 2}, ${(y1 + y2) / 2 - 8})`}>
-                        <rect
-                          x="-28"
-                          y="-10"
-                          width="56"
-                          height="16"
-                          rx="4"
-                          fill="#0f172a"
-                          stroke="#334155"
-                          strokeWidth="1"
-                        />
-                        <text
-                          textAnchor="middle"
-                          y="1"
-                          fill="#94a3b8"
-                          fontSize="9"
-                          fontWeight="bold"
-                        >
-                          {Math.round(flow.total) >= 1000
-                            ? `${(flow.total / 1000).toFixed(1)}k/s`
-                            : `${Math.round(flow.total)}/s`}
-                        </text>
-                      </g>
-                    )}
+                    >
+                      <rect x="-28" y="-10" width="56" height="18" rx="6" fill="#0f172a" stroke="#334155" />
+                      <text textAnchor="middle" y="2" className="text-[9px] fill-slate-300 font-bold group-hover:fill-red-400">
+                        {activeRpsOnEdge > 0.1 ? `${Math.round(activeRpsOnEdge)}/s ✕` : 'wire ✕'}
+                      </text>
+                    </g>
                   </g>
                 );
               })}
-            </svg>
 
-            {/* INFRASTRUCTURE NODES ON CANVAS */}
-            <div className="absolute inset-0 pointer-events-none">
-              {nodes.map((node) => {
-                const spec = COMPONENT_CATALOG[node.type];
-                const m = evaluation.nodeMetrics[node.id] || {
-                  totalIn: 0,
-                  utilization: 0,
-                  effectiveLatency: spec.baseLatency,
-                  capacity: spec.baseCapacity,
-                  isCrashed: false
-                };
-                const Icon = spec.icon;
+              {/* Nodes */}
+              {nodes.map(node => {
+                const spec = SERVICE_CATALOG[node.type];
                 const isSelected = selectedNodeId === node.id;
                 const isConnectingSource = connectingFromId === node.id;
-                const utilPct = Math.round(m.utilization * 100);
-
-                let statusColor = 'border-slate-700/90';
-                if (m.isCrashed) {
-                  statusColor = 'border-rose-600 ring-2 ring-rose-600/50 animate-pulse';
-                } else if (m.utilization > 1.0) {
-                  statusColor = 'border-rose-500 ring-2 ring-rose-500/40';
-                } else if (m.utilization > 0.78) {
-                  statusColor = 'border-amber-500';
-                } else if (isSelected) {
-                  statusColor = 'border-indigo-400 ring-2 ring-indigo-500/30';
-                }
+                const tierMult = node.tier === 1 ? 1 : node.tier === 2 ? 1.75 : 2.6;
+                const maxCap = Math.round(spec.baseCap * tierMult);
+                const loadPct =
+                  node.type === 'INTERNET'
+                    ? 40
+                    : Math.min(100, Math.round(((node.handledRps || 0) / maxCap) * 100));
 
                 return (
-                  <div
+                  <foreignObject
                     key={node.id}
-                    style={{ left: node.x, top: node.y, width: 176 }}
-                    onMouseDown={(e) => {
-                      e.stopPropagation();
-                      if (connectingFromId && connectingFromId !== node.id && node.type !== 'SOURCE') {
-                        handlePortClick(e, node.id, 'in');
-                        return;
-                      }
-                      setSelectedNodeId(node.id);
-                      const rect = canvasRef.current.getBoundingClientRect();
-                      const screenX = e.clientX - rect.left;
-                      const screenY = e.clientY - rect.top;
-                      const worldX = (screenX - pan.x) / zoom;
-                      const worldY = (screenY - pan.y) / zoom;
-                      setDraggingNodeId(node.id);
-                      setDragOffset({
-                        x: worldX - node.x,
-                        y: worldY - node.y
-                      });
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                    className={`no-pan pointer-events-auto absolute z-20 bg-slate-900/95 backdrop-blur rounded-xl border ${statusColor} p-2.5 shadow-xl transition-shadow cursor-grab active:cursor-grabbing`}
+                    x={node.x}
+                    y={node.y}
+                    width="162"
+                    height="104"
+                    className="overflow-visible"
                   >
-                    {/* Left Input Port */}
-                    {node.type !== 'SOURCE' && (
-                      <button
-                        onClick={(e) => handlePortClick(e, node.id, 'in')}
-                        title="Input Port (Click to finish wire connection)"
-                        className={`w-4 h-4 rounded-full border-2 absolute -left-2 top-10 transition-transform hover:scale-125 ${
-                          connectingFromId && connectingFromId !== node.id
-                            ? 'bg-amber-400 border-white scale-125 animate-bounce'
-                            : 'bg-slate-800 border-slate-400 hover:border-indigo-400'
+                    <div
+                      onMouseDown={e => handleMouseDownNode(node.id, e)}
+                      onClick={e => handleNodeClick(node.id, e)}
+                      className={`w-[156px] rounded-2xl p-2.5 bg-slate-900/95 border-2 transition-all shadow-xl cursor-grab active:cursor-grabbing ${isConnectingSource
+                        ? 'border-amber-400 ring-4 ring-amber-400/30'
+                        : isSelected
+                          ? 'border-indigo-400 ring-2 ring-indigo-500/30'
+                          : node.dropReason
+                            ? 'border-red-500 animate-pulse'
+                            : 'border-slate-700/90 hover:border-slate-500'
                         }`}
-                      />
-                    )}
-
-                    {/* Right Output Port */}
-                    <button
-                      onClick={(e) => handlePortClick(e, node.id, 'out')}
-                      title="Output Port (Click to start drawing wire)"
-                      className={`w-4 h-4 rounded-full border-2 absolute -right-2 top-10 transition-transform hover:scale-125 ${
-                        isConnectingSource
-                          ? 'bg-indigo-400 border-white scale-125'
-                          : 'bg-indigo-600 border-slate-200 hover:bg-indigo-400'
-                      }`}
-                    />
-
-                    {/* Node Header */}
-                    <div className="flex items-center justify-between gap-1.5">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div
-                          className={`w-7 h-7 rounded-lg bg-gradient-to-br ${spec.color} flex items-center justify-center shrink-0`}
-                        >
-                          <Icon className="w-4 h-4 text-white" />
-                        </div>
-                        <div className="truncate">
-                          <div className="text-xs font-bold text-white truncate">{spec.name}</div>
-                          <div className="text-[10px] text-slate-400">
-                            {node.type === 'SOURCE' ? 'Entry Point' : `$${m.cost}/hr`}
-                          </div>
-                        </div>
-                      </div>
-
-                      {node.type !== 'SOURCE' && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteNode(node.id);
-                          }}
-                          className="text-slate-500 hover:text-rose-400 p-0.5 transition"
-                          title="Remove Node"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Live Node Metrics Footer */}
-                    {m.isCrashed ? (
-                      <div className="mt-2 bg-rose-950/90 border border-rose-600/50 rounded-lg px-2 py-1 flex items-center justify-between text-[10px] text-rose-300 font-bold">
-                        <span>NODE CRASHED</span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setNodes((prev) =>
-                              prev.map((n) => (n.id === node.id ? { ...n, crashed: false } : n))
-                            );
-                          }}
-                          className="underline hover:text-white"
-                        >
-                          Reboot
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="mt-2 pt-1.5 border-t border-slate-800/90 space-y-1">
-                        <div className="flex items-center justify-between text-[10px]">
-                          <span className="text-slate-400">
-                            {Math.round(m.totalIn).toLocaleString()} RPS
-                          </span>
-                          <span
-                            className={`font-semibold ${
-                              utilPct > 100
-                                ? 'text-rose-400'
-                                : utilPct > 78
-                                ? 'text-amber-400'
-                                : 'text-emerald-400'
-                            }`}
-                          >
-                            {node.type === 'SOURCE' ? 'Active' : `${utilPct}% Load`}
+                    >
+                      <div className="flex items-center justify-between gap-1">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="text-base">{spec.emoji}</span>
+                          <span className="text-[11px] font-extrabold text-white truncate">
+                            {kidFriendlyMode ? spec.kidName.replace(/^[^\s]+\s/, '') : spec.proName}
                           </span>
                         </div>
-
-                        {node.type !== 'SOURCE' && (
-                          <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full transition-all duration-200 ${
-                                utilPct > 100
-                                  ? 'bg-rose-500'
-                                  : utilPct > 78
-                                  ? 'bg-amber-400'
-                                  : 'bg-emerald-500'
-                              }`}
-                              style={{ width: `${Math.min(100, utilPct)}%` }}
-                            />
-                          </div>
+                        {node.type !== 'INTERNET' && (
+                          <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">
+                            T{node.tier}
+                          </span>
                         )}
                       </div>
-                    )}
-                  </div>
+
+                      {node.type !== 'INTERNET' ? (
+                        <div className="mt-1.5 space-y-1">
+                          <div className="flex justify-between text-[9px] text-slate-400 font-semibold">
+                            <span>{Math.round(node.handledRps || 0)}/{maxCap} rps</span>
+                            <span className="text-cyan-300">{node.nodeLatency || spec.baseLatencyMs}ms</span>
+                            <span className={node.health < 45 ? 'text-red-400 font-bold' : 'text-emerald-400'}>
+                              {Math.round(node.health)}%
+                            </span>
+                          </div>
+                          <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full transition-all ${loadPct > 90 ? 'bg-red-500' : loadPct > 70 ? 'bg-amber-400' : 'bg-cyan-400'
+                                }`}
+                              style={{ width: `${loadPct}%` }}
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mt-1.5 text-[10px] text-emerald-300 font-bold">
+                          Ingress: {gameMode === 'CAMPAIGN' ? currentLevel.baseRps : customRps} req/sec
+                        </div>
+                      )}
+
+                      <div className="mt-2 flex items-center justify-between gap-1">
+                        <button
+                          onClick={e => {
+                            e.stopPropagation();
+                            setConnectingFromId(connectingFromId === node.id ? null : node.id);
+                          }}
+                          className={`flex-1 py-0.5 px-1.5 rounded text-[9px] font-bold border transition-all ${isConnectingSource
+                            ? 'bg-amber-400 text-slate-950 border-amber-300'
+                            : 'bg-slate-800 hover:bg-indigo-600 text-slate-200 border-slate-700'
+                            }`}
+                        >
+                          {isConnectingSource ? '📍 Target' : '🔗 Wire'}
+                        </button>
+                        {node.type !== 'INTERNET' && node.health < 90 && (
+                          <button
+                            onClick={e => {
+                              e.stopPropagation();
+                              handleRepairNode(node.id);
+                            }}
+                            className="py-0.5 px-1.5 rounded text-[9px] font-bold bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-300 border border-emerald-500/40"
+                          >
+                            🔧 Fix
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </foreignObject>
                 );
               })}
-            </div>
-          </div>
-        </main>
 
-        {/* RIGHT SIDEBAR: NODE CONFIGURATOR & LIVE ARCHITECTURE MENTOR */}
-        <aside className="lg:col-span-3 bg-slate-900/90 border-l border-slate-800 p-3.5 flex flex-col justify-between gap-4 overflow-y-auto">
-          {/* Selected Node Inspector */}
-          <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-3.5">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-indigo-400 flex items-center gap-1.5">
-                <Settings className="w-3.5 h-3.5" />
-                <span>Component Inspector</span>
-              </span>
-              {selectedNode && selectedNode.type !== 'SOURCE' && (
-                <button
-                  onClick={() => deleteNode(selectedNode.id)}
-                  className="text-xs text-rose-400 hover:text-rose-300 flex items-center gap-1"
+              {/* Floating Failure Badges */}
+              {failureBadges.map((b, i) => (
+                <foreignObject
+                  key={`${b.nodeId}_${i}`}
+                  x={Math.max(10, b.x - 10)}
+                  y={Math.max(5, b.y - 32)}
+                  width="205"
+                  height="30"
                 >
-                  <Trash2 className="w-3.5 h-3.5" /> Delete
-                </button>
-              )}
-            </div>
-
-            {selectedNode && selectedSpec && selectedMetrics ? (
-              <div className="space-y-3">
-                <div>
-                  <div className="text-sm font-bold text-white">{selectedSpec.name}</div>
-                  <p className="text-xs text-slate-400 mt-0.5">{selectedSpec.description}</p>
-                </div>
-
-                {/* Live Telemetry Stats of Selected Node */}
-                <div className="grid grid-cols-3 gap-2 bg-slate-900 p-2 rounded-lg border border-slate-800 text-center">
-                  <div>
-                    <div className="text-[10px] text-slate-400">Throughput</div>
-                    <div className="text-xs font-bold text-white">
-                      {Math.round(selectedMetrics.totalIn).toLocaleString()} /{' '}
-                      {(selectedMetrics.capacity / 1000).toFixed(1)}k
-                    </div>
+                  <div className="px-2 py-0.5 rounded-lg bg-red-600/95 text-white text-[10px] font-extrabold shadow-lg border border-red-300 truncate animate-bounce">
+                    {b.text}
                   </div>
-                  <div>
-                    <div className="text-[10px] text-slate-400">Node Latency</div>
-                    <div className="text-xs font-bold text-amber-400">
-                      {selectedMetrics.effectiveLatency} ms
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[10px] text-slate-400">Dropped</div>
-                    <div className="text-xs font-bold text-rose-400">
-                      {Math.round(selectedMetrics.dropped).toLocaleString()} RPS
-                    </div>
-                  </div>
-                </div>
+                </foreignObject>
+              ))}
+            </svg>
 
-                {/* Configurable Tier / Policy Options */}
-                {selectedSpec.configOptions &&
-                  Object.entries(selectedSpec.configOptions).map(([configKey, opt]) => {
-                    const currentIdx = selectedNode.config?.[configKey] || 0;
-                    return (
-                      <div key={configKey} className="space-y-1.5">
-                        <label className="text-xs font-semibold text-slate-300 block">
-                          {opt.label}
-                        </label>
-                        <div className="space-y-1">
-                          {opt.values.map((valLabel, idx) => (
-                            <button
-                              key={valLabel}
-                              onClick={() => {
-                                setNodes((prev) =>
-                                  prev.map((n) =>
-                                    n.id === selectedNode.id
-                                      ? { ...n, config: { ...n.config, [configKey]: idx } }
-                                      : n
-                                  )
-                                );
-                              }}
-                              className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium border transition flex items-center justify-between ${
-                                currentIdx === idx
-                                  ? 'bg-indigo-600/25 border-indigo-500 text-white'
-                                  : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
-                              }`}
-                            >
-                              <span>{valLabel}</span>
-                              {currentIdx === idx && (
-                                <CheckCircle2 className="w-3.5 h-3.5 text-indigo-400" />
-                              )}
-                            </button>
-                          ))}
-                        </div>
+            {/* Win / Loss Post-Mortem Overlay with 1-to-3 Star Grading */}
+            {levelStatus !== 'PLAYING' && (
+              <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-6 z-30">
+                <div className="max-w-md w-full bg-slate-900 border-2 border-indigo-500/50 rounded-3xl p-6 text-center shadow-2xl">
+                  <div className="text-4xl mb-2">
+                    {levelStatus === 'WON' ? '⭐'.repeat(earnedStars) : '💥🚒'}
+                  </div>
+                  <h2 className="text-xl font-extrabold text-white">
+                    {levelStatus === 'WON' ? `SLA Passed (${earnedStars}/3 Stars)!` : 'SLA Breached (System Outage)'}
+                  </h2>
+                  <p className="text-xs text-slate-300 mt-2 leading-relaxed">{coachMessage.text}</p>
+
+                  {gameMode === 'CAMPAIGN' && (
+                    <div className="mt-4 p-3 rounded-2xl bg-indigo-950/60 border border-indigo-500/30 text-left text-xs">
+                      <div className="font-bold text-indigo-300 mb-1">
+                        🎓 Key Takeaway ({currentLevel.concept}):
                       </div>
-                    );
-                  })}
-              </div>
-            ) : (
-              <div className="text-xs text-slate-400 py-6 text-center">
-                Click any component node on the canvas to inspect its live RPS load, latency curve, and upgrade its scaling tier or caching policy.
+                      <p className="text-slate-300">{currentLevel.schoolAnalogy}</p>
+                    </div>
+                  )}
+
+                  <div className="mt-5 flex items-center justify-center gap-3">
+                    <button
+                      onClick={() => loadScenario(gameMode, currentLevelIdx)}
+                      className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs"
+                    >
+                      🔄 Replay
+                    </button>
+                    {levelStatus === 'WON' &&
+                      gameMode === 'CAMPAIGN' &&
+                      currentLevelIdx < CAMPAIGN_LEVELS.length - 1 && (
+                        <button
+                          onClick={() => {
+                            const next = currentLevelIdx + 1;
+                            setCurrentLevelIdx(next);
+                            loadScenario('CAMPAIGN', next);
+                          }}
+                          className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold text-xs shadow-lg"
+                        >
+                          Next Level ➡️
+                        </button>
+                      )}
+                  </div>
+                </div>
               </div>
             )}
           </div>
+        </main>
 
-          {/* Root-Cause Debugger & Live Architecture Mentor */}
-          <div className="flex-1 bg-slate-950/90 border border-slate-800 rounded-xl p-3.5 flex flex-col">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
-                <Terminal className="w-3.5 h-3.5" />
-                <span>Root-Cause Architecture Mentor</span>
-              </span>
-              <span className="text-[10px] text-slate-500">Live Diagnostics</span>
-            </div>
-
-            <div className="space-y-2 flex-1 overflow-y-auto pr-1">
-              {evaluation.diagnostics.map((diag, i) => {
-                const isCritical =
-                  diag.startsWith('CRITICAL') ||
-                  diag.startsWith('BOTTLENECK') ||
-                  diag.startsWith('SECURITY') ||
-                  diag.startsWith('CHAOS') ||
-                  diag.startsWith('BUDGET');
-                const isNominal = diag.startsWith('ALL SYSTEMS NOMINAL');
-
-                return (
-                  <div
-                    key={i}
-                    className={`p-2.5 rounded-lg border text-xs leading-relaxed flex items-start gap-2 ${
-                      isCritical
-                        ? 'bg-rose-950/30 border-rose-500/40 text-rose-200'
-                        : isNominal
-                        ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-200'
-                        : 'bg-amber-950/30 border-amber-500/40 text-amber-200'
-                    }`}
+        {/* RIGHT COLUMN: COMPONENT INSPECTOR & ROUTING GUIDE (3 Cols) */}
+        <aside className="col-span-3 bg-slate-900/80 border-l border-slate-800 flex flex-col overflow-y-auto p-3 gap-3">
+          {selectedNode && (
+            <div className="bg-slate-950 border border-slate-800 rounded-2xl p-3.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                  🔍 Node Telemetry Inspector
+                </span>
+                {selectedNode.id !== 'src' && (
+                  <button
+                    onClick={() => handleDeleteNode(selectedNode.id)}
+                    className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1 font-bold"
                   >
-                    {isCritical ? (
-                      <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-                    ) : isNominal ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                    ) : (
-                      <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                    )}
-                    <span>{diag}</span>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Scrolling Telemetry Sparkline Bars */}
-            <div className="mt-3 pt-2.5 border-t border-slate-800">
-              <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
-                <span>Live P99 Latency Trend</span>
-                <span>Target: &lt;{currentLevel.maxLatencyMs}ms</span>
-              </div>
-              <div className="h-12 bg-slate-900 rounded-lg p-1.5 flex items-end gap-1 overflow-hidden">
-                {telemetryHistory.length === 0 ? (
-                  <div className="text-[10px] text-slate-500 m-auto">
-                    Press &quot;Start Stress Test&quot; to record live telemetry...
-                  </div>
-                ) : (
-                  telemetryHistory.map((pt, idx) => {
-                    const heightPct = Math.min(100, Math.max(12, (pt.latency / 300) * 100));
-                    const breached = pt.latency > currentLevel.maxLatencyMs;
-                    return (
-                      <div
-                        key={idx}
-                        style={{ height: `${heightPct}%` }}
-                        className={`flex-1 rounded-t transition-all ${
-                          breached ? 'bg-rose-500' : 'bg-emerald-500'
-                        }`}
-                        title={`${pt.latency}ms at ${pt.rps} RPS`}
-                      />
-                    );
-                  })
+                    <Trash2 className="w-3.5 h-3.5" /> Decommission (+50%)
+                  </button>
                 )}
               </div>
+
+              <div className="flex items-center gap-2.5 mt-2">
+                <div className="text-2xl">{SERVICE_CATALOG[selectedNode.type].emoji}</div>
+                <div>
+                  <h3 className="font-extrabold text-sm text-white">
+                    {kidFriendlyMode
+                      ? SERVICE_CATALOG[selectedNode.type].kidName
+                      : SERVICE_CATALOG[selectedNode.type].proName}
+                  </h3>
+                  <span className="text-[11px] text-indigo-400 font-semibold">
+                    {kidFriendlyMode
+                      ? `Pro Term: ${SERVICE_CATALOG[selectedNode.type].proName}`
+                      : `Simple Analogy: ${SERVICE_CATALOG[selectedNode.type].kidName}`}
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-300 mt-2 leading-relaxed">
+                {kidFriendlyMode
+                  ? SERVICE_CATALOG[selectedNode.type].kidDesc
+                  : SERVICE_CATALOG[selectedNode.type].proDesc}
+              </p>
+
+              {selectedNode.type !== 'INTERNET' && (
+                <div className="mt-3 pt-3 border-t border-slate-800 space-y-1.5 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Instance Tier:</span>
+                    <span className="font-bold text-indigo-300">Tier {selectedNode.tier} / 3</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Node Latency:</span>
+                    <span className="font-bold text-cyan-300">
+                      {selectedNode.nodeLatency || SERVICE_CATALOG[selectedNode.type].baseLatencyMs} ms
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Server Health:</span>
+                    <span className="font-bold text-emerald-400">{Math.round(selectedNode.health)}%</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 pt-2">
+                    {selectedNode.tier < 3 && (
+                      <button
+                        onClick={() => handleUpgradeNode(selectedNode.id)}
+                        className="py-2 px-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-1"
+                      >
+                        <ArrowUpCircle className="w-3.5 h-3.5" />
+                        Scale Up (${Math.round(SERVICE_CATALOG[selectedNode.type].cost * 0.8 * selectedNode.tier)})
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleRepairNode(selectedNode.id)}
+                      className="py-2 px-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 font-bold text-xs flex items-center justify-center gap-1"
+                    >
+                      <Wrench className="w-3.5 h-3.5" />
+                      Repair
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Traffic Routing Reference */}
+          <div className="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 flex-1">
+            <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 mb-2">
+              🗺️ Packet Routing Matrix
+            </h3>
+            <div className="space-y-2 text-xs">
+              {Object.values(TRAFFIC_TYPES).map(t => (
+                <div key={t.id} className="p-2 rounded-xl bg-slate-900/90 border border-slate-800/90 flex items-start gap-2">
+                  <span className="text-base">{t.emoji}</span>
+                  <div className="flex-1">
+                    <div className="font-bold text-slate-100 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: t.color }} />
+                      <span>{kidFriendlyMode ? t.kidName : t.proName}</span>
+                      <span className="text-[10px] text-emerald-400 ml-auto">+${t.reward}</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5">{t.hint}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </aside>
       </div>
 
-      {/* ====================================================================
-          MODAL 1: LEVEL POST-MORTEM & STAR RATING REPORT
-      ==================================================================== */}
-      {postMortemModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
-            <div className="text-center space-y-1">
-              <div className="text-3xl tracking-widest text-amber-400">
-                {'★'.repeat(postMortemModal.stars)}
-                <span className="text-slate-700">{'★'.repeat(3 - postMortemModal.stars)}</span>
-              </div>
-              <h2 className="text-xl font-bold text-white">
-                {postMortemModal.stars === 3
-                  ? 'SLA Mastered! Production Ready'
-                  : postMortemModal.stars === 2
-                  ? 'Wave Survived (Minor SLA Breach)'
-                  : 'System Outage — Post-Mortem Required'}
-              </h2>
-              <p className="text-xs text-slate-400">{currentLevel.title}</p>
-            </div>
-
-            <div className="space-y-2 bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs">
-              <div className="flex items-center justify-between py-1 border-b border-slate-800">
-                <span className="text-slate-400">Availability / Uptime SLA (&ge;{currentLevel.minUptimePct}%)</span>
-                <span
-                  className={`font-bold ${
-                    postMortemModal.passedUptime ? 'text-emerald-400' : 'text-rose-400'
-                  }`}
-                >
-                  {postMortemModal.finalUptime}% {postMortemModal.passedUptime ? '✓' : '✗'}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between py-1 border-b border-slate-800">
-                <span className="text-slate-400">P99 Latency SLA (&le;{currentLevel.maxLatencyMs}ms)</span>
-                <span
-                  className={`font-bold ${
-                    postMortemModal.passedLatency ? 'text-emerald-400' : 'text-rose-400'
-                  }`}
-                >
-                  {postMortemModal.finalLatency} ms {postMortemModal.passedLatency ? '✓' : '✗'}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between py-1">
-                <span className="text-slate-400">Hourly Cloud Budget (&le;${currentLevel.maxBudgetHr}/hr)</span>
-                <span
-                  className={`font-bold ${
-                    postMortemModal.passedBudget ? 'text-emerald-400' : 'text-rose-400'
-                  }`}
-                >
-                  ${postMortemModal.finalCost}/hr {postMortemModal.passedBudget ? '✓' : '✗'}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 pt-2">
-              <button
-                onClick={resetWave}
-                className="flex-1 py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition"
-              >
-                Refine Architecture
-              </button>
-              {currentLevelIdx < CAMPAIGN_LEVELS.length - 1 && postMortemModal.stars >= 2 && (
-                <button
-                  onClick={() => selectLevel(currentLevelIdx + 1)}
-                  className="flex-1 py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition"
-                >
-                  <span>Next Level</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ====================================================================
-          MODAL 2: ARCHITECTURE HINTS & SOLUTION GUIDE
-      ==================================================================== */}
-      {showHintsModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <HelpCircle className="w-5 h-5 text-amber-400" />
-                <h3 className="text-base font-bold text-white">
-                  Architecture Blueprint Hints — {currentLevel.title}
-                </h3>
-              </div>
-              <button
-                onClick={() => setShowHintsModal(false)}
-                className="text-slate-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-2.5">
-              {currentLevel.hints.map((hint, i) => (
-                <div
-                  key={i}
-                  className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 leading-relaxed flex items-start gap-2.5"
-                >
-                  <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-300 font-bold flex items-center justify-center shrink-0">
-                    {i + 1}
-                  </span>
-                  <span>{hint}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex justify-end">
-              <button
-                onClick={() => setShowHintsModal(false)}
-                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold"
-              >
-                Got It, Back to Canvas
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ====================================================================
-          MODAL 3: EXPORT FOR GITHUB REPOSITORY
-      ==================================================================== */}
+      {/* =================================================================== */}
+      {/* MULTI-TAB GITHUB EXPORT MODAL (Brought back from V1!)               */}
+      {/* =================================================================== */}
       {showGithubModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <Github className="w-6 h-6 text-emerald-400" />
-                <div>
-                  <h3 className="text-base font-bold text-white">
-                    Push &quot;ArchQuest: System Design Simulator&quot; to GitHub
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    Ready-to-commit Vite + React + Tailwind project structure
-                  </p>
-                </div>
-              </div>
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-2xl w-full p-6 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <h2 className="text-base font-extrabold text-white flex items-center gap-2">
+                <Terminal className="w-4 h-4 text-indigo-400" />
+                Export Original Hybrid Game to GitHub
+              </h2>
               <button
                 onClick={() => setShowGithubModal(false)}
-                className="text-slate-400 hover:text-white"
+                className="px-3 py-1 rounded-lg bg-slate-800 text-slate-300 text-xs font-bold"
               >
-                <X className="w-5 h-5" />
+                Close ✕
               </button>
             </div>
 
-            {/* File Tabs */}
-            <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
-              {Object.keys(GITHUB_FILES).map((fileKey) => (
+            <div className="flex gap-2 mt-4">
+              {[
+                { id: 'COMMANDS', label: '1. git-commands.sh' },
+                { id: 'PACKAGE', label: '2. package.json' },
+                { id: 'README', label: '3. README.md' }
+              ].map(t => (
                 <button
-                  key={fileKey}
-                  onClick={() => setActiveGithubTab(fileKey)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-                    activeGithubTab === fileKey
-                      ? 'bg-emerald-600/20 text-emerald-300 border border-emerald-500/40'
-                      : 'text-slate-400 hover:text-white bg-slate-950'
-                  }`}
+                  key={t.id}
+                  onClick={() => setGithubTab(t.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold ${githubTab === t.id ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'
+                    }`}
                 >
-                  {fileKey}
+                  {t.label}
                 </button>
               ))}
             </div>
 
-            {/* Code Block */}
-            <div className="relative">
-              <pre className="bg-slate-950 border border-slate-800 rounded-xl p-4 text-xs text-slate-300 font-mono overflow-x-auto max-h-72 leading-relaxed">
-                {GITHUB_FILES[activeGithubTab]}
+            <div className="relative mt-3">
+              <pre className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-emerald-300 overflow-x-auto font-mono text-xs leading-relaxed">
+                {githubFiles[githubTab]}
               </pre>
               <button
-                onClick={() => copyToClipboard(GITHUB_FILES[activeGithubTab], activeGithubTab)}
-                className="absolute top-3 right-3 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 flex items-center gap-1.5 border border-slate-700"
+                onClick={() => {
+                  navigator.clipboard.writeText(githubFiles[githubTab]);
+                  setCopiedCode(true);
+                  setTimeout(() => setCopiedCode(false), 1800);
+                }}
+                className="absolute top-3 right-3 px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center gap-1 border border-slate-700"
               >
-                {copiedTab === activeGithubTab ? (
-                  <>
-                    <Check className="w-3.5 h-3.5 text-emerald-400" /> Copied!
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3.5 h-3.5" /> Copy
-                  </>
-                )}
+                {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                {copiedCode ? 'Copied!' : 'Copy'}
               </button>
-            </div>
-
-            <div className="bg-indigo-950/30 border border-indigo-500/30 rounded-xl p-3 text-xs text-indigo-200 leading-relaxed">
-              <strong>How to push to GitHub:</strong> Save this editor file as{' '}
-              <code className="bg-slate-950 px-1.5 py-0.5 rounded text-indigo-300">src/App.jsx</code>{' '}
-              inside a standard Vite React project, copy the{' '}
-              <code className="bg-slate-950 px-1.5 py-0.5 rounded text-indigo-300">package.json</code>{' '}
-              and{' '}
-              <code className="bg-slate-950 px-1.5 py-0.5 rounded text-indigo-300">README.md</code>{' '}
-              above, and run the commands in <code className="bg-slate-950 px-1.5 py-0.5 rounded text-indigo-300">git-commands.sh</code>.
             </div>
           </div>
         </div>
