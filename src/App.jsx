@@ -867,6 +867,9 @@ export default function App() {
   const [activeCatalogTab, setActiveCatalogTab] = useState('ALL');
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
+  const mentorSectionRef = useRef(null);
+  const prevDiagnosticsKeyRef = useRef('');
+  const [highlightMentor, setHighlightMentor] = useState(false);
 
   // Load level when switched (validates unlocked levels)
   const selectLevel = useCallback((idx) => {
@@ -990,6 +993,27 @@ export default function App() {
   const passedUptime = evaluation.uptimePct >= targetMinUptime;
   const passedBudget = !currentMaxBudget || evaluation.totalHourlyCost <= currentMaxBudget;
   const isLevelPassing = passedLatency && passedUptime && passedBudget;
+
+  // Automatically scroll Architecture Mentor & Diagnostics into screen view when diagnostics change
+  useEffect(() => {
+    const currentKey = evaluation.diagnostics.join('||');
+    if (prevDiagnosticsKeyRef.current && prevDiagnosticsKeyRef.current !== currentKey) {
+      if (rightPanelCollapsed) {
+        setRightPanelCollapsed(false);
+      }
+      // Small timeout to allow right panel expansion if it was collapsed
+      setTimeout(() => {
+        if (mentorSectionRef.current) {
+          mentorSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 60);
+
+      setHighlightMentor(true);
+      const timer = setTimeout(() => setHighlightMentor(false), 2600);
+      return () => clearTimeout(timer);
+    }
+    prevDiagnosticsKeyRef.current = currentKey;
+  }, [evaluation.diagnostics, rightPanelCollapsed]);
 
   // Global mouseup listener to reliably release drag and pan anywhere on window
   useEffect(() => {
@@ -1736,10 +1760,15 @@ export default function App() {
           {rightPanelCollapsed && (
             <button
               onClick={() => setRightPanelCollapsed(false)}
-              className="absolute right-3 top-14 z-30 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/95 backdrop-blur-md border border-indigo-500/50 text-xs font-bold text-indigo-300 hover:text-white hover:bg-slate-800 shadow-2xl transition hover:scale-105 pointer-events-auto"
+              className={`absolute right-3 top-14 z-30 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/95 backdrop-blur-md border text-xs font-bold transition hover:scale-105 pointer-events-auto shadow-2xl ${
+                highlightMentor
+                  ? 'border-amber-400 ring-2 ring-amber-400/60 bg-amber-950/80 text-amber-200 animate-pulse'
+                  : 'border-indigo-500/50 text-indigo-300 hover:text-white hover:bg-slate-800'
+              }`}
               title="Expand Problem & Inspector (Make Canvas Smaller)"
             >
               <span>Problem &amp; Inspector</span>
+              {highlightMentor && <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />}
               <PanelRightOpen className="w-3.5 h-3.5 text-indigo-400" />
             </button>
           )}
@@ -2197,9 +2226,16 @@ export default function App() {
         >
           {/* Panel Header & Collapse Action */}
           <div className="flex items-center justify-between pb-2 border-b border-slate-800/80 shrink-0">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
-              Problem &amp; Diagnostics
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                Problem &amp; Diagnostics
+              </span>
+              {highlightMentor && (
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
+                  Mentor Alert
+                </span>
+              )}
+            </div>
             <button
               onClick={() => setRightPanelCollapsed(true)}
               className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
@@ -2610,12 +2646,26 @@ export default function App() {
           {/* =============================================================== */}
           {/* 3. LIVE ROOT-CAUSE ARCHITECTURE MENTOR & DIAGNOSTICS             */}
           {/* =============================================================== */}
-          <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-3.5 space-y-2">
-            <div className="flex items-center gap-2 mb-1">
-              <Sparkles className="w-4 h-4 text-amber-400" />
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
-                Architecture Mentor &amp; Diagnostics
-              </span>
+          <div
+            ref={mentorSectionRef}
+            className={`bg-slate-950/80 border rounded-2xl p-3.5 space-y-2 transition-all duration-500 ${
+              highlightMentor
+                ? 'border-amber-400 ring-2 ring-amber-400/50 bg-amber-950/20 shadow-xl shadow-amber-950/40 scale-[1.01]'
+                : 'border-slate-800'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2">
+                <Sparkles className={`w-4 h-4 ${highlightMentor ? 'text-amber-300 animate-spin' : 'text-amber-400'}`} />
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
+                  Architecture Mentor &amp; Diagnostics
+                </span>
+              </div>
+              {highlightMentor && (
+                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 animate-pulse">
+                  Live Alert
+                </span>
+              )}
             </div>
 
             <div className="space-y-2 max-h-56 overflow-y-auto">
