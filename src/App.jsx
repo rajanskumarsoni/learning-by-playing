@@ -5,7 +5,8 @@ import {
   Settings, Award, Terminal, Flame, ChevronRight, Copy, Check, Download,
   FastForward, Eye, Sliders, Share2, Lock, Unlock, Box, HardDrive, Network,
   ArrowRight, Sparkles, Info, X, RefreshCw, ZoomIn, ZoomOut, Maximize2, Move,
-  BookOpen, Search, Bot
+  BookOpen, Search, Bot, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
+  ChevronLeft
 } from 'lucide-react';
 
 // ============================================================================
@@ -864,6 +865,8 @@ export default function App() {
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [activeCatalogTab, setActiveCatalogTab] = useState('ALL');
+  const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
+  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
 
   // Load level when switched (validates unlocked levels)
   const selectLevel = useCallback((idx) => {
@@ -1410,6 +1413,34 @@ export default function App() {
             </button>
           </div>
 
+          {/* Panel Layout Toggles (Make Canvas Larger or Smaller) */}
+          <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+            <button
+              onClick={() => setLeftPanelCollapsed(!leftPanelCollapsed)}
+              className={`px-2 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 transition ${
+                !leftPanelCollapsed
+                  ? 'bg-slate-800 text-indigo-300 border border-indigo-500/30'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              }`}
+              title={leftPanelCollapsed ? "Expand Component Palette (Make Canvas Smaller)" : "Collapse Component Palette (Make Canvas Bigger)"}
+            >
+              {leftPanelCollapsed ? <PanelLeftOpen className="w-3.5 h-3.5" /> : <PanelLeftClose className="w-3.5 h-3.5" />}
+              <span className="hidden xl:inline text-[11px]">Palette</span>
+            </button>
+            <button
+              onClick={() => setRightPanelCollapsed(!rightPanelCollapsed)}
+              className={`px-2 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 transition ${
+                !rightPanelCollapsed
+                  ? 'bg-slate-800 text-indigo-300 border border-indigo-500/30'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              }`}
+              title={rightPanelCollapsed ? "Expand Mission & Inspector (Make Canvas Smaller)" : "Collapse Mission & Inspector (Make Canvas Bigger)"}
+            >
+              <span className="hidden xl:inline text-[11px]">Inspector</span>
+              {rightPanelCollapsed ? <PanelRightOpen className="w-3.5 h-3.5" /> : <PanelRightClose className="w-3.5 h-3.5" />}
+            </button>
+          </div>
+
           {/* Chaos Monkey Trigger */}
           <button
             onClick={triggerManualChaos}
@@ -1502,14 +1533,29 @@ export default function App() {
       {/* =================================================================== */}
       {/* 2. MAIN WORKSPACE: PALETTE + INTERACTIVE GRAPH CANVAS + INSPECTOR    */}
       {/* =================================================================== */}
-      <div className="flex-1 grid grid-cols-12 min-h-0 h-full overflow-hidden relative">
-        {/* LEFT COLUMN: INFRASTRUCTURE COMPONENT PALETTE (3 Cols) */}
-        <aside className="col-span-3 h-full bg-slate-900/80 border-r border-slate-800 flex flex-col p-3 min-h-0 overflow-hidden">
+      <div className="flex-1 flex min-h-0 h-full overflow-hidden relative">
+        {/* LEFT COLUMN: INFRASTRUCTURE COMPONENT PALETTE */}
+        <aside
+          className={`h-full bg-slate-900/80 border-r border-slate-800 flex flex-col min-h-0 overflow-hidden relative transition-all duration-300 ease-in-out shrink-0 z-20 ${
+            leftPanelCollapsed
+              ? 'w-0 p-0 border-r-0 opacity-0 pointer-events-none'
+              : 'w-72 xl:w-80 2xl:w-88 p-3 opacity-100'
+          }`}
+        >
           {/* Category Filter Pills (Pinned Header) */}
           <div className="shrink-0 mb-2">
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-300">Cloud Components</span>
-              <span className="text-[10px] text-indigo-400 font-medium">Drag or Click</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-300">Cloud Components</span>
+                <span className="text-[10px] text-indigo-400 font-medium hidden xl:inline">• Drag or Click</span>
+              </div>
+              <button
+                onClick={() => setLeftPanelCollapsed(true)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                title="Collapse Component Palette (Make Canvas Bigger)"
+              >
+                <PanelLeftClose className="w-3.5 h-3.5" />
+              </button>
             </div>
 
             <div className="grid grid-cols-5 gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-[10px] font-bold">
@@ -1631,7 +1677,7 @@ export default function App() {
               handleAddService(compType, worldX, worldY);
             }
           }}
-          className={`col-span-6 h-full relative bg-slate-950 flex flex-col overflow-hidden select-none min-h-0 ${
+          className={`flex-1 min-w-0 h-full relative bg-slate-950 flex flex-col overflow-hidden select-none min-h-0 ${
             isPanning ? 'cursor-grabbing' : 'cursor-grab'
           }`}
           style={{
@@ -1640,6 +1686,30 @@ export default function App() {
             backgroundPosition: `${pan.x}px ${pan.y}px`
           }}
         >
+          {/* Floating Expand Left Panel Button (When Collapsed) */}
+          {leftPanelCollapsed && (
+            <button
+              onClick={() => setLeftPanelCollapsed(false)}
+              className="absolute left-3 top-14 z-30 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/95 backdrop-blur-md border border-indigo-500/50 text-xs font-bold text-indigo-300 hover:text-white hover:bg-slate-800 shadow-2xl transition hover:scale-105 pointer-events-auto"
+              title="Expand Component Palette (Make Canvas Smaller)"
+            >
+              <PanelLeftOpen className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Components</span>
+            </button>
+          )}
+
+          {/* Floating Expand Right Panel Button (When Collapsed) */}
+          {rightPanelCollapsed && (
+            <button
+              onClick={() => setRightPanelCollapsed(false)}
+              className="absolute right-3 top-14 z-30 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/95 backdrop-blur-md border border-indigo-500/50 text-xs font-bold text-indigo-300 hover:text-white hover:bg-slate-800 shadow-2xl transition hover:scale-105 pointer-events-auto"
+              title="Expand Problem & Inspector (Make Canvas Smaller)"
+            >
+              <span>Problem &amp; Inspector</span>
+              <PanelRightOpen className="w-3.5 h-3.5 text-indigo-400" />
+            </button>
+          )}
+
           {/* Top Helper / Connection Banner */}
           <div className="absolute top-3 left-3 right-3 flex flex-wrap items-center justify-between gap-2 pointer-events-none z-30">
             <div className="bg-slate-900/90 backdrop-blur border border-slate-800 px-3.5 py-1.5 rounded-xl text-xs text-slate-300 flex items-center gap-2 pointer-events-auto shadow-lg">
@@ -2083,8 +2153,27 @@ export default function App() {
           )}
         </main>
 
-        {/* RIGHT COLUMN: PROBLEM STATEMENT, INSPECTOR & LIVE MENTOR (3 Cols) */}
-        <aside className="col-span-3 h-full bg-slate-900/80 border-l border-slate-800 flex flex-col overflow-y-auto p-3.5 space-y-4 min-h-0">
+        {/* RIGHT COLUMN: PROBLEM STATEMENT, INSPECTOR & LIVE MENTOR */}
+        <aside
+          className={`h-full bg-slate-900/80 border-l border-slate-800 flex flex-col overflow-y-auto min-h-0 relative transition-all duration-300 ease-in-out shrink-0 z-20 ${
+            rightPanelCollapsed
+              ? 'w-0 p-0 border-l-0 opacity-0 pointer-events-none'
+              : 'w-80 xl:w-96 2xl:w-[420px] p-3.5 space-y-4 opacity-100'
+          }`}
+        >
+          {/* Panel Header & Collapse Action */}
+          <div className="flex items-center justify-between pb-2 border-b border-slate-800/80 shrink-0">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
+              Problem &amp; Diagnostics
+            </span>
+            <button
+              onClick={() => setRightPanelCollapsed(true)}
+              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              title="Collapse Panel (Make Canvas Bigger)"
+            >
+              <PanelRightClose className="w-3.5 h-3.5" />
+            </button>
+          </div>
           {/* =============================================================== */}
           {/* 1. SCENARIO PROBLEM STATEMENT (TOP OF RIGHT PANEL)              */}
           {/* =============================================================== */}
