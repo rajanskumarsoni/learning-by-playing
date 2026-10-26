@@ -2083,159 +2083,290 @@ export default function App() {
           )}
         </main>
 
-        {/* RIGHT COLUMN: ARCHITECTURAL TUNING INSPECTOR & LIVE MENTOR (3 Cols) */}
+        {/* RIGHT COLUMN: PROBLEM STATEMENT, INSPECTOR & LIVE MENTOR (3 Cols) */}
         <aside className="col-span-3 h-full bg-slate-900/80 border-l border-slate-800 flex flex-col overflow-y-auto p-3.5 space-y-4 min-h-0">
-          <div className="space-y-4">
-            {/* Selected Node Inspector */}
-            <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-3.5">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-indigo-400 flex items-center gap-1.5">
-                  <Settings className="w-3.5 h-3.5" />
-                  <span>Component Inspector</span>
+          {/* =============================================================== */}
+          {/* 1. SCENARIO PROBLEM STATEMENT (TOP OF RIGHT PANEL)              */}
+          {/* =============================================================== */}
+          {gameMode === 'CAMPAIGN' ? (
+            <div className="bg-slate-950/90 border border-indigo-500/40 rounded-2xl p-4 space-y-3 shadow-lg shadow-indigo-950/20">
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 flex items-center gap-1.5">
+                  <AlertTriangle className="w-3 h-3 text-amber-400" />
+                  <span>Problem Statement</span>
                 </span>
-                {selectedNode && selectedNode.type !== 'SOURCE' && (
-                  <button
-                    onClick={() => deleteNode(selectedNode.id)}
-                    className="text-xs text-rose-400 hover:text-rose-300 flex items-center gap-1"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" /> Delete
-                  </button>
-                )}
-              </div>
-
-              {selectedNode && selectedSpec && selectedMetrics ? (
-                <div className="space-y-3">
-                  <div>
-                    <div className="text-sm font-bold text-white">{selectedSpec.name}</div>
-                    <p className="text-xs text-slate-400 mt-0.5">{selectedSpec.description}</p>
-                  </div>
-
-                  {/* Telemetry Stats */}
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="bg-slate-900 p-2 rounded-lg border border-slate-800">
-                      <div className="text-[10px] text-slate-400">Total Ingress</div>
-                      <div className="font-mono font-bold text-white mt-0.5">
-                        {Math.round(selectedMetrics.totalIn).toLocaleString()} RPS
-                      </div>
-                    </div>
-                    <div className="bg-slate-900 p-2 rounded-lg border border-slate-800">
-                      <div className="text-[10px] text-slate-400">Latency</div>
-                      <div className="font-mono font-bold text-cyan-300 mt-0.5">
-                        {selectedMetrics.effectiveLatency}ms
-                      </div>
-                    </div>
-                    <div className="bg-slate-900 p-2 rounded-lg border border-slate-800">
-                      <div className="text-[10px] text-slate-400">Saturation</div>
-                      <div className="font-mono font-bold text-amber-300 mt-0.5">
-                        {Math.round(selectedMetrics.utilization * 100)}%
-                      </div>
-                    </div>
-                    <div className="bg-slate-900 p-2 rounded-lg border border-slate-800">
-                      <div className="text-[10px] text-slate-400">Hourly Cost</div>
-                      <div className="font-mono font-bold text-emerald-400 mt-0.5">
-                        ${selectedMetrics.cost}/hr
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Architectural Configuration Dropdowns */}
-                  {selectedSpec.configOptions && (
-                    <div className="space-y-2 pt-2 border-t border-slate-800">
-                      <span className="text-[11px] font-bold text-slate-300">Architectural Tuning:</span>
-                      {Object.keys(selectedSpec.configOptions).map((configKey) => {
-                        const opt = selectedSpec.configOptions[configKey];
-                        const currentVal = selectedNode.config?.[configKey] || 0;
-                        return (
-                          <div key={configKey} className="space-y-1">
-                            <label className="text-[10px] text-slate-400">{opt.label}</label>
-                            <select
-                              value={currentVal}
-                              onChange={(e) => {
-                                const val = Number(e.target.value);
-                                setNodes((prev) =>
-                                  prev.map((n) =>
-                                    n.id === selectedNode.id
-                                      ? { ...n, config: { ...(n.config || {}), [configKey]: val } }
-                                      : n
-                                  )
-                                );
-                              }}
-                              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 cursor-pointer"
-                            >
-                              {opt.values.map((vName, idx) => (
-                                <option key={vName} value={idx}>
-                                  {vName}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Optional Beginner Tip */}
-                  {showBeginnerHints && selectedSpec.beginnerTip && (
-                    <div className="p-2.5 rounded-xl bg-indigo-950/40 border border-indigo-500/30 text-[11px] text-indigo-200 leading-relaxed">
-                      <strong>💡 Simple Analogy:</strong> {selectedSpec.beginnerTip}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-xs text-slate-500 py-6 text-center">
-                  Click any component node on the canvas to inspect its live load and tune configurations.
-                </div>
-              )}
-            </div>
-
-            {/* Live Root-Cause Architecture Mentor */}
-            <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-3.5">
-              <div className="flex items-center gap-2 mb-2">
-                <Sparkles className="w-4 h-4 text-amber-400" />
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
-                  Architecture Mentor
+                <span className="text-[11px] font-mono text-indigo-400 font-bold">
+                  {currentLevel.title.split(':')[0]}
                 </span>
               </div>
 
-              <div className="space-y-2 max-h-56 overflow-y-auto">
-                {evaluation.diagnostics.map((diag, i) => {
-                  const isCrit = diag.includes('CRITICAL') || diag.includes('ALERT') || diag.includes('OUTAGE');
-                  const isWarn = diag.includes('BOTTLENECK') || diag.includes('HIGH') || diag.includes('BUDGET');
-                  return (
-                    <div
-                      key={i}
-                      className={`p-2.5 rounded-lg border text-[11px] leading-relaxed flex items-start gap-2 ${
-                        isCrit
-                          ? 'bg-rose-950/40 border-rose-500/40 text-rose-200'
-                          : isWarn
-                          ? 'bg-amber-950/40 border-amber-500/40 text-amber-200'
-                          : 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200'
-                      }`}
-                    >
-                      <span className="mt-0.5">{isCrit ? '⚠️' : isWarn ? '⚡' : '✅'}</span>
-                      <span>{diag}</span>
-                    </div>
-                  );
-                })}
+              {/* Title & Core Concept */}
+              <div>
+                <h3 className="text-sm font-extrabold text-white leading-tight">
+                  {currentLevel.title}
+                </h3>
+                <div className="text-xs text-indigo-300 font-medium mt-0.5">
+                  ⚡ Focus: {currentLevel.concept}
+                </div>
               </div>
-            </div>
-          </div>
 
-          {/* Quick Scenario Brief Card in Campaign */}
-          {gameMode === 'CAMPAIGN' && (
-            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs space-y-1.5">
-              <div className="flex items-center justify-between text-indigo-300 font-bold">
-                <span>{currentLevel.title}</span>
-                <span>{currentLevel.concept}</span>
+              {/* Problem Brief */}
+              <p className="text-xs text-slate-300 leading-relaxed bg-slate-900/80 p-3 rounded-xl border border-slate-800/80">
+                {currentLevel.brief}
+              </p>
+
+              {/* SLA & Budget Constraints Grid */}
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-slate-900/90 p-2 rounded-xl border border-slate-800">
+                  <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                    <span>🎯 Target Peak Load</span>
+                  </div>
+                  <div className="font-mono font-bold text-white mt-0.5">
+                    {currentLevel.targetRps.toLocaleString()} RPS
+                  </div>
+                </div>
+
+                <div className="bg-slate-900/90 p-2 rounded-xl border border-slate-800">
+                  <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                    <span>⏱️ Latency SLA</span>
+                  </div>
+                  <div className="font-mono font-bold text-cyan-300 mt-0.5">
+                    &lt; {currentLevel.maxLatencyMs}ms
+                  </div>
+                </div>
+
+                <div className="bg-slate-900/90 p-2 rounded-xl border border-slate-800">
+                  <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                    <span>💰 Max Cloud Budget</span>
+                  </div>
+                  <div className="font-mono font-bold text-emerald-400 mt-0.5">
+                    &le; ${currentLevel.maxBudgetHr}/hr
+                  </div>
+                </div>
+
+                <div className="bg-slate-900/90 p-2 rounded-xl border border-slate-800">
+                  <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                    <span>🛡️ Min Uptime SLA</span>
+                  </div>
+                  <div className="font-mono font-bold text-purple-300 mt-0.5">
+                    &ge; {currentLevel.minUptimePct}%
+                  </div>
+                </div>
               </div>
-              <p className="text-[11px] text-slate-400 leading-relaxed">{currentLevel.brief}</p>
-              {showBeginnerHints && currentLevel.beginnerAnalogy && (
-                <div className="text-[10px] text-amber-300/90 pt-1 border-t border-slate-800">
-                  <strong>Analogy:</strong> {currentLevel.beginnerAnalogy}
+
+              {/* Real-Life Everyday Analogy */}
+              {currentLevel.beginnerAnalogy && (
+                <div className="p-3 rounded-xl bg-amber-950/25 border border-amber-500/30 text-xs text-amber-200 leading-relaxed space-y-1">
+                  <div className="font-bold text-[10px] uppercase tracking-wider text-amber-400 flex items-center gap-1">
+                    <span>💡 Everyday Analogy</span>
+                  </div>
+                  <div>{currentLevel.beginnerAnalogy}</div>
                 </div>
               )}
+
+              {/* Architecture Hints & Solution Clues */}
+              {currentLevel.hints && currentLevel.hints.length > 0 && (
+                <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1.5">
+                  <div className="font-bold text-[10px] uppercase tracking-wider text-indigo-400 flex items-center gap-1">
+                    <span>🔍 Architectural Strategy Tips</span>
+                  </div>
+                  <ul className="space-y-1 text-[11px] text-slate-300 list-disc list-inside">
+                    {currentLevel.hints.map((h, i) => (
+                      <li key={i} className="leading-snug">{h}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ) : gameMode === 'SURVIVAL' ? (
+            <div className="bg-slate-950/90 border border-amber-500/40 rounded-2xl p-4 space-y-2.5 shadow-lg shadow-amber-950/20">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1.5">
+                  <Flame className="w-3 h-3 text-amber-400" />
+                  <span>Survival Mission</span>
+                </span>
+                <span className="text-[11px] font-mono text-amber-400 font-bold">
+                  Wave {survivalWave}
+                </span>
+              </div>
+              <h3 className="text-sm font-extrabold text-white">
+                Infinite Escalating Traffic Surge
+              </h3>
+              <p className="text-xs text-slate-300 leading-relaxed bg-slate-900/80 p-2.5 rounded-xl border border-slate-800/80">
+                Survive as many waves as possible! Traffic surges by +2,500 RPS every wave with malicious bot swarms and random Chaos Monkey server outages. Maintain &ge;98% availability to advance!
+              </p>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-slate-900/90 p-2 rounded-xl border border-slate-800">
+                  <span className="text-[10px] text-slate-400">Current Wave Load</span>
+                  <div className="font-mono font-bold text-amber-300 mt-0.5">
+                    {(3000 + survivalWave * 2500).toLocaleString()} RPS
+                  </div>
+                </div>
+                <div className="bg-slate-900/90 p-2 rounded-xl border border-slate-800">
+                  <span className="text-[10px] text-slate-400">Survival Target</span>
+                  <div className="font-mono font-bold text-emerald-400 mt-0.5">
+                    SLA &ge; 98.0%
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-slate-950/90 border border-emerald-500/40 rounded-2xl p-4 space-y-2.5 shadow-lg shadow-emerald-950/20">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                  🧪 Sandbox Lab
+                </span>
+                <span className="text-[11px] font-mono text-emerald-400 font-bold">
+                  Freeform Workbench
+                </span>
+              </div>
+              <h3 className="text-sm font-extrabold text-white">
+                Unrestricted Architectural Playground
+              </h3>
+              <p className="text-xs text-slate-300 leading-relaxed bg-slate-900/80 p-2.5 rounded-xl border border-slate-800/80">
+                Zero budget caps and zero constraints. Drag and deploy any cloud component, dial the peak load slider up to 35,000+ RPS, and stress-test custom topologies.
+              </p>
             </div>
           )}
+
+          {/* =============================================================== */}
+          {/* 2. SELECTED COMPONENT INSPECTOR & TUNING                         */}
+          {/* =============================================================== */}
+          <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-3.5 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-indigo-400 flex items-center gap-1.5">
+                <Settings className="w-3.5 h-3.5" />
+                <span>Component Inspector</span>
+              </span>
+              {selectedNode && selectedNode.type !== 'SOURCE' && (
+                <button
+                  onClick={() => deleteNode(selectedNode.id)}
+                  className="text-xs text-rose-400 hover:text-rose-300 flex items-center gap-1"
+                >
+                  <Trash2 className="w-3.5 h-3.5" /> Delete
+                </button>
+              )}
+            </div>
+
+            {selectedNode && selectedSpec && selectedMetrics ? (
+              <div className="space-y-3">
+                <div>
+                  <div className="text-sm font-bold text-white">{selectedSpec.name}</div>
+                  <p className="text-xs text-slate-400 mt-0.5">{selectedSpec.description}</p>
+                </div>
+
+                {/* Telemetry Stats */}
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="bg-slate-900 p-2 rounded-lg border border-slate-800">
+                    <div className="text-[10px] text-slate-400">Total Ingress</div>
+                    <div className="font-mono font-bold text-white mt-0.5">
+                      {Math.round(selectedMetrics.totalIn).toLocaleString()} RPS
+                    </div>
+                  </div>
+                  <div className="bg-slate-900 p-2 rounded-lg border border-slate-800">
+                    <div className="text-[10px] text-slate-400">Latency</div>
+                    <div className="font-mono font-bold text-cyan-300 mt-0.5">
+                      {selectedMetrics.effectiveLatency}ms
+                    </div>
+                  </div>
+                  <div className="bg-slate-900 p-2 rounded-lg border border-slate-800">
+                    <div className="text-[10px] text-slate-400">Saturation</div>
+                    <div className="font-mono font-bold text-amber-300 mt-0.5">
+                      {Math.round(selectedMetrics.utilization * 100)}%
+                    </div>
+                  </div>
+                  <div className="bg-slate-900 p-2 rounded-lg border border-slate-800">
+                    <div className="text-[10px] text-slate-400">Hourly Cost</div>
+                    <div className="font-mono font-bold text-emerald-400 mt-0.5">
+                      ${selectedMetrics.cost}/hr
+                    </div>
+                  </div>
+                </div>
+
+                {/* Architectural Configuration Dropdowns */}
+                {selectedSpec.configOptions && (
+                  <div className="space-y-2 pt-2 border-t border-slate-800">
+                    <span className="text-[11px] font-bold text-slate-300">Architectural Tuning:</span>
+                    {Object.keys(selectedSpec.configOptions).map((configKey) => {
+                      const opt = selectedSpec.configOptions[configKey];
+                      const currentVal = selectedNode.config?.[configKey] || 0;
+                      return (
+                        <div key={configKey} className="space-y-1">
+                          <label className="text-[10px] text-slate-400">{opt.label}</label>
+                          <select
+                            value={currentVal}
+                            onChange={(e) => {
+                              const val = Number(e.target.value);
+                              setNodes((prev) =>
+                                prev.map((n) =>
+                                  n.id === selectedNode.id
+                                    ? { ...n, config: { ...(n.config || {}), [configKey]: val } }
+                                    : n
+                                )
+                              );
+                            }}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 cursor-pointer"
+                          >
+                            {opt.values.map((vName, idx) => (
+                              <option key={vName} value={idx}>
+                                {vName}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Optional Beginner Tip */}
+                {showBeginnerHints && selectedSpec.beginnerTip && (
+                  <div className="p-2.5 rounded-xl bg-indigo-950/40 border border-indigo-500/30 text-[11px] text-indigo-200 leading-relaxed">
+                    <strong>💡 Simple Analogy:</strong> {selectedSpec.beginnerTip}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-xs text-slate-500 py-4 text-center">
+                Click any component node on the canvas to inspect its live load and tune configurations.
+              </div>
+            )}
+          </div>
+
+          {/* =============================================================== */}
+          {/* 3. LIVE ROOT-CAUSE ARCHITECTURE MENTOR & DIAGNOSTICS             */}
+          {/* =============================================================== */}
+          <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-3.5 space-y-2">
+            <div className="flex items-center gap-2 mb-1">
+              <Sparkles className="w-4 h-4 text-amber-400" />
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
+                Architecture Mentor &amp; Diagnostics
+              </span>
+            </div>
+
+            <div className="space-y-2 max-h-56 overflow-y-auto">
+              {evaluation.diagnostics.map((diag, i) => {
+                const isCrit = diag.includes('CRITICAL') || diag.includes('ALERT') || diag.includes('OUTAGE');
+                const isWarn = diag.includes('BOTTLENECK') || diag.includes('HIGH') || diag.includes('BUDGET');
+                return (
+                  <div
+                    key={i}
+                    className={`p-2.5 rounded-lg border text-[11px] leading-relaxed flex items-start gap-2 ${
+                      isCrit
+                        ? 'bg-rose-950/40 border-rose-500/40 text-rose-200'
+                        : isWarn
+                        ? 'bg-amber-950/40 border-amber-500/40 text-amber-200'
+                        : 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200'
+                    }`}
+                  >
+                    <span className="mt-0.5">{isCrit ? '⚠️' : isWarn ? '⚡' : '✅'}</span>
+                    <span>{diag}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </aside>
       </div>
 
