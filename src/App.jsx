@@ -6,8 +6,10 @@ import {
   FastForward, Eye, Sliders, Share2, Lock, Unlock, Box, HardDrive, Network,
   ArrowRight, Sparkles, Info, X, RefreshCw, ZoomIn, ZoomOut, Maximize2, Move,
   BookOpen, Search, Bot, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
-  ChevronLeft
+  ChevronLeft, Star, Trophy, Radio, Target
 } from 'lucide-react';
+import mentorAdaImg from './assets/mentor_ada.jpg';
+import chaosMonkeyImg from './assets/chaos_monkey.jpg';
 
 // ============================================================================
 // 1. TRAFFIC TYPES (6 REALISTIC CLOUD TRAFFIC FLOWS)
@@ -874,6 +876,66 @@ export default function App() {
   const [highlightInspector, setHighlightInspector] = useState(false);
   const touchStartDistRef = useRef(0);
   const touchStartZoomRef = useRef(1);
+  const [chaosBanner, setChaosBanner] = useState(null);
+
+  // Player Architect Rank progression based on cleared levels & survival waves
+  const playerRank = useMemo(() => {
+    const ranks = [
+      { level: 1, title: 'Cadet Architect', badge: '🔰' },
+      { level: 2, title: 'Junior SRE', badge: '🥉' },
+      { level: 3, title: 'Senior Cloud Architect', badge: '🥈' },
+      { level: 4, title: 'Staff Reliability Lead', badge: '🥇' },
+      { level: 5, title: 'Legendary Cloud Saviour', badge: '👑' }
+    ];
+    const rankIdx = Math.min(unlockedLevelIdx, ranks.length - 1);
+    const xp = (unlockedLevelIdx + 1) * 350 + (survivalWave > 1 ? (survivalWave - 1) * 200 : 0);
+    return {
+      ...ranks[rankIdx],
+      xp
+    };
+  }, [unlockedLevelIdx, survivalWave]);
+
+  // Ada's Reactive Tactical Comms Advice
+  const adaCurrentTip = useMemo(() => {
+    const crashedCount = nodes.filter((n) => n.crashed).length;
+    if (crashedCount > 0) {
+      return {
+        mood: 'DANGER',
+        text: `Red Alert! ${crashedCount} service instance(s) crashed! Verify failover paths or click Chaos to restore.`,
+        action: 'Check Outage'
+      };
+    }
+    const targetLat = gameMode === 'CAMPAIGN' ? currentLevel.maxLatencyMs : 250;
+    const targetUptime = gameMode === 'CAMPAIGN' ? currentLevel.minUptimePct : 98.0;
+    const budgetLimit = gameMode === 'CAMPAIGN' ? currentLevel.maxHourlyCost : null;
+
+    if (evaluation.p99Latency > targetLat) {
+      return {
+        mood: 'WARNING',
+        text: `P99 Latency (${evaluation.p99Latency}ms) breaches SLA (<${targetLat}ms)! Mitigate queuing with Redis Cache or horizontal scaling.`,
+        action: 'Add Cache / Scale'
+      };
+    }
+    if (evaluation.uptimePct < targetUptime) {
+      return {
+        mood: 'WARNING',
+        text: `Uptime SLA (${evaluation.uptimePct}%) is below target (≥${targetUptime}%). Bottlenecked nodes are dropping packets!`,
+        action: 'Relieve Bottlenecks'
+      };
+    }
+    if (budgetLimit && evaluation.totalHourlyCost > budgetLimit) {
+      return {
+        mood: 'WARNING',
+        text: `Hourly compute cost ($${evaluation.totalHourlyCost}/hr) exceeds the budget limit ($${budgetLimit}/hr). Trim redundant instances!`,
+        action: 'Optimize Cost'
+      };
+    }
+    return {
+      mood: 'NOMINAL',
+      text: 'All architecture telemetry within SLA parameters! Defense grid armed and ready for Peak Wave simulation.',
+      action: 'Launch Peak Wave'
+    };
+  }, [nodes, evaluation, gameMode, currentLevel]);
 
   // Select node and smoothly bring Component Inspector into screen view in right panel
   const handleSelectNode = useCallback((nodeId) => {
@@ -1123,10 +1185,12 @@ export default function App() {
                 return updated;
               });
             }
+            const stars = isWon ? 1 + (passedSLA ? 1 : 0) + (passedBudget ? 1 : 0) : 0;
             setPostMortemModal({
               won: isWon,
               passedSLA,
               passedBudget,
+              stars,
               p99Latency: evaluation.p99Latency,
               uptimePct: evaluation.uptimePct,
               totalCost: evaluation.totalHourlyCost
@@ -1140,6 +1204,7 @@ export default function App() {
               setPostMortemModal({
                 won: false,
                 survivalWave,
+                stars: Math.max(1, Math.min(3, Math.floor(survivalWave / 2))),
                 p99Latency: evaluation.p99Latency,
                 uptimePct: evaluation.uptimePct
               });
@@ -1380,10 +1445,21 @@ export default function App() {
     const candidates = nodes.filter((n) => n.type !== 'SOURCE' && !n.crashed);
     if (candidates.length === 0) {
       setNodes((prev) => prev.map((n) => ({ ...n, crashed: false })));
+      setChaosBanner({
+        message: 'All damaged nodes rebooted and restored to nominal service.',
+        isRestore: true
+      });
+      setTimeout(() => setChaosBanner(null), 3500);
       return;
     }
     const victim = candidates[Math.floor(Math.random() * candidates.length)];
     setNodes((prev) => prev.map((n) => (n.id === victim.id ? { ...n, crashed: true } : n)));
+    setChaosBanner({
+      message: `Chaos Monkey snipped power to ${victim.name}! Instance crashed!`,
+      victimName: victim.name,
+      isRestore: false
+    });
+    setTimeout(() => setChaosBanner(null), 4500);
   };
 
   const resetWave = () => {
@@ -1410,19 +1486,32 @@ export default function App() {
       {/* =================================================================== */}
       <header className="shrink-0 bg-slate-900/95 border-b border-slate-800 px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-2.5 sm:gap-3 z-30 shadow-md">
         <div className="flex items-center gap-2.5 sm:gap-3">
-          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 text-base sm:text-lg shrink-0">
-            ⚡
+          <div className="relative">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 text-base sm:text-lg shrink-0">
+              ⚡
+            </div>
+            <span className="absolute -bottom-1 -right-1 text-[11px] leading-none" title={playerRank.title}>
+              {playerRank.badge}
+            </span>
           </div>
           <div>
             <div className="flex items-center gap-1.5 sm:gap-2">
               <h1 className="font-extrabold text-xs sm:text-sm tracking-tight text-white truncate">
                 System Saviour <span className="text-indigo-400">Simulator</span>
               </h1>
-              <span className="text-[9px] sm:text-[10px] font-bold uppercase px-1.5 sm:px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 shrink-0">
-                Architect
+              <span className="text-[9px] sm:text-[10px] font-bold uppercase px-1.5 sm:px-2 py-0.5 rounded-full bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-indigo-300 border border-indigo-500/40 shrink-0 flex items-center gap-1">
+                <span>{playerRank.badge}</span>
+                <span className="hidden xs:inline">{playerRank.title}</span>
               </span>
             </div>
-            <p className="text-[10px] sm:text-[11px] text-slate-400 hidden sm:block">Interactive Distributed Systems & Capacity Simulator</p>
+            <div className="flex items-center gap-2 text-[10px] text-slate-400">
+              <span className="hidden sm:inline font-mono text-indigo-300">XP: {playerRank.xp}</span>
+              <span className="hidden sm:inline text-slate-600">•</span>
+              <span className="flex items-center gap-1 text-cyan-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                <span className="hidden xs:inline">Ada AI Comms: Online</span>
+              </span>
+            </div>
           </div>
 
           {/* Mobile Mode Switcher Dropdown */}
@@ -1603,24 +1692,35 @@ export default function App() {
             </button>
           </div>
 
-          {/* Chaos Monkey Trigger */}
+          {/* Chaos Monkey Incident Trigger */}
           <button
             onClick={triggerManualChaos}
-            className="px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-amber-500/50 text-xs text-amber-300 flex items-center gap-1.5 transition"
-            title="Randomly crash an active node to test failover redundancy"
+            className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-rose-950/80 to-purple-950/80 border border-rose-500/50 hover:border-rose-400 text-xs text-rose-200 flex items-center gap-1.5 transition shadow-md shadow-rose-950/30 group active:scale-95"
+            title="Summon Chaos Monkey to snip an instance and test system failover!"
           >
-            <Flame className="w-3.5 h-3.5 text-amber-400" />
-            <span className="hidden sm:inline">Chaos</span>
+            <div className="relative">
+              <img
+                src={chaosMonkeyImg}
+                alt="Chaos Monkey"
+                className="w-5 h-5 rounded-full object-cover ring-1 ring-rose-400/80 group-hover:scale-110 transition-transform"
+              />
+              <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+            </div>
+            <span className="font-bold text-rose-300 hidden sm:inline">Chaos</span>
           </button>
 
-          {/* Welcome Guide / Tutorial Trigger */}
+          {/* Ada AI Mentor Guide Trigger */}
           <button
             onClick={() => setShowWelcomeModal(true)}
-            className="px-2.5 py-1.5 rounded-xl bg-indigo-950/70 border border-indigo-500/40 hover:bg-indigo-900 text-xs text-indigo-300 flex items-center gap-1.5 transition shadow-sm"
-            title="Learn what you get from playing System Saviour and how game modes work"
+            className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-indigo-950/90 to-cyan-950/90 border border-cyan-500/40 hover:border-cyan-400 text-xs text-cyan-200 flex items-center gap-1.5 transition shadow-md shadow-cyan-950/30 group active:scale-95"
+            title="Consult Ada (AI Cloud Architect Lead) for briefing & game tutorial"
           >
-            <BookOpen className="w-3.5 h-3.5 text-indigo-400" />
-            <span className="hidden sm:inline">Guide</span>
+            <img
+              src={mentorAdaImg}
+              alt="Ada Mentor"
+              className="w-5 h-5 rounded-full object-cover ring-1 ring-cyan-400/80 group-hover:scale-110 transition-transform"
+            />
+            <span className="font-bold text-cyan-300 hidden sm:inline">Ada Guide</span>
           </button>
         </div>
       </header>
@@ -1870,8 +1970,12 @@ export default function App() {
               handleAddService(compType, worldX, worldY);
             }
           }}
-          className={`flex-1 min-w-0 h-full relative bg-slate-950 flex flex-col overflow-hidden select-none min-h-0 ${
+          className={`flex-1 min-w-0 h-full relative bg-slate-950 flex flex-col overflow-hidden select-none min-h-0 cyber-grid-overlay transition-all duration-500 ${
             isPanning ? 'cursor-grabbing' : 'cursor-grab'
+          } ${
+            isRunning
+              ? 'shadow-[inset_0_0_120px_rgba(244,63,94,0.18)] ring-1 ring-rose-500/30'
+              : 'shadow-[inset_0_0_80px_rgba(99,102,241,0.06)]'
           }`}
           style={{
             touchAction: 'none',
@@ -1880,6 +1984,101 @@ export default function App() {
             backgroundPosition: `${pan.x}px ${pan.y}px`
           }}
         >
+          {/* Cyber Defense Grid Corner Brackets */}
+          <div className="absolute top-2 left-2 pointer-events-none z-10 flex items-center gap-1.5 text-[9px] font-mono text-cyan-500/40 select-none">
+            <span className="w-2.5 h-2.5 border-t-2 border-l-2 border-cyan-500/60" />
+            <span className="hidden sm:inline">SECTOR 01 // ARCH-GRID ONLINE</span>
+          </div>
+          <div className="absolute top-2 right-2 pointer-events-none z-10 flex items-center gap-1.5 text-[9px] font-mono text-cyan-500/40 select-none">
+            <span className="hidden sm:inline">TELEMETRY MATRIX: ACTIVE</span>
+            <span className="w-2.5 h-2.5 border-t-2 border-r-2 border-cyan-500/60" />
+          </div>
+          <div className="absolute bottom-16 lg:bottom-2 left-2 pointer-events-none z-10 flex items-center gap-1.5 text-[9px] font-mono text-cyan-500/30 select-none">
+            <span className="w-2.5 h-2.5 border-b-2 border-l-2 border-cyan-500/50" />
+            <span className="hidden sm:inline">GRID SYNC: 60Hz</span>
+          </div>
+          <div className="absolute bottom-16 lg:bottom-2 right-2 pointer-events-none z-10 flex items-center gap-1.5 text-[9px] font-mono text-cyan-500/30 select-none">
+            <span className="hidden sm:inline">CHAOS MONKEY SHIELD: ARMED</span>
+            <span className="w-2.5 h-2.5 border-b-2 border-r-2 border-cyan-500/50" />
+          </div>
+
+          {/* Surge Alert Ambient Banner (when Peak Wave is active) */}
+          {isRunning && (
+            <div className="absolute top-12 left-1/2 -translate-x-1/2 z-30 pointer-events-none animate-pulse">
+              <div className="px-3.5 py-1 rounded-full bg-rose-950/90 border border-rose-500/60 text-rose-300 text-[11px] font-bold flex items-center gap-2 shadow-2xl backdrop-blur-md">
+                <span className="w-2 h-2 rounded-full bg-rose-400 animate-ping" />
+                <span>⚡ LIVE PEAK WAVE: SIMULATING MAXIMUM SURGE LOAD</span>
+              </div>
+            </div>
+          )}
+
+          {/* Chaos Monkey Incident Alert Banner */}
+          {chaosBanner && (
+            <div className="absolute top-14 left-1/2 -translate-x-1/2 z-40 pointer-events-auto transition-all animate-bounce">
+              <div className="px-4 py-2 rounded-2xl bg-slate-900/95 border-2 border-rose-500 text-white text-xs font-bold flex items-center gap-3 shadow-2xl shadow-rose-950/80 backdrop-blur-md">
+                <img
+                  src={chaosMonkeyImg}
+                  alt="Chaos Monkey"
+                  className="w-8 h-8 rounded-full object-cover ring-2 ring-rose-400 shrink-0"
+                />
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-rose-400 font-black flex items-center gap-1">
+                    <Flame className="w-3 h-3 text-amber-400" />
+                    <span>Chaos Monkey Incident Alert</span>
+                  </div>
+                  <div className="text-slate-200 text-xs">{chaosBanner.message}</div>
+                </div>
+                <button
+                  onClick={() => setChaosBanner(null)}
+                  className="text-slate-400 hover:text-white p-1 rounded-lg ml-2"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Floating Ada Tactical Advisor Widget */}
+          <div className="absolute bottom-16 lg:bottom-3 left-1/2 -translate-x-1/2 z-30 pointer-events-auto">
+            <div
+              onClick={() => {
+                setRightPanelCollapsed(false);
+                setTimeout(() => {
+                  if (mentorSectionRef.current) {
+                    mentorSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }
+                }, 50);
+              }}
+              className="group cursor-pointer flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-slate-900/95 border border-cyan-500/50 hover:border-cyan-400 text-slate-200 shadow-2xl backdrop-blur-md transition-all hover:scale-105 active:scale-95"
+              title="Click to consult Ada's full diagnosis"
+            >
+              <div className="relative">
+                <img
+                  src={mentorAdaImg}
+                  alt="Ada Mentor"
+                  className="w-6 h-6 rounded-full object-cover ring-1 ring-cyan-400"
+                />
+                <span
+                  className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-slate-900 ${
+                    adaCurrentTip.mood === 'DANGER'
+                      ? 'bg-rose-500 animate-ping'
+                      : adaCurrentTip.mood === 'WARNING'
+                      ? 'bg-amber-400'
+                      : 'bg-emerald-400'
+                  }`}
+                />
+              </div>
+              <div className="flex items-center gap-1.5 text-xs">
+                <span className="font-bold text-cyan-300">Ada:</span>
+                <span className="text-[11px] text-slate-300 max-w-[200px] sm:max-w-xs md:max-w-sm truncate">
+                  {adaCurrentTip.text}
+                </span>
+                <span className="text-[10px] text-indigo-400 font-semibold group-hover:text-indigo-300 ml-1">
+                  Inspect &rarr;
+                </span>
+              </div>
+            </div>
+          </div>
           {/* Floating Expand Left Panel Button (When Collapsed) */}
           {leftPanelCollapsed && (
             <button
@@ -2330,14 +2529,71 @@ export default function App() {
             </div>
           </div>
 
-          {/* Win / Loss Modal */}
+          {/* Win / Loss Modal with Character Assets & Star Rating */}
           {postMortemModal && (
-            <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-6 z-40">
-              <div className="max-w-md w-full bg-slate-900 border-2 border-indigo-500/50 rounded-3xl p-6 text-center shadow-2xl">
-                <div className="text-4xl mb-2">{postMortemModal.won ? '🏆' : '💥'}</div>
-                <h2 className="text-xl font-extrabold text-white">
-                  {postMortemModal.won ? 'SLA Passed Successfully!' : 'SLA Target Breached'}
+            <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 z-40">
+              <div className="max-w-md w-full bg-slate-900 border-2 border-indigo-500/50 rounded-3xl p-6 text-center shadow-2xl relative overflow-hidden">
+                {/* Glow backdrop */}
+                <div
+                  className={`absolute -top-24 -left-24 w-48 h-48 rounded-full blur-3xl pointer-events-none ${
+                    postMortemModal.won ? 'bg-emerald-500/20' : 'bg-rose-500/20'
+                  }`}
+                />
+
+                {/* Character Hero Artwork */}
+                <div className="relative mb-3 flex justify-center">
+                  <div className="relative">
+                    <img
+                      src={postMortemModal.won ? mentorAdaImg : chaosMonkeyImg}
+                      alt={postMortemModal.won ? 'Ada Mentor' : 'Chaos Monkey'}
+                      className={`w-20 h-20 rounded-2xl object-cover shadow-2xl ring-4 ${
+                        postMortemModal.won
+                          ? 'ring-emerald-400 shadow-emerald-500/30'
+                          : 'ring-rose-500 shadow-rose-500/30'
+                      }`}
+                    />
+                    <span className="absolute -bottom-2 -right-2 text-xl">
+                      {postMortemModal.won ? '🏆' : '👾'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Star Rating on Victory */}
+                {postMortemModal.won && (
+                  <div className="flex items-center justify-center gap-1.5 mb-2">
+                    {[1, 2, 3].map((starIdx) => (
+                      <Star
+                        key={starIdx}
+                        className={`w-6 h-6 transition-all ${
+                          starIdx <= (postMortemModal.stars || 3)
+                            ? 'text-amber-400 fill-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.6)] animate-bounce'
+                            : 'text-slate-700'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                <h2 className="text-xl font-black text-white">
+                  {postMortemModal.won ? 'Mission Complete: SLA Sustained!' : 'Incident Alert: SLA Target Breached'}
                 </h2>
+
+                {/* Character Speech Quote */}
+                <div
+                  className={`mt-2 p-2.5 rounded-xl border text-[11px] leading-relaxed italic ${
+                    postMortemModal.won
+                      ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-200'
+                      : 'bg-rose-950/30 border-rose-500/40 text-rose-200'
+                  }`}
+                >
+                  {postMortemModal.won ? (
+                    <p>&ldquo;Spectacular architecture, Architect! Your system gracefully absorbed peak traffic wave within latency and uptime targets.&rdquo; &mdash; <strong>Ada</strong></p>
+                  ) : (
+                    <p>&ldquo;Hehe! Volumetric overload crashed the servers! Don&apos;t worry, real SREs learn from outages&mdash;check Ada&apos;s diagnostics &amp; optimize!&rdquo; &mdash; <strong>Chaos Monkey</strong></p>
+                  )}
+                </div>
+
+                {/* Telemetry Summary Card */}
                 <div className="mt-3 p-3 bg-slate-950 rounded-2xl border border-slate-800 text-xs space-y-1.5 text-slate-300">
                   <div className="flex justify-between">
                     <span>P99 Latency:</span>
@@ -2358,16 +2614,17 @@ export default function App() {
                 <div className="mt-5 flex items-center justify-center gap-3">
                   <button
                     onClick={resetWave}
-                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs"
+                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs active:scale-95 transition"
                   >
                     🔄 Replay Wave
                   </button>
                   {postMortemModal.won && gameMode === 'CAMPAIGN' && currentLevelIdx < CAMPAIGN_LEVELS.length - 1 && (
                     <button
                       onClick={() => selectLevel(currentLevelIdx + 1)}
-                      className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold text-xs shadow-lg"
+                      className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold text-xs shadow-lg shadow-emerald-500/20 active:scale-95 transition flex items-center gap-1.5"
                     >
-                      Next Scenario ➡️
+                      <span>Next Mission</span>
+                      <span>➡️</span>
                     </button>
                   )}
                 </div>
@@ -2830,34 +3087,62 @@ export default function App() {
           {/* =============================================================== */}
           <div
             ref={mentorSectionRef}
-            className={`bg-slate-950/80 border rounded-2xl p-3.5 space-y-2 transition-all duration-500 ${
+            className={`bg-slate-950/90 border rounded-2xl p-3.5 space-y-3 transition-all duration-500 ${
               highlightMentor
                 ? 'border-amber-400 ring-2 ring-amber-400/50 bg-amber-950/20 shadow-xl shadow-amber-950/40 scale-[1.01]'
-                : 'border-slate-800'
+                : 'border-cyan-500/30 shadow-lg shadow-cyan-950/10'
             }`}
           >
-            <div className="flex items-center justify-between mb-1">
-              <div className="flex items-center gap-2">
-                <Sparkles className={`w-4 h-4 ${highlightMentor ? 'text-amber-300 animate-spin' : 'text-amber-400'}`} />
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
-                  Architecture Mentor &amp; Diagnostics
-                </span>
+            {/* Mentor Character Header */}
+            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="relative">
+                  <img
+                    src={mentorAdaImg}
+                    alt="Ada SRE Mentor"
+                    className="w-10 h-10 rounded-xl object-cover ring-2 ring-cyan-400/80 shadow-md"
+                  />
+                  <span className="absolute -bottom-1 -right-1 w-3 h-3 rounded-full bg-emerald-400 border-2 border-slate-950" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-black text-white">Ada</span>
+                    <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                      Chief Architect AI
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono">
+                    <Radio className="w-3 h-3 text-cyan-400 animate-pulse" />
+                    <span>Live Architecture Comms</span>
+                  </div>
+                </div>
               </div>
               {highlightMentor && (
-                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 animate-pulse">
+                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 animate-pulse shrink-0">
                   Live Alert
                 </span>
               )}
             </div>
 
-            <div className="space-y-2 max-h-56 overflow-y-auto">
+            {/* Ada's Reactive Speech Bubble */}
+            <div className="p-2.5 rounded-xl bg-cyan-950/30 border border-cyan-500/30 text-xs text-cyan-200 leading-relaxed">
+              <p className="text-[11px] font-medium italic">
+                &ldquo;{adaCurrentTip.text}&rdquo;
+              </p>
+            </div>
+
+            {/* Diagnostics List */}
+            <div className="space-y-1.5 max-h-52 overflow-y-auto">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 pb-0.5">
+                Telemetry Diagnostics:
+              </div>
               {evaluation.diagnostics.map((diag, i) => {
                 const isCrit = diag.includes('CRITICAL') || diag.includes('ALERT') || diag.includes('OUTAGE');
                 const isWarn = diag.includes('BOTTLENECK') || diag.includes('HIGH') || diag.includes('BUDGET');
                 return (
                   <div
                     key={i}
-                    className={`p-2.5 rounded-lg border text-[11px] leading-relaxed flex items-start gap-2 ${
+                    className={`p-2 rounded-lg border text-[11px] leading-relaxed flex items-start gap-2 ${
                       isCrit
                         ? 'bg-rose-950/40 border-rose-500/40 text-rose-200'
                         : isWarn
@@ -2865,7 +3150,7 @@ export default function App() {
                         : 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200'
                     }`}
                   >
-                    <span className="mt-0.5">{isCrit ? '⚠️' : isWarn ? '⚡' : '✅'}</span>
+                    <span className="mt-0.5 shrink-0">{isCrit ? '⚠️' : isWarn ? '⚡' : '✅'}</span>
                     <span>{diag}</span>
                   </div>
                 );
@@ -2948,22 +3233,27 @@ export default function App() {
               <X className="w-5 h-5" />
             </button>
 
-            {/* Modal Header */}
-            <div className="flex items-center gap-3.5 mb-5 shrink-0">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-indigo-500/25 text-2xl">
-                ⚡
+            {/* Modal Header with Ada Mentor Briefing */}
+            <div className="flex items-center gap-4 mb-5 p-4 rounded-2xl bg-gradient-to-r from-indigo-950/70 via-slate-900 to-cyan-950/70 border border-cyan-500/40 shadow-xl shrink-0">
+              <div className="relative shrink-0">
+                <img
+                  src={mentorAdaImg}
+                  alt="Ada Chief Systems Architect"
+                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover ring-2 ring-cyan-400 shadow-xl shadow-cyan-950/50"
+                />
+                <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-400 border-2 border-slate-900" />
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-lg sm:text-2xl font-black text-white tracking-tight">
                     Welcome to System Saviour
                   </h2>
-                  <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">
-                    Simulator
+                  <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                    Mission Briefing
                   </span>
                 </div>
-                <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
-                  Interactive Distributed Systems Architecture &amp; Capacity Simulator
+                <p className="text-xs sm:text-sm text-cyan-100 mt-1 leading-snug">
+                  &ldquo;Greetings, Architect! I&apos;m <strong>Ada</strong>, your Principal SRE Lead. Welcome to our distributed systems simulator. Ready to design battle-hardened architectures?&rdquo;
                 </p>
               </div>
             </div>
@@ -3050,17 +3340,24 @@ export default function App() {
                     </button>
                   </div>
 
-                  {/* Survival */}
+                  {/* Survival with Chaos Monkey */}
                   <div className="p-4 rounded-2xl bg-slate-950/80 border border-amber-500/30 flex flex-col justify-between space-y-3">
-                    <div className="space-y-1.5">
+                    <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="font-bold text-sm text-amber-300">🔥 2. Survival Wave</span>
+                        <div className="flex items-center gap-2">
+                          <img
+                            src={chaosMonkeyImg}
+                            alt="Chaos Monkey"
+                            className="w-6 h-6 rounded-lg object-cover ring-1 ring-amber-400"
+                          />
+                          <span className="font-bold text-sm text-amber-300">2. Survival Wave</span>
+                        </div>
                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-200">
-                          Endless
+                          Chaos Mode
                         </span>
                       </div>
                       <p className="text-xs text-slate-400 leading-relaxed">
-                        Endless scaling stress test waves! Traffic surges by +2,500 RPS each wave with escalating bot swarms and random node crashes.
+                        Endless scaling stress test waves! Traffic surges by +2,500 RPS each wave while <strong>Chaos Monkey</strong> injects random server crashes and bot swarms.
                       </p>
                       <div className="text-[11px] text-slate-400 pt-1 border-t border-slate-800/80">
                         ⚡ <strong>Goal:</strong> Test your cluster&apos;s breaking point. How many waves can you survive?
@@ -3071,9 +3368,10 @@ export default function App() {
                         switchMode('SURVIVAL');
                         setShowWelcomeModal(false);
                       }}
-                      className="w-full py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs transition shadow"
+                      className="w-full py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs transition shadow flex items-center justify-center gap-1.5"
                     >
-                      Play Survival &rarr;
+                      <span>Challenge Chaos Monkey</span>
+                      <span>&rarr;</span>
                     </button>
                   </div>
 
