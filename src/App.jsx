@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import mentorAdaImg from './assets/mentor_ada.jpg';
 import chaosMonkeyImg from './assets/chaos_monkey.jpg';
+import gameplayDemoVideo from './assets/gameplay_demo.mp4';
 import { sound } from './audioEngine.js';
 
 // ============================================================================
@@ -3347,6 +3348,42 @@ export default function App() {
 
             {/* Modal Body (Scrollable) */}
             <div className="flex-1 overflow-y-auto space-y-6 pr-2 min-h-0 text-xs sm:text-sm">
+              {/* Gameplay Preview Video Section (First Level Demo) */}
+              <div className="rounded-2xl bg-gradient-to-b from-slate-900 to-slate-950 border border-indigo-500/40 p-3 sm:p-4 shadow-2xl space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
+                    <span className="font-extrabold text-xs sm:text-sm text-white flex items-center gap-1.5">
+                      <Play className="w-4 h-4 text-emerald-400 fill-emerald-400" />
+                      <span>Level 1 Gameplay Walkthrough (The Garage Startup)</span>
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 font-mono">
+                    HD Gameplay Preview
+                  </span>
+                </div>
+
+                <div className="relative rounded-xl overflow-hidden bg-slate-950 border border-slate-800 shadow-2xl group aspect-video max-h-[300px]">
+                  <video
+                    src={gameplayDemoVideo}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    controls
+                    className="w-full h-full object-cover rounded-xl"
+                  />
+                  <div className="absolute top-2.5 left-2.5 bg-slate-950/85 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] text-cyan-300 font-mono border border-cyan-500/30 flex items-center gap-1.5 pointer-events-none shadow-lg">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>Watch: Insert Redis Cache ➔ Rewire ➔ 800 RPS SLA Victory!</span>
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  🎬 <strong>How to Play Level 1:</strong> Your viral social app receives 800 RPS of heavy read queries that choke default SQL storage. Insert a Redis Cache between the Web Server and Database to absorb 75% of reads and maintain sub-120ms P99 latency!
+                </p>
+              </div>
+
               {/* What You Will Get Section */}
               <div>
                 <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-400 mb-2.5 flex items-center gap-1.5">
@@ -3760,6 +3797,40 @@ export default function App() {
                             </span>
                           );
                         })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Level 1 Video Demonstration */}
+                {modalMode === 'CAMPAIGN' && selectedLvl.id === 1 && (
+                  <div className="rounded-2xl bg-gradient-to-b from-slate-900 to-slate-950 border border-indigo-500/40 p-3 sm:p-4 shadow-xl space-y-2.5">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
+                        <span className="font-extrabold text-xs sm:text-sm text-white flex items-center gap-1.5">
+                          <Play className="w-4 h-4 text-emerald-400 fill-emerald-400" />
+                          <span>Level 1 Gameplay Walkthrough</span>
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 font-mono">
+                        Auto Demo
+                      </span>
+                    </div>
+
+                    <div className="relative rounded-xl overflow-hidden bg-slate-950 border border-slate-800 shadow-2xl group aspect-video max-h-[260px]">
+                      <video
+                        src={gameplayDemoVideo}
+                        autoPlay
+                        loop
+                        muted
+                        playsInline
+                        controls
+                        className="w-full h-full object-cover rounded-xl"
+                      />
+                      <div className="absolute top-2 left-2 bg-slate-950/85 backdrop-blur-md px-2 py-0.5 rounded-md text-[10px] text-cyan-300 font-mono border border-cyan-500/30 flex items-center gap-1 pointer-events-none">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <span>Watch Solution: Add Redis ➔ Rewire ➔ 800 RPS SLA Victory</span>
+                      </div>
                     </div>
                   </div>
                 )}
