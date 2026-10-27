@@ -3512,7 +3512,7 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* Saviour Video Game Music Toggle */}
+                {/* Warrior Battle Soundtrack Toggle */}
                 <button
                   onClick={() => {
                     sound.playClick();
@@ -3522,18 +3522,18 @@ export default function App() {
                   }}
                   className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 border transition ${
                     isSaviourMusicPlaying
-                      ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300 shadow-md shadow-emerald-500/20'
+                      ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 shadow-md shadow-amber-500/20'
                       : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-slate-200'
                   }`}
-                  title="Toggle 124 BPM Saviour Theme Background Music"
+                  title="Toggle Epic Warrior Battle Theme (High 75% volume, audibly ducked to 30% while Ada narrates)"
                 >
-                  <Music className={`w-3.5 h-3.5 ${isSaviourMusicPlaying ? 'animate-bounce text-emerald-400' : ''}`} />
-                  <span>Saviour Music: {isSaviourMusicPlaying ? 'ON' : 'OFF'}</span>
+                  <Music className={`w-3.5 h-3.5 ${isSaviourMusicPlaying ? 'animate-bounce text-amber-400' : ''}`} />
+                  <span>Warrior Theme: {isSaviourMusicPlaying ? 'ON (75%)' : 'OFF'}</span>
                   {isSaviourMusicPlaying && (
                     <div className="flex items-center gap-0.5 h-2.5">
-                      <span className="w-0.5 h-2 bg-emerald-400 animate-pulse" />
-                      <span className="w-0.5 h-3 bg-cyan-400 animate-ping" />
-                      <span className="w-0.5 h-1.5 bg-emerald-400 animate-pulse" />
+                      <span className="w-0.5 h-2 bg-amber-400 animate-pulse" />
+                      <span className="w-0.5 h-3 bg-red-400 animate-ping" />
+                      <span className="w-0.5 h-1.5 bg-amber-400 animate-pulse" />
                     </div>
                   )}
                 </button>
