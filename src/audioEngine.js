@@ -25,13 +25,12 @@ class SoundEngine {
     this.isDucked = false;
     this._fadeInterval = null;
     this._pendingAutoplay = true;
+    this._needsUnmuteOnGesture = false;
 
-    // Load persisted mute state
+    // Reset default to active unmuted sound
+    this.isMuted = false;
     try {
-      const savedMute = localStorage.getItem('systemsaviour_sound_muted');
-      if (savedMute !== null) {
-        this.isMuted = savedMute === 'true';
-      }
+      localStorage.removeItem('systemsaviour_sound_muted');
     } catch (e) {}
   }
 
@@ -500,6 +499,16 @@ class SoundEngine {
         this.warriorAudio.loop = true;
         this.warriorAudio.preload = 'auto';
         this.warriorAudio.volume = this.isMuted ? 0 : (this.isDucked ? this.duckedGain : this.musicTargetGain);
+
+        this.warriorAudio.onerror = (e) => {
+          console.warn('Primary warrior audio load failed, falling back to public path:', e);
+          if (!this.warriorAudio._triedFallback) {
+            this.warriorAudio._triedFallback = true;
+            this.warriorAudio.src = (import.meta.env?.BASE_URL || '/') + 'warrior_theme.mp3';
+            this.warriorAudio.load();
+            this.warriorAudio.play().catch(() => {});
+          }
+        };
       } catch (e) {
         console.warn('Warrior audio initialization exception:', e);
       }
@@ -543,22 +552,50 @@ class SoundEngine {
     if (this.warriorAudio) {
       const activeVolume = this.isMuted ? 0 : (this.isDucked ? this.duckedGain : this.musicTargetGain);
       this.warriorAudio.volume = activeVolume;
+      this.warriorAudio.muted = this.isMuted;
+
       const playPromise = this.warriorAudio.play();
       if (playPromise !== undefined) {
         playPromise
           .then(() => {
             this._pendingAutoplay = false;
+            this._needsUnmuteOnGesture = false;
           })
           .catch((err) => {
-            // Autoplay policy waiting for user interaction
+            // Browser autoplay policy restricted unmuted playback.
+            // Start playing muted immediately so stream is buffered and playing:
             this._pendingAutoplay = true;
+            this._needsUnmuteOnGesture = true;
+            try {
+              this.warriorAudio.muted = true;
+              this.warriorAudio.play().catch(() => {});
+            } catch (e) {}
           });
       }
     }
   }
 
+  unlockAudio() {
+    this.ensureContext();
+    this.initWarriorAudio();
+    this.isSaviourMusicPlaying = true;
+
+    if (this.warriorAudio) {
+      this.warriorAudio.muted = this.isMuted;
+      this.warriorAudio.volume = this.isMuted ? 0 : (this.isDucked ? this.duckedGain : this.musicTargetGain);
+      this._needsUnmuteOnGesture = false;
+      this._pendingAutoplay = false;
+      this.warriorAudio.play().catch(() => {});
+    }
+  }
+
+  isMusicActive() {
+    return !!(this.warriorAudio && !this.warriorAudio.paused && !this.warriorAudio.muted);
+  }
+
   stopSaviourTheme() {
     this._pendingAutoplay = false;
+    this._needsUnmuteOnGesture = false;
     if (!this.isSaviourMusicPlaying) return;
     this.isSaviourMusicPlaying = false;
     if (this.warriorAudio) {
@@ -575,11 +612,11 @@ class SoundEngine {
   }
 
   toggleSaviourTheme() {
-    if (this.isSaviourMusicPlaying) {
+    if (this.isMusicActive()) {
       this.stopSaviourTheme();
       return false;
     } else {
-      this.startSaviourTheme();
+      this.unlockAudio();
       return true;
     }
   }

@@ -862,6 +862,7 @@ export default function App() {
   // Intro Audio Tour & Saviour Background Music State
   const [audioTourState, setAudioTourState] = useState({ isPlaying: false, currentStepIdx: 0 });
   const [isSaviourMusicPlaying, setIsSaviourMusicPlaying] = useState(true);
+  const [isAudioActive, setIsAudioActive] = useState(() => sound.isMusicActive());
 
   useEffect(() => {
     const unsub = introAudioTour.subscribe((state) => {
@@ -877,29 +878,32 @@ export default function App() {
   useEffect(() => {
     // Attempt immediate playback upon page load
     sound.ensureContext();
-    if (!sound.isMuted) {
-      sound.startSaviourTheme();
-      setIsSaviourMusicPlaying(true);
-    }
+    sound.startSaviourTheme();
 
-    const handleUserGesture = () => {
-      sound.ensureContext();
-      if (!sound.isMuted && (sound._pendingAutoplay || !sound.isSaviourMusicPlaying)) {
-        sound.startSaviourTheme();
-        setIsSaviourMusicPlaying(true);
-      }
+    const syncAudioState = () => {
+      setIsAudioActive(sound.isMusicActive());
     };
 
-    window.addEventListener('click', handleUserGesture);
-    window.addEventListener('keydown', handleUserGesture);
-    window.addEventListener('touchstart', handleUserGesture);
-    window.addEventListener('pointerdown', handleUserGesture);
+    const handleUserGesture = () => {
+      sound.unlockAudio();
+      syncAudioState();
+    };
+
+    // Use capture phase so no child component can swallow or stop propagation of the unlock
+    window.addEventListener('click', handleUserGesture, { capture: true });
+    window.addEventListener('keydown', handleUserGesture, { capture: true });
+    window.addEventListener('touchstart', handleUserGesture, { capture: true });
+    window.addEventListener('pointerdown', handleUserGesture, { capture: true });
+
+    // Polling sync to detect when audio begins playing or pauses
+    const syncTimer = setInterval(syncAudioState, 350);
 
     return () => {
-      window.removeEventListener('click', handleUserGesture);
-      window.removeEventListener('keydown', handleUserGesture);
-      window.removeEventListener('touchstart', handleUserGesture);
-      window.removeEventListener('pointerdown', handleUserGesture);
+      clearInterval(syncTimer);
+      window.removeEventListener('click', handleUserGesture, { capture: true });
+      window.removeEventListener('keydown', handleUserGesture, { capture: true });
+      window.removeEventListener('touchstart', handleUserGesture, { capture: true });
+      window.removeEventListener('pointerdown', handleUserGesture, { capture: true });
     };
   }, []);
 
@@ -1815,16 +1819,17 @@ export default function App() {
               sound.ensureContext();
               const next = sound.toggleSaviourTheme();
               setIsSaviourMusicPlaying(next);
+              setIsAudioActive(sound.isMusicActive());
             }}
             className={`px-2.5 py-1 rounded-xl border text-xs flex items-center gap-1.5 transition active:scale-95 shadow-md ${
-              isSaviourMusicPlaying && !isSoundMuted
+              isAudioActive && !isSoundMuted
                 ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 shadow-amber-500/20'
                 : 'bg-slate-900/90 border-slate-800 text-slate-500 hover:text-slate-300'
             }`}
             title="Warrior Battle Music Soundtrack (Click to Toggle)"
           >
-            <Music className={`w-3.5 h-3.5 ${isSaviourMusicPlaying && !isSoundMuted ? 'animate-bounce text-amber-400' : ''}`} />
-            <span className="font-bold hidden md:inline">Warrior Theme: {isSaviourMusicPlaying && !isSoundMuted ? 'ON' : 'OFF'}</span>
+            <Music className={`w-3.5 h-3.5 ${isAudioActive && !isSoundMuted ? 'animate-bounce text-amber-400' : ''}`} />
+            <span className="font-bold hidden md:inline">Warrior Theme: {isAudioActive && !isSoundMuted ? 'ON (75%)' : 'OFF'}</span>
           </button>
 
           {/* Chaos Monkey Incident Trigger */}
@@ -3442,6 +3447,43 @@ export default function App() {
               </div>
             </div>
 
+            {/* Immediate Sound Activation Prompt (if browser blocked unmuted autoplay) */}
+            {!isAudioActive && (
+              <div
+                onClick={() => {
+                  sound.unlockAudio();
+                  setIsAudioActive(true);
+                }}
+                className="mb-3 px-3.5 py-2.5 rounded-2xl bg-gradient-to-r from-amber-950/80 via-red-950/60 to-amber-950/80 border border-amber-400/80 shadow-xl shadow-amber-950/50 flex items-center justify-between gap-3 cursor-pointer hover:border-amber-300 transition-all group animate-pulse shrink-0"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-7 h-7 rounded-lg bg-amber-400 text-slate-950 flex items-center justify-center font-bold">
+                    <Music className="w-4 h-4 animate-bounce" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-black text-amber-200 flex items-center gap-1.5">
+                      <span>WARRIOR BATTLE SOUNDTRACK READY</span>
+                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-red-500/30 text-red-200 border border-red-500/40">75% Volume</span>
+                    </div>
+                    <div className="text-[11px] text-slate-300">
+                      Tap or click anywhere on the screen to unleash the background soundtrack!
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    sound.unlockAudio();
+                    setIsAudioActive(true);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-amber-400 group-hover:bg-amber-300 text-slate-950 font-black text-xs shadow-md transition active:scale-95 shrink-0 flex items-center gap-1"
+                >
+                  <span>Start Music</span>
+                  <Volume2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
             {/* Audio Mode Guide & Saviour Music Control Bar */}
             <div className="mb-4 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-indigo-500/30 p-2.5 sm:p-3 shadow-xl flex flex-wrap items-center justify-between gap-2.5 shrink-0">
               <div className="flex items-center gap-2.5 min-w-0">
@@ -3546,17 +3588,18 @@ export default function App() {
                     sound.ensureContext();
                     const nextPlaying = sound.toggleSaviourTheme();
                     setIsSaviourMusicPlaying(nextPlaying);
+                    setIsAudioActive(sound.isMusicActive());
                   }}
                   className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 border transition ${
-                    isSaviourMusicPlaying
+                    isAudioActive
                       ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 shadow-md shadow-amber-500/20'
                       : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-slate-200'
                   }`}
                   title="Toggle Epic Warrior Battle Theme (High 75% volume, audibly ducked to 30% while Ada narrates)"
                 >
-                  <Music className={`w-3.5 h-3.5 ${isSaviourMusicPlaying ? 'animate-bounce text-amber-400' : ''}`} />
-                  <span>Warrior Theme: {isSaviourMusicPlaying ? 'ON (75%)' : 'OFF'}</span>
-                  {isSaviourMusicPlaying && (
+                  <Music className={`w-3.5 h-3.5 ${isAudioActive ? 'animate-bounce text-amber-400' : ''}`} />
+                  <span>Warrior Theme: {isAudioActive ? 'ON (75%)' : 'OFF'}</span>
+                  {isAudioActive && (
                     <div className="flex items-center gap-0.5 h-2.5">
                       <span className="w-0.5 h-2 bg-amber-400 animate-pulse" />
                       <span className="w-0.5 h-3 bg-red-400 animate-ping" />
