@@ -843,8 +843,9 @@ export default function App() {
     }
   });
 
-  // Welcome Screen & Component Details Modal States
+  // Welcome Screen, Level Targets Briefing & Component Details Modal States
   const [showWelcomeModal, setShowWelcomeModal] = useState(true);
+  const [levelBriefingModal, setLevelBriefingModal] = useState(null); // { mode: 'CAMPAIGN' | 'SURVIVAL' | 'SANDBOX', levelIdx?: number }
   const [detailModalComponent, setDetailModalComponent] = useState(null);
 
   // Simulation State
@@ -895,47 +896,6 @@ export default function App() {
     };
   }, [unlockedLevelIdx, survivalWave]);
 
-  // Ada's Reactive Tactical Comms Advice
-  const adaCurrentTip = useMemo(() => {
-    const crashedCount = nodes.filter((n) => n.crashed).length;
-    if (crashedCount > 0) {
-      return {
-        mood: 'DANGER',
-        text: `Red Alert! ${crashedCount} service instance(s) crashed! Verify failover paths or click Chaos to restore.`,
-        action: 'Check Outage'
-      };
-    }
-    const targetLat = gameMode === 'CAMPAIGN' ? currentLevel.maxLatencyMs : 250;
-    const targetUptime = gameMode === 'CAMPAIGN' ? currentLevel.minUptimePct : 98.0;
-    const budgetLimit = gameMode === 'CAMPAIGN' ? currentLevel.maxHourlyCost : null;
-
-    if (evaluation.p99Latency > targetLat) {
-      return {
-        mood: 'WARNING',
-        text: `P99 Latency (${evaluation.p99Latency}ms) breaches SLA (<${targetLat}ms)! Mitigate queuing with Redis Cache or horizontal scaling.`,
-        action: 'Add Cache / Scale'
-      };
-    }
-    if (evaluation.uptimePct < targetUptime) {
-      return {
-        mood: 'WARNING',
-        text: `Uptime SLA (${evaluation.uptimePct}%) is below target (≥${targetUptime}%). Bottlenecked nodes are dropping packets!`,
-        action: 'Relieve Bottlenecks'
-      };
-    }
-    if (budgetLimit && evaluation.totalHourlyCost > budgetLimit) {
-      return {
-        mood: 'WARNING',
-        text: `Hourly compute cost ($${evaluation.totalHourlyCost}/hr) exceeds the budget limit ($${budgetLimit}/hr). Trim redundant instances!`,
-        action: 'Optimize Cost'
-      };
-    }
-    return {
-      mood: 'NOMINAL',
-      text: 'All architecture telemetry within SLA parameters! Defense grid armed and ready for Peak Wave simulation.',
-      action: 'Launch Peak Wave'
-    };
-  }, [nodes, evaluation, gameMode, currentLevel]);
 
   // Select node and smoothly bring Component Inspector into screen view in right panel
   const handleSelectNode = useCallback((nodeId) => {
@@ -1074,6 +1034,49 @@ export default function App() {
   const passedUptime = evaluation.uptimePct >= targetMinUptime;
   const passedBudget = !currentMaxBudget || evaluation.totalHourlyCost <= currentMaxBudget;
   const isLevelPassing = passedLatency && passedUptime && passedBudget;
+
+  // Ada's Reactive Tactical Comms Advice
+  const adaCurrentTip = useMemo(() => {
+    const crashedCount = nodes.filter((n) => n.crashed).length;
+    if (crashedCount > 0) {
+      return {
+        mood: 'DANGER',
+        text: `Red Alert! ${crashedCount} service instance(s) crashed! Verify failover paths or click Chaos to restore.`,
+        action: 'Check Outage'
+      };
+    }
+    const targetLat = gameMode === 'CAMPAIGN' ? currentLevel.maxLatencyMs : 250;
+    const targetUptime = gameMode === 'CAMPAIGN' ? currentLevel.minUptimePct : 98.0;
+    const budgetLimit = currentMaxBudget;
+
+    if (evaluation.p99Latency > targetLat) {
+      return {
+        mood: 'WARNING',
+        text: `P99 Latency (${evaluation.p99Latency}ms) breaches SLA (<${targetLat}ms)! Mitigate queuing with Redis Cache or horizontal scaling.`,
+        action: 'Add Cache / Scale'
+      };
+    }
+    if (evaluation.uptimePct < targetUptime) {
+      return {
+        mood: 'WARNING',
+        text: `Uptime SLA (${evaluation.uptimePct}%) is below target (≥${targetUptime}%). Bottlenecked nodes are dropping packets!`,
+        action: 'Relieve Bottlenecks'
+      };
+    }
+    if (budgetLimit && evaluation.totalHourlyCost > budgetLimit) {
+      return {
+        mood: 'WARNING',
+        text: `Hourly compute cost ($${evaluation.totalHourlyCost}/hr) exceeds the budget limit ($${budgetLimit}/hr). Trim redundant instances!`,
+        action: 'Optimize Cost'
+      };
+    }
+    return {
+      mood: 'NOMINAL',
+      text: 'All architecture telemetry within SLA parameters! Defense grid armed and ready for Peak Wave simulation.',
+      action: 'Launch Peak Wave'
+    };
+  }, [nodes, evaluation, gameMode, currentLevel, currentMaxBudget]);
+
 
   // Automatically scroll Architecture Mentor & Diagnostics into screen view when diagnostics change
   useEffect(() => {
@@ -1518,7 +1521,7 @@ export default function App() {
           <div className="md:hidden">
             <select
               value={gameMode}
-              onChange={(e) => switchMode(e.target.value)}
+              onChange={(e) => setLevelBriefingModal({ mode: e.target.value, levelIdx: currentLevelIdx })}
               className="bg-slate-950 text-indigo-300 text-xs font-bold border border-slate-800 rounded-lg px-2 py-1 outline-none"
             >
               <option value="CAMPAIGN">🎓 Campaign</option>
@@ -1536,7 +1539,7 @@ export default function App() {
             ].map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => switchMode(tab.id)}
+                onClick={() => setLevelBriefingModal({ mode: tab.id, levelIdx: currentLevelIdx })}
                 className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
                   gameMode === tab.id ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
                 }`}
@@ -1762,6 +1765,16 @@ export default function App() {
                 </button>
               );
             })}
+
+            {/* Inspect Targets & Briefing Button */}
+            <button
+              onClick={() => setLevelBriefingModal({ mode: 'CAMPAIGN', levelIdx: currentLevelIdx })}
+              className="px-2.5 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/40 text-[11px] font-bold flex items-center gap-1.5 transition shrink-0 ml-1 shadow-sm active:scale-95"
+              title="Inspect mission objectives and SLA targets to achieve"
+            >
+              <Target className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Targets &amp; Briefing</span>
+            </button>
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
@@ -2620,10 +2633,13 @@ export default function App() {
                   </button>
                   {postMortemModal.won && gameMode === 'CAMPAIGN' && currentLevelIdx < CAMPAIGN_LEVELS.length - 1 && (
                     <button
-                      onClick={() => selectLevel(currentLevelIdx + 1)}
+                      onClick={() => {
+                        setPostMortemModal(null);
+                        setLevelBriefingModal({ mode: 'CAMPAIGN', levelIdx: currentLevelIdx + 1 });
+                      }}
                       className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold text-xs shadow-lg shadow-emerald-500/20 active:scale-95 transition flex items-center gap-1.5"
                     >
-                      <span>Next Mission</span>
+                      <span>Next Mission Briefing</span>
                       <span>➡️</span>
                     </button>
                   )}
@@ -3331,12 +3347,13 @@ export default function App() {
                     </div>
                     <button
                       onClick={() => {
-                        switchMode('CAMPAIGN');
                         setShowWelcomeModal(false);
+                        setLevelBriefingModal({ mode: 'CAMPAIGN', levelIdx: currentLevelIdx });
                       }}
-                      className="w-full py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition shadow"
+                      className="w-full py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition shadow flex items-center justify-center gap-1.5"
                     >
-                      Play Campaign &rarr;
+                      <Target className="w-3.5 h-3.5" />
+                      <span>Select Level &amp; View Targets &rarr;</span>
                     </button>
                   </div>
 
@@ -3365,13 +3382,13 @@ export default function App() {
                     </div>
                     <button
                       onClick={() => {
-                        switchMode('SURVIVAL');
                         setShowWelcomeModal(false);
+                        setLevelBriefingModal({ mode: 'SURVIVAL' });
                       }}
-                      className="w-full py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs transition shadow flex items-center justify-center gap-1.5"
+                      className="w-full py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs transition shadow flex items-center justify-center gap-1.5"
                     >
-                      <span>Challenge Chaos Monkey</span>
-                      <span>&rarr;</span>
+                      <Flame className="w-3.5 h-3.5" />
+                      <span>Inspect Survival Targets &rarr;</span>
                     </button>
                   </div>
 
@@ -3393,12 +3410,13 @@ export default function App() {
                     </div>
                     <button
                       onClick={() => {
-                        switchMode('SANDBOX');
                         setShowWelcomeModal(false);
+                        setLevelBriefingModal({ mode: 'SANDBOX' });
                       }}
-                      className="w-full py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold text-xs transition shadow"
+                      className="w-full py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold text-xs transition shadow flex items-center justify-center gap-1.5"
                     >
-                      Play Sandbox &rarr;
+                      <Sliders className="w-3.5 h-3.5" />
+                      <span>Review Sandbox Specs &rarr;</span>
                     </button>
                   </div>
                 </div>
@@ -3428,19 +3446,317 @@ export default function App() {
 
             {/* Modal Footer CTA */}
             <div className="pt-4 mt-4 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3 shrink-0">
-              <span className="text-xs text-slate-500">
-                You can reopen this guide anytime using the <strong>Guide</strong> button in the top navigation.
+              <span className="text-xs text-slate-400 flex items-center gap-1.5">
+                <Info className="w-4 h-4 text-indigo-400 shrink-0" />
+                <span>Choose any game mode above to inspect its <strong>mission targets &amp; level briefing</strong> before entering the arena.</span>
               </span>
               <button
                 onClick={() => setShowWelcomeModal(false)}
-                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 text-white font-extrabold text-xs shadow-lg shadow-indigo-500/25 transition"
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs transition border border-slate-700"
               >
-                🚀 Start Playing (Level 1: Garage Startup) &rarr;
+                Close Guide
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* =================================================================== */}
+      {/* 4B. LEVEL & MODE MISSION BRIEFING MODAL (TARGETS & SLA OBJECTIVES)   */}
+      {/* =================================================================== */}
+      {levelBriefingModal && (() => {
+        const modalMode = levelBriefingModal.mode;
+        const selectedLvlIdx = levelBriefingModal.levelIdx !== undefined ? levelBriefingModal.levelIdx : currentLevelIdx;
+        const selectedLvl = CAMPAIGN_LEVELS[selectedLvlIdx] || CAMPAIGN_LEVELS[0];
+
+        return (
+          <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
+            <div className="relative max-w-3xl w-full bg-slate-900 border border-indigo-500/40 rounded-3xl p-6 sm:p-8 shadow-2xl my-auto text-slate-100 max-h-[92vh] flex flex-col">
+              {/* Close Button */}
+              <button
+                onClick={() => setLevelBriefingModal(null)}
+                className="absolute top-5 right-5 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
+                title="Close Briefing"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              {/* Modal Header */}
+              {modalMode === 'CAMPAIGN' ? (
+                <div>
+                  <div className="flex items-center gap-3.5 mb-4 p-4 rounded-2xl bg-gradient-to-r from-indigo-950/80 via-slate-900 to-cyan-950/80 border border-cyan-500/40 shadow-xl">
+                    <img
+                      src={mentorAdaImg}
+                      alt="Ada Systems Architect"
+                      className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover ring-2 ring-cyan-400 shadow-lg shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">
+                          Campaign Mission #{selectedLvl.id}
+                        </span>
+                        <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                          {selectedLvl.concept}
+                        </span>
+                      </div>
+                      <h2 className="text-lg sm:text-2xl font-black text-white tracking-tight mt-1 truncate">
+                        {selectedLvl.title}
+                      </h2>
+                    </div>
+                  </div>
+
+                  {/* Campaign Level Selector Tabs */}
+                  <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-3 border-b border-slate-800">
+                    <span className="text-xs text-slate-400 font-bold shrink-0 mr-1">Choose Level:</span>
+                    {CAMPAIGN_LEVELS.map((lvl, idx) => {
+                      const isUnlocked = idx <= unlockedLevelIdx;
+                      const isPassed = idx < unlockedLevelIdx;
+                      const isSelected = selectedLvlIdx === idx;
+
+                      return (
+                        <button
+                          key={lvl.id}
+                          disabled={!isUnlocked}
+                          onClick={() => setLevelBriefingModal({ mode: 'CAMPAIGN', levelIdx: idx })}
+                          className={`px-3 py-1.5 rounded-xl font-bold text-xs transition flex items-center gap-1.5 shrink-0 ${
+                            isSelected
+                              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-indigo-400'
+                              : isPassed
+                              ? 'bg-emerald-950/60 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-900/50'
+                              : isUnlocked
+                              ? 'bg-slate-950 text-slate-300 hover:text-white border border-slate-800'
+                              : 'bg-slate-950/40 text-slate-600 border border-slate-900 cursor-not-allowed opacity-50'
+                          }`}
+                        >
+                          {isPassed ? (
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          ) : isUnlocked ? (
+                            <span className="w-2 h-2 rounded-full bg-indigo-400 shrink-0" />
+                          ) : (
+                            <Lock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                          )}
+                          <span>Level {lvl.id}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : modalMode === 'SURVIVAL' ? (
+                <div className="flex items-center gap-3.5 mb-4 p-4 rounded-2xl bg-gradient-to-r from-amber-950/80 via-slate-900 to-rose-950/80 border border-amber-500/40 shadow-xl">
+                  <img
+                    src={chaosMonkeyImg}
+                    alt="Chaos Monkey"
+                    className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover ring-2 ring-amber-400 shadow-lg shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                        Chaos Engineering Mode
+                      </span>
+                      <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                        Endless Scaling Stress Test
+                      </span>
+                    </div>
+                    <h2 className="text-lg sm:text-2xl font-black text-white tracking-tight mt-1">
+                      Survival Wave Mode
+                    </h2>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3.5 mb-4 p-4 rounded-2xl bg-gradient-to-r from-emerald-950/80 via-slate-900 to-teal-950/80 border border-emerald-500/40 shadow-xl">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-emerald-500/20 border border-emerald-400 flex items-center justify-center text-emerald-300 shrink-0">
+                    <Sliders className="w-8 h-8" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                        Open Architecture Playground
+                      </span>
+                      <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/40">
+                        No Budget Constraints
+                      </span>
+                    </div>
+                    <h2 className="text-lg sm:text-2xl font-black text-white tracking-tight mt-1">
+                      Sandbox Architecture Lab
+                    </h2>
+                  </div>
+                </div>
+              )}
+
+              {/* Scrollable Body */}
+              <div className="flex-1 overflow-y-auto space-y-4 pr-1 min-h-0 text-xs sm:text-sm">
+                {/* Scenario Box */}
+                <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2.5">
+                  <div className="font-bold text-white text-xs uppercase tracking-wider flex items-center gap-1.5 text-indigo-400">
+                    <BookOpen className="w-4 h-4" />
+                    <span>Mission Scenario</span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                    {modalMode === 'CAMPAIGN'
+                      ? selectedLvl.brief
+                      : modalMode === 'SURVIVAL'
+                      ? 'Endless scaling stress test waves! Traffic surges by +2,500 RPS each wave while Chaos Monkey randomly terminates active servers and unleashes DDoS bot swarms. Test your cluster failover resilience and see how many waves you can withstand.'
+                      : 'Freeform open architect workbench. Build any distributed system topology with zero budget ceilings, all 11 cloud components unlocked, and live interactive traffic simulation from 1,000 to 35,000+ RPS.'}
+                  </p>
+                  {modalMode === 'CAMPAIGN' && selectedLvl.beginnerAnalogy && (
+                    <div className="p-3 rounded-xl bg-indigo-950/30 border border-indigo-500/20 text-xs text-indigo-200">
+                      💡 <strong>Real-Life Analogy:</strong> {selectedLvl.beginnerAnalogy}
+                    </div>
+                  )}
+                </div>
+
+                {/* TARGETS TO ACHIEVE (SLA REQUIREMENTS) */}
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-cyan-400 mb-2.5 flex items-center gap-1.5">
+                    <Target className="w-4 h-4 text-cyan-400" />
+                    <span>Targets You Must Achieve To Pass</span>
+                  </h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    {/* Target 1: Peak Traffic */}
+                    <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col justify-between">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase">Peak Traffic</span>
+                      <div className="text-base sm:text-lg font-black font-mono text-cyan-300 mt-1">
+                        {modalMode === 'CAMPAIGN'
+                          ? `${selectedLvl.targetRps.toLocaleString()} RPS`
+                          : modalMode === 'SURVIVAL'
+                          ? '3,000+ RPS'
+                          : 'Up to 35k RPS'}
+                      </div>
+                      <span className="text-[10px] text-slate-500 mt-1">
+                        {modalMode === 'CAMPAIGN' ? 'Client request surge' : modalMode === 'SURVIVAL' ? '+2.5k RPS / wave' : 'Adjustable slider'}
+                      </span>
+                    </div>
+
+                    {/* Target 2: Latency SLA */}
+                    <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col justify-between">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase">P99 Latency SLA</span>
+                      <div className="text-base sm:text-lg font-black font-mono text-indigo-300 mt-1">
+                        {modalMode === 'CAMPAIGN' ? `< ${selectedLvl.maxLatencyMs} ms` : modalMode === 'SURVIVAL' ? '< 250 ms' : 'Live Benchmark'}
+                      </div>
+                      <span className="text-[10px] text-slate-500 mt-1">
+                        {modalMode === 'SANDBOX' ? 'Telemetry tracking' : 'Max allowable SLA'}
+                      </span>
+                    </div>
+
+                    {/* Target 3: Uptime SLA */}
+                    <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col justify-between">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase">Uptime SLA</span>
+                      <div className="text-base sm:text-lg font-black font-mono text-emerald-300 mt-1">
+                        {modalMode === 'CAMPAIGN' ? `≥ ${selectedLvl.minUptimePct}%` : modalMode === 'SURVIVAL' ? '≥ 98.0%' : 'Live Telemetry'}
+                      </div>
+                      <span className="text-[10px] text-slate-500 mt-1">
+                        Zero dropped requests
+                      </span>
+                    </div>
+
+                    {/* Target 4: Cloud Budget */}
+                    <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col justify-between">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase">Hourly Budget</span>
+                      <div className="text-base sm:text-lg font-black font-mono text-amber-300 mt-1">
+                        {modalMode === 'CAMPAIGN' ? `≤ $${selectedLvl.maxBudgetHr}/hr` : 'Unlimited ($∞)'}
+                      </div>
+                      <span className="text-[10px] text-slate-500 mt-1">
+                        {modalMode === 'CAMPAIGN' ? 'Cost SLA constraint' : 'Zero budget limit'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Traffic Breakdown for Campaign */}
+                {modalMode === 'CAMPAIGN' && (
+                  <div>
+                    <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                      Incoming Traffic Composition:
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(selectedLvl.trafficMix)
+                        .filter(([, ratio]) => ratio > 0)
+                        .map(([typeKey, ratio]) => {
+                          const spec = TRAFFIC_TYPES[typeKey];
+                          if (!spec) return null;
+                          return (
+                            <span
+                              key={typeKey}
+                              className="px-2.5 py-1 rounded-xl text-xs font-semibold border flex items-center gap-1.5"
+                              style={{
+                                backgroundColor: `${spec.color}18`,
+                                borderColor: `${spec.color}40`,
+                                color: spec.color
+                              }}
+                            >
+                              <span>{spec.emoji}</span>
+                              <span>{Math.round(ratio * 100)}% {spec.name.split('(')[0]}</span>
+                            </span>
+                          );
+                        })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Tactical Directives / Hints */}
+                {modalMode === 'CAMPAIGN' && selectedLvl.hints && selectedLvl.hints.length > 0 && (
+                  <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>Architect Directives from Ada:</span>
+                    </span>
+                    <ul className="space-y-1.5 text-xs text-slate-300">
+                      {selectedLvl.hints.map((hint, i) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <span className="text-indigo-400 font-bold shrink-0">{i + 1}.</span>
+                          <span>{hint}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons Footer */}
+              <div className="pt-4 mt-4 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3 shrink-0">
+                <button
+                  onClick={() => {
+                    setLevelBriefingModal(null);
+                    setShowWelcomeModal(true);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs transition border border-slate-700 flex items-center gap-1.5"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  <span>Back to Modes</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    if (modalMode === 'CAMPAIGN') {
+                      selectLevel(selectedLvlIdx);
+                      setGameMode('CAMPAIGN');
+                    } else {
+                      switchMode(modalMode);
+                    }
+                    setLevelBriefingModal(null);
+                  }}
+                  className={`px-6 py-2.5 rounded-xl font-black text-xs shadow-xl transition flex items-center gap-2 ${
+                    modalMode === 'CAMPAIGN'
+                      ? 'bg-gradient-to-r from-indigo-500 via-indigo-600 to-purple-600 hover:from-indigo-400 hover:to-purple-500 text-white shadow-indigo-500/30'
+                      : modalMode === 'SURVIVAL'
+                      ? 'bg-gradient-to-r from-amber-500 to-rose-600 hover:from-amber-400 hover:to-rose-500 text-white shadow-amber-500/30'
+                      : 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-emerald-500/30'
+                  }`}
+                >
+                  <span>
+                    {modalMode === 'CAMPAIGN'
+                      ? `🚀 Open Game Arena for Level ${selectedLvl.id}`
+                      : modalMode === 'SURVIVAL'
+                      ? '🔥 Open Survival Arena & Challenge Chaos Monkey'
+                      : '🧪 Open Sandbox Arena & Build Architecture'}
+                  </span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* =================================================================== */}
       {/* 5. COMPONENT DEEP-DIVE MODAL (CASE STUDY & REAL-LIFE ANALOGY)       */}
