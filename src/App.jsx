@@ -1980,6 +1980,7 @@ export default function App() {
                     e.dataTransfer.effectAllowed = 'copy';
                   }}
                   onClick={() => setDetailModalComponent(item.type)}
+                  data-component-type={item.type}
                   className={`group relative w-full text-left p-2.5 rounded-xl border transition-all select-none ${
                     isAllowed
                       ? 'bg-slate-950/90 hover:bg-slate-850 border-slate-800 hover:border-indigo-500/60 cursor-grab active:cursor-grabbing shadow-sm hover:shadow-indigo-500/10'
@@ -2443,6 +2444,9 @@ export default function App() {
 
                     {/* RPS Flow Label on Wire */}
                     <g
+                      data-edge-id={edge.id}
+                      data-edge-from={edge.from}
+                      data-edge-to={edge.to}
                       transform={`translate(${(x1 + x2) / 2}, ${(y1 + y2) / 2 - 8})`}
                       className="cursor-pointer group/label"
                       onClick={(e) => {
@@ -2507,6 +2511,7 @@ export default function App() {
                 return (
                   <div
                     key={node.id}
+                    data-node-id={node.id}
                     style={{ left: node.x, top: node.y, width: 176, touchAction: 'none' }}
                     onMouseDown={(e) => handleMouseDownNode(node.id, e)}
                     onTouchStart={(e) => handleTouchStartNode(node.id, e)}
@@ -2532,6 +2537,8 @@ export default function App() {
                     {/* Left Input Port */}
                     {node.type !== 'SOURCE' && (
                       <button
+                        data-port-node={node.id}
+                        data-port-type="in"
                         onClick={(e) => handlePortClick(e, node.id, 'in')}
                         onTouchEnd={(e) => {
                           e.stopPropagation();
@@ -2548,6 +2555,8 @@ export default function App() {
 
                     {/* Right Output Port */}
                     <button
+                      data-port-node={node.id}
+                      data-port-type="out"
                       onClick={(e) => handlePortClick(e, node.id, 'out')}
                       onTouchEnd={(e) => {
                         e.stopPropagation();
