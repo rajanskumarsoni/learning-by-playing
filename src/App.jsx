@@ -1575,8 +1575,8 @@ export default function App() {
           </div>
           <div>
             <div className="flex items-center gap-1.5 sm:gap-2">
-              <h1 className="font-extrabold text-xs sm:text-sm tracking-tight text-white truncate">
-                System Saviour <span className="text-indigo-400">Simulator</span>
+              <h1 className="font-black text-xs sm:text-sm tracking-wide text-white truncate font-display">
+                System Saviour <span className="text-cyan-400">Simulator</span>
               </h1>
               <span className="text-[9px] sm:text-[10px] font-bold uppercase px-1.5 sm:px-2 py-0.5 rounded-full bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-indigo-300 border border-indigo-500/40 shrink-0 flex items-center gap-1">
                 <span>{playerRank.badge}</span>
@@ -1598,7 +1598,7 @@ export default function App() {
             <select
               value={gameMode}
               onChange={(e) => setLevelBriefingModal({ mode: e.target.value, levelIdx: currentLevelIdx })}
-              className="bg-slate-950 text-indigo-300 text-xs font-bold border border-slate-800 rounded-lg px-2 py-1 outline-none"
+              className="bg-slate-950 text-indigo-300 text-xs font-bold border border-slate-800 rounded-lg px-2 py-1 outline-none font-display"
             >
               <option value="CAMPAIGN">🎓 Campaign</option>
               <option value="SURVIVAL">🔥 Survival Wave</option>
@@ -1616,7 +1616,7 @@ export default function App() {
               <button
                 key={tab.id}
                 onClick={() => setLevelBriefingModal({ mode: tab.id, levelIdx: currentLevelIdx })}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                className={`px-3 py-1 rounded-lg text-xs font-bold font-display tracking-wide transition-all ${
                   gameMode === tab.id ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
@@ -1846,7 +1846,7 @@ export default function App() {
                   disabled={!isUnlocked}
                   onClick={() => isUnlocked && selectLevel(idx)}
                   title={isUnlocked ? lvl.title : `🔒 Pass Level ${idx} to unlock this scenario`}
-                  className={`px-3 py-1 rounded-lg font-bold text-xs transition flex items-center gap-1.5 shrink-0 ${
+                  className={`px-3 py-1 rounded-lg font-bold font-display tracking-wide text-xs transition flex items-center gap-1.5 shrink-0 ${
                     isCurrent
                       ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-indigo-400/40'
                       : isPassed
@@ -1872,7 +1872,7 @@ export default function App() {
             {/* Inspect Targets & Briefing Button */}
             <button
               onClick={() => setLevelBriefingModal({ mode: 'CAMPAIGN', levelIdx: currentLevelIdx })}
-              className="px-2.5 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/40 text-[11px] font-bold flex items-center gap-1.5 transition shrink-0 ml-1 shadow-sm active:scale-95"
+              className="px-2.5 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/40 text-[11px] font-bold font-display tracking-wide flex items-center gap-1.5 transition shrink-0 ml-1 shadow-sm active:scale-95"
               title="Inspect mission objectives and SLA targets to achieve"
             >
               <Target className="w-3.5 h-3.5 text-indigo-400" />
@@ -3396,7 +3396,7 @@ export default function App() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="text-lg sm:text-2xl font-black text-white tracking-tight">
+                  <h2 className="text-lg sm:text-2xl font-black text-white tracking-wide font-display">
                     Welcome to System Saviour
                   </h2>
                   <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
