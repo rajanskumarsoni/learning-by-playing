@@ -17,13 +17,14 @@ class SoundEngine {
     this.musicGain = null;
     this.musicFilter = null;
     this.musicInterval = null;
-    this.isSaviourMusicPlaying = false;
+    this.isSaviourMusicPlaying = true; // Default music is ON!
     this.warriorAudio = null;
     this.warriorSourceNode = null;
     this.musicTargetGain = 0.75; // High, audible, energetic warrior theme volume
     this.duckedGain = 0.30;      // Background volume during Ada speech (keeps music clearly audible!)
     this.isDucked = false;
     this._fadeInterval = null;
+    this._pendingAutoplay = true;
 
     // Load persisted mute state
     try {
@@ -544,15 +545,20 @@ class SoundEngine {
       this.warriorAudio.volume = activeVolume;
       const playPromise = this.warriorAudio.play();
       if (playPromise !== undefined) {
-        playPromise.catch((err) => {
-          // Autoplay policy waiting for user interaction
-          console.warn('Warrior theme play deferred for user interaction:', err);
-        });
+        playPromise
+          .then(() => {
+            this._pendingAutoplay = false;
+          })
+          .catch((err) => {
+            // Autoplay policy waiting for user interaction
+            this._pendingAutoplay = true;
+          });
       }
     }
   }
 
   stopSaviourTheme() {
+    this._pendingAutoplay = false;
     if (!this.isSaviourMusicPlaying) return;
     this.isSaviourMusicPlaying = false;
     if (this.warriorAudio) {

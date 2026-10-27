@@ -861,7 +861,7 @@ export default function App() {
 
   // Intro Audio Tour & Saviour Background Music State
   const [audioTourState, setAudioTourState] = useState({ isPlaying: false, currentStepIdx: 0 });
-  const [isSaviourMusicPlaying, setIsSaviourMusicPlaying] = useState(false);
+  const [isSaviourMusicPlaying, setIsSaviourMusicPlaying] = useState(true);
 
   useEffect(() => {
     const unsub = introAudioTour.subscribe((state) => {
@@ -873,30 +873,40 @@ export default function App() {
     return () => unsub();
   }, []);
 
-  // When Welcome modal is visible, listen for user gesture to auto-start Saviour music
+  // Default Background Warrior Music ON: Autostart immediately & ensure on first user interaction
   useEffect(() => {
-    if (showWelcomeModal) {
-      const handleUserGesture = () => {
-        sound.ensureContext();
-        if (!sound.isMuted && !sound.isSaviourMusicPlaying) {
-          sound.startSaviourTheme();
-          setIsSaviourMusicPlaying(true);
-        }
-      };
+    // Attempt immediate playback upon page load
+    sound.ensureContext();
+    if (!sound.isMuted) {
+      sound.startSaviourTheme();
+      setIsSaviourMusicPlaying(true);
+    }
 
-      window.addEventListener('click', handleUserGesture, { once: true });
-      window.addEventListener('keydown', handleUserGesture, { once: true });
-      window.addEventListener('touchstart', handleUserGesture, { once: true });
+    const handleUserGesture = () => {
+      sound.ensureContext();
+      if (!sound.isMuted && (sound._pendingAutoplay || !sound.isSaviourMusicPlaying)) {
+        sound.startSaviourTheme();
+        setIsSaviourMusicPlaying(true);
+      }
+    };
 
-      return () => {
-        window.removeEventListener('click', handleUserGesture);
-        window.removeEventListener('keydown', handleUserGesture);
-        window.removeEventListener('touchstart', handleUserGesture);
-      };
-    } else {
+    window.addEventListener('click', handleUserGesture);
+    window.addEventListener('keydown', handleUserGesture);
+    window.addEventListener('touchstart', handleUserGesture);
+    window.addEventListener('pointerdown', handleUserGesture);
+
+    return () => {
+      window.removeEventListener('click', handleUserGesture);
+      window.removeEventListener('keydown', handleUserGesture);
+      window.removeEventListener('touchstart', handleUserGesture);
+      window.removeEventListener('pointerdown', handleUserGesture);
+    };
+  }, []);
+
+  // When Welcome modal closes, only stop the voiceover tour if active
+  useEffect(() => {
+    if (!showWelcomeModal) {
       introAudioTour.stop();
-      sound.stopSaviourTheme();
-      setIsSaviourMusicPlaying(false);
     }
   }, [showWelcomeModal]);
 
@@ -1796,6 +1806,25 @@ export default function App() {
           >
             {isSoundMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4 animate-pulse text-indigo-400" />}
             <span className="font-bold hidden sm:inline">{isSoundMuted ? 'Muted' : 'Sound ON'}</span>
+          </button>
+
+          {/* Warrior Battle Music Track Toggle */}
+          <button
+            onClick={() => {
+              sound.playClick();
+              sound.ensureContext();
+              const next = sound.toggleSaviourTheme();
+              setIsSaviourMusicPlaying(next);
+            }}
+            className={`px-2.5 py-1 rounded-xl border text-xs flex items-center gap-1.5 transition active:scale-95 shadow-md ${
+              isSaviourMusicPlaying && !isSoundMuted
+                ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 shadow-amber-500/20'
+                : 'bg-slate-900/90 border-slate-800 text-slate-500 hover:text-slate-300'
+            }`}
+            title="Warrior Battle Music Soundtrack (Click to Toggle)"
+          >
+            <Music className={`w-3.5 h-3.5 ${isSaviourMusicPlaying && !isSoundMuted ? 'animate-bounce text-amber-400' : ''}`} />
+            <span className="font-bold hidden md:inline">Warrior Theme: {isSaviourMusicPlaying && !isSoundMuted ? 'ON' : 'OFF'}</span>
           </button>
 
           {/* Chaos Monkey Incident Trigger */}
@@ -3367,8 +3396,6 @@ export default function App() {
             <button
               onClick={() => {
                 introAudioTour.stop();
-                sound.stopSaviourTheme();
-                setIsSaviourMusicPlaying(false);
                 setShowWelcomeModal(false);
               }}
               className="absolute top-5 right-5 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition z-10"
@@ -3695,8 +3722,6 @@ export default function App() {
                     <button
                       onClick={() => {
                         introAudioTour.stop();
-                        sound.stopSaviourTheme();
-                        setIsSaviourMusicPlaying(false);
                         setShowWelcomeModal(false);
                         setLevelBriefingModal({ mode: 'CAMPAIGN', levelIdx: currentLevelIdx });
                       }}
@@ -3733,8 +3758,6 @@ export default function App() {
                     <button
                       onClick={() => {
                         introAudioTour.stop();
-                        sound.stopSaviourTheme();
-                        setIsSaviourMusicPlaying(false);
                         setShowWelcomeModal(false);
                         setLevelBriefingModal({ mode: 'SURVIVAL' });
                       }}
@@ -3764,8 +3787,6 @@ export default function App() {
                     <button
                       onClick={() => {
                         introAudioTour.stop();
-                        sound.stopSaviourTheme();
-                        setIsSaviourMusicPlaying(false);
                         setShowWelcomeModal(false);
                         setLevelBriefingModal({ mode: 'SANDBOX' });
                       }}
@@ -3824,8 +3845,6 @@ export default function App() {
               <button
                 onClick={() => {
                   introAudioTour.stop();
-                  sound.stopSaviourTheme();
-                  setIsSaviourMusicPlaying(false);
                   setShowWelcomeModal(false);
                 }}
                 className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs transition border border-slate-700"
