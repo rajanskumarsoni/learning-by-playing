@@ -91,3 +91,54 @@ body,
     linear-gradient(to bottom, rgba(99, 102, 241, 0.035) 1px, transparent 1px);
   background-size: 28px 28px, 56px 56px, 56px 56px;
 }
+
+/* Character Zoom In / Zoom Out in Loop */
+@keyframes zoom-loop {
+  0%, 100% {
+    transform: scale(0.92);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+@keyframes hero-zoom-loop {
+  0%, 100% {
+    transform: scale(0.92);
+    filter: drop-shadow(0 0 16px rgba(56, 189, 248, 0.4)) drop-shadow(0 10px 24px rgba(0, 0, 0, 0.6));
+  }
+  50% {
+    transform: scale(1.08);
+    filter: drop-shadow(0 0 32px rgba(56, 189, 248, 0.85)) drop-shadow(0 16px 32px rgba(0, 0, 0, 0.7));
+  }
+}
+
+@keyframes devil-zoom-loop {
+  0%, 100% {
+    transform: scale(0.92);
+    filter: drop-shadow(0 0 16px rgba(239, 68, 68, 0.45)) drop-shadow(0 10px 24px rgba(0, 0, 0, 0.6));
+  }
+  50% {
+    transform: scale(1.08);
+    filter: drop-shadow(0 0 32px rgba(239, 68, 68, 0.85)) drop-shadow(0 16px 32px rgba(0, 0, 0, 0.7));
+  }
+}
+
+.animate-zoom-loop {
+  animation: zoom-loop 3s ease-in-out infinite;
+  transform-origin: center center;
+}
+
+.animate-hero-zoom {
+  animation: hero-zoom-loop 3s ease-in-out infinite;
+  transform-origin: center center;
+  will-change: transform, filter;
+}
+
+.animate-devil-zoom {
+  animation: devil-zoom-loop 3s ease-in-out infinite;
+  animation-delay: 0.3s;
+  transform-origin: center center;
+  will-change: transform, filter;
+}
+

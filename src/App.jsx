@@ -11,6 +11,8 @@ import {
 import mentorAdaImg from './assets/mentor_ada.jpg';
 import chaosMonkeyImg from './assets/chaos_monkey.jpg';
 import gameplayDemoVideo from './assets/gameplay_demo.mp4';
+import heroImg from './assets/hero.png';
+import devilImg from './assets/devil.png';
 import { sound } from './audioEngine.js';
 import { introAudioTour, INTRO_TOUR_STEPS } from './introAudioTour.js';
 
@@ -3395,27 +3397,68 @@ export default function App() {
       {/* 4. WELCOME & ORIENTATION MODAL (EXPLAINS REWARDS & 3 GAME MODES)   */}
       {/* =================================================================== */}
       {showWelcomeModal && (
-        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="relative max-w-4xl w-full bg-slate-900 border border-indigo-500/40 rounded-3xl p-6 sm:p-8 shadow-2xl my-auto text-slate-100 max-h-[92vh] flex flex-col">
+        <div className="fixed inset-0 bg-[#070a13] flex items-center justify-center p-4 z-50 overflow-y-auto overflow-x-hidden">
+          {/* Subtle Ambient Arena Lighting (Solid backdrop, zero pass-through to game) */}
+          <div className="absolute inset-0 bg-gradient-to-r from-cyan-950/25 via-slate-950 to-red-950/25 pointer-events-none" />
+
+          {/* ================================================================= */}
+          {/* BIG BACKGROUND HERO (LEFT) & DEVIL (RIGHT)                        */}
+          {/* ================================================================= */}
+          {/* BIG HERO IN BACKGROUND (LEFT) */}
+          <div className="fixed left-0 xl:left-4 2xl:left-10 top-1/2 -translate-y-1/2 z-20 pointer-events-none select-none flex flex-col items-center">
+            <div className="relative">
+              <div className="absolute -inset-14 bg-cyan-500/30 rounded-full blur-3xl animate-pulse pointer-events-none" />
+              <img
+                src={heroImg}
+                alt="System Saviour Hero"
+                className="w-72 sm:w-88 md:w-[440px] lg:w-[520px] xl:w-[620px] 2xl:w-[720px] max-h-[94vh] object-contain animate-hero-zoom drop-shadow-[0_0_60px_rgba(56,189,248,0.8)]"
+              />
+            </div>
+            <div className="mt-3 px-4 py-1.5 rounded-full bg-slate-950/85 border border-cyan-400/80 text-cyan-300 font-black text-xs sm:text-sm uppercase tracking-wider backdrop-blur-md shadow-2xl flex items-center gap-2 ring-2 ring-cyan-500/40">
+              <Shield className="w-4 h-4 text-cyan-400" />
+              <span>Architect Hero</span>
+            </div>
+            <span className="text-xs font-mono text-cyan-400/90 mt-1 font-bold">High Availability Guardian</span>
+          </div>
+
+          {/* BIG DEVIL IN BACKGROUND (RIGHT) */}
+          <div className="fixed right-0 xl:right-4 2xl:right-10 top-1/2 -translate-y-1/2 z-20 pointer-events-none select-none flex flex-col items-center">
+            <div className="relative">
+              <div className="absolute -inset-14 bg-red-500/30 rounded-full blur-3xl animate-pulse pointer-events-none" />
+              <img
+                src={devilImg}
+                alt="Chaos Outage Devil"
+                className="w-72 sm:w-88 md:w-[440px] lg:w-[520px] xl:w-[620px] 2xl:w-[720px] max-h-[94vh] object-contain animate-devil-zoom drop-shadow-[0_0_60px_rgba(239,68,68,0.8)]"
+              />
+            </div>
+            <div className="mt-3 px-4 py-1.5 rounded-full bg-slate-950/85 border border-red-500/80 text-red-300 font-black text-xs sm:text-sm uppercase tracking-wider backdrop-blur-md shadow-2xl flex items-center gap-2 ring-2 ring-red-500/40">
+              <Flame className="w-4 h-4 text-red-400" />
+              <span>Chaos Devil</span>
+            </div>
+            <span className="text-xs font-mono text-red-400/90 mt-1 font-bold">Outages &amp; Chaos Demon</span>
+          </div>
+
+          {/* Transparent Glass Info Pane */}
+          <div className="relative max-w-4xl w-full bg-slate-950/30 border border-indigo-400/35 rounded-3xl p-6 sm:p-8 shadow-[0_0_60px_rgba(0,0,0,0.6)] my-auto text-slate-100 max-h-[92vh] flex flex-col z-30 backdrop-blur-sm">
             {/* Close Button */}
             <button
               onClick={() => {
                 introAudioTour.stop();
                 setShowWelcomeModal(false);
               }}
-              className="absolute top-5 right-5 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition z-10"
+              className="absolute top-5 right-5 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800/50 transition z-10"
               title="Close Guide"
             >
               <X className="w-5 h-5" />
             </button>
 
-            {/* Modal Header with Ada Mentor Briefing */}
+            {/* Modal Header with Ada Mentor Briefing (Transparent Glass) */}
             <div
               id="intro-header-card"
-              className={`flex items-start sm:items-center gap-4 mb-3 p-4 rounded-2xl bg-gradient-to-r from-indigo-950/70 via-slate-900 to-cyan-950/70 border shadow-xl shrink-0 transition-all duration-300 ${
+              className={`flex items-start sm:items-center gap-4 mb-3 p-4 rounded-2xl bg-indigo-950/25 backdrop-blur-sm border shadow-lg shrink-0 transition-all duration-300 ${
                 audioTourState.isPlaying && audioTourState.currentStepIdx === 0
                   ? 'border-cyan-400 ring-2 ring-cyan-400/80 shadow-cyan-500/30'
-                  : 'border-cyan-500/40'
+                  : 'border-cyan-500/30'
               }`}
             >
               <div className="relative shrink-0">
@@ -3447,14 +3490,14 @@ export default function App() {
               </div>
             </div>
 
-            {/* Immediate Sound Activation Prompt (if browser blocked unmuted autoplay) */}
+            {/* Immediate Sound Activation Prompt (Transparent Glass) */}
             {!isAudioActive && (
               <div
                 onClick={() => {
                   sound.unlockAudio();
                   setIsAudioActive(true);
                 }}
-                className="mb-3 px-3.5 py-2.5 rounded-2xl bg-gradient-to-r from-amber-950/80 via-red-950/60 to-amber-950/80 border border-amber-400/80 shadow-xl shadow-amber-950/50 flex items-center justify-between gap-3 cursor-pointer hover:border-amber-300 transition-all group animate-pulse shrink-0"
+                className="mb-3 px-3.5 py-2.5 rounded-2xl bg-amber-950/25 backdrop-blur-sm border border-amber-400/60 shadow-lg shadow-amber-950/30 flex items-center justify-between gap-3 cursor-pointer hover:border-amber-300 transition-all group animate-pulse shrink-0"
               >
                 <div className="flex items-center gap-2.5">
                   <div className="w-7 h-7 rounded-lg bg-amber-400 text-slate-950 flex items-center justify-center font-bold">
@@ -3484,14 +3527,14 @@ export default function App() {
               </div>
             )}
 
-            {/* Audio Mode Guide & Saviour Music Control Bar */}
-            <div className="mb-4 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-indigo-500/30 p-2.5 sm:p-3 shadow-xl flex flex-wrap items-center justify-between gap-2.5 shrink-0">
+            {/* Audio Mode Guide & Saviour Music Control Bar (Transparent Glass) */}
+            <div className="mb-4 rounded-2xl bg-slate-950/30 backdrop-blur-sm border border-indigo-500/25 p-2.5 sm:p-3 shadow-lg flex flex-wrap items-center justify-between gap-2.5 shrink-0">
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="relative shrink-0">
                   <div className={`w-9 h-9 rounded-xl flex items-center justify-center border transition-all ${
                     audioTourState.isPlaying 
                       ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300 shadow-lg shadow-cyan-500/30 ring-1 ring-cyan-400' 
-                      : 'bg-slate-900 border-slate-700 text-slate-400'
+                      : 'bg-slate-900/40 border-slate-700/60 text-slate-400'
                   }`}>
                     <Headphones className="w-4 h-4" />
                   </div>
@@ -3553,14 +3596,14 @@ export default function App() {
                 </button>
 
                 {/* Tour navigation buttons (Prev / Next) */}
-                <div className="flex items-center gap-1 bg-slate-900 border border-slate-700 rounded-xl p-0.5">
+                <div className="flex items-center gap-1 bg-slate-900/40 border border-slate-700/60 rounded-xl p-0.5 backdrop-blur-sm">
                   <button
                     onClick={() => {
                       sound.playClick();
                       introAudioTour.prev();
                     }}
                     disabled={audioTourState.currentStepIdx === 0}
-                    className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:hover:bg-transparent transition"
+                    className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/60 disabled:opacity-30 disabled:hover:bg-transparent transition"
                     title="Previous Tour Step"
                   >
                     <ChevronLeft className="w-3.5 h-3.5" />
@@ -3574,7 +3617,7 @@ export default function App() {
                       introAudioTour.next();
                     }}
                     disabled={audioTourState.currentStepIdx >= INTRO_TOUR_STEPS.length - 1}
-                    className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:hover:bg-transparent transition"
+                    className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/60 disabled:opacity-30 disabled:hover:bg-transparent transition"
                     title="Next Tour Step"
                   >
                     <ChevronRight className="w-3.5 h-3.5" />
@@ -3590,10 +3633,10 @@ export default function App() {
                     setIsSaviourMusicPlaying(nextPlaying);
                     setIsAudioActive(sound.isMusicActive());
                   }}
-                  className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 border transition ${
+                  className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 border transition backdrop-blur-sm ${
                     isAudioActive
                       ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 shadow-md shadow-amber-500/20'
-                      : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-slate-200'
+                      : 'bg-slate-900/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
                   }`}
                   title="Toggle Epic Warrior Battle Theme (High 75% volume, audibly ducked to 30% while Ada narrates)"
                 >
@@ -3612,13 +3655,13 @@ export default function App() {
 
             {/* Modal Body (Scrollable) */}
             <div className="flex-1 overflow-y-auto space-y-6 pr-2 min-h-0 text-xs sm:text-sm">
-              {/* Gameplay Preview Video Section (First Level Demo) */}
+              {/* Gameplay Preview Video Section (First Level Demo - Transparent Glass) */}
               <div
                 id="intro-video-card"
-                className={`rounded-2xl bg-gradient-to-b from-slate-900 to-slate-950 border p-3 sm:p-4 shadow-2xl space-y-3 transition-all duration-300 ${
+                className={`rounded-2xl bg-slate-950/25 backdrop-blur-sm border p-3 sm:p-4 shadow-xl space-y-3 transition-all duration-300 ${
                   audioTourState.isPlaying && audioTourState.currentStepIdx === 1
                     ? 'border-cyan-400 ring-2 ring-cyan-400/80 shadow-cyan-500/30'
-                    : 'border-indigo-500/40'
+                    : 'border-indigo-500/30'
                 }`}
               >
                 <div className="flex items-center justify-between flex-wrap gap-2">
@@ -3642,7 +3685,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="relative rounded-xl overflow-hidden bg-slate-950 border border-slate-800 shadow-2xl group aspect-video max-h-[300px]">
+                <div className="relative rounded-xl overflow-hidden bg-slate-950/60 border border-slate-800/80 shadow-2xl group aspect-video max-h-[300px]">
                   <video
                     src={gameplayDemoVideo}
                     autoPlay
@@ -3652,7 +3695,7 @@ export default function App() {
                     controls
                     className="w-full h-full object-cover rounded-xl"
                   />
-                  <div className="absolute top-2.5 left-2.5 bg-slate-950/85 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] text-cyan-300 font-mono border border-cyan-500/30 flex items-center gap-1.5 pointer-events-none shadow-lg">
+                  <div className="absolute top-2.5 left-2.5 bg-slate-950/70 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] text-cyan-300 font-mono border border-cyan-500/30 flex items-center gap-1.5 pointer-events-none shadow-lg">
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                     <span>Watch: Insert Redis Cache ➔ Rewire ➔ 800 RPS SLA Victory!</span>
                   </div>
@@ -3685,7 +3728,7 @@ export default function App() {
                   )}
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-1">
+                  <div className="p-3.5 rounded-2xl bg-slate-950/30 backdrop-blur-sm border border-slate-700/40 space-y-1">
                     <div className="font-bold text-white flex items-center gap-2">
                       <span>🧠 Real-World Architecture Mastery</span>
                     </div>
@@ -3694,7 +3737,7 @@ export default function App() {
                     </p>
                   </div>
 
-                  <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-1">
+                  <div className="p-3.5 rounded-2xl bg-slate-950/30 backdrop-blur-sm border border-slate-700/40 space-y-1">
                     <div className="font-bold text-white flex items-center gap-2">
                       <span>⏱️ SLA Latency &amp; Bottleneck Diagnosis</span>
                     </div>
@@ -3703,7 +3746,7 @@ export default function App() {
                     </p>
                   </div>
 
-                  <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-1">
+                  <div className="p-3.5 rounded-2xl bg-slate-950/30 backdrop-blur-sm border border-slate-700/40 space-y-1">
                     <div className="font-bold text-white flex items-center gap-2">
                       <span>💰 Cloud Cost vs Performance Tradeoffs</span>
                     </div>
@@ -3712,7 +3755,7 @@ export default function App() {
                     </p>
                   </div>
 
-                  <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-1">
+                  <div className="p-3.5 rounded-2xl bg-slate-950/30 backdrop-blur-sm border border-slate-700/40 space-y-1">
                     <div className="font-bold text-white flex items-center gap-2">
                       <span>💥 Chaos Engineering &amp; Self-Healing</span>
                     </div>
@@ -3747,7 +3790,7 @@ export default function App() {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   {/* Campaign */}
-                  <div className="p-4 rounded-2xl bg-slate-950/80 border border-indigo-500/30 flex flex-col justify-between space-y-3">
+                  <div className="p-4 rounded-2xl bg-slate-950/30 backdrop-blur-sm border border-indigo-500/30 flex flex-col justify-between space-y-3">
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-sm text-indigo-300">🎓 1. Campaign Mode</span>
@@ -3776,7 +3819,7 @@ export default function App() {
                   </div>
 
                   {/* Survival with Chaos Monkey */}
-                  <div className="p-4 rounded-2xl bg-slate-950/80 border border-amber-500/30 flex flex-col justify-between space-y-3">
+                  <div className="p-4 rounded-2xl bg-slate-950/30 backdrop-blur-sm border border-amber-500/30 flex flex-col justify-between space-y-3">
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
@@ -3812,7 +3855,7 @@ export default function App() {
                   </div>
 
                   {/* Sandbox */}
-                  <div className="p-4 rounded-2xl bg-slate-950/80 border border-emerald-500/30 flex flex-col justify-between space-y-3">
+                  <div className="p-4 rounded-2xl bg-slate-950/30 backdrop-blur-sm border border-emerald-500/30 flex flex-col justify-between space-y-3">
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-sm text-emerald-300">🧪 3. Sandbox Lab</span>
@@ -3842,13 +3885,13 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Quick How to Play */}
+              {/* Quick How to Play (Transparent Glass) */}
               <div
                 id="intro-footer-card"
                 className={`p-4 rounded-2xl border space-y-2 transition-all duration-300 ${
                   audioTourState.isPlaying && audioTourState.currentStepIdx === 4
-                    ? 'bg-indigo-950/60 border-cyan-400 ring-2 ring-cyan-400/80 shadow-cyan-500/30'
-                    : 'bg-indigo-950/30 border-indigo-500/30'
+                    ? 'bg-indigo-950/40 backdrop-blur-sm border-cyan-400 ring-2 ring-cyan-400/80 shadow-cyan-500/30'
+                    : 'bg-indigo-950/20 backdrop-blur-sm border-indigo-500/25'
                 }`}
               >
                 <div className="flex items-center justify-between">
@@ -3880,7 +3923,7 @@ export default function App() {
             </div>
 
             {/* Modal Footer CTA */}
-            <div className="pt-4 mt-4 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3 shrink-0">
+            <div className="pt-4 mt-4 border-t border-slate-800/60 flex flex-wrap items-center justify-between gap-3 shrink-0">
               <span className="text-xs text-slate-400 flex items-center gap-1.5">
                 <Info className="w-4 h-4 text-indigo-400 shrink-0" />
                 <span>Choose any game mode above to inspect its <strong>mission targets &amp; level briefing</strong> before entering the arena.</span>
@@ -3890,7 +3933,7 @@ export default function App() {
                   introAudioTour.stop();
                   setShowWelcomeModal(false);
                 }}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs transition border border-slate-700"
+                className="px-4 py-2 rounded-xl bg-slate-900/50 hover:bg-slate-800/70 text-slate-300 hover:text-white font-bold text-xs transition border border-slate-700/60 backdrop-blur-sm"
               >
                 Close Guide
               </button>
