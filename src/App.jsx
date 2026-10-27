@@ -4069,39 +4069,6 @@ export default function App() {
                   </div>
                 )}
 
-                {/* Level 1 Video Demonstration */}
-                {modalMode === 'CAMPAIGN' && selectedLvl.id === 1 && (
-                  <div className="rounded-2xl bg-gradient-to-b from-slate-900 to-slate-950 border border-indigo-500/40 p-3 sm:p-4 shadow-xl space-y-2.5">
-                    <div className="flex items-center justify-between flex-wrap gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
-                        <span className="font-extrabold text-xs sm:text-sm text-white flex items-center gap-1.5">
-                          <Play className="w-4 h-4 text-emerald-400 fill-emerald-400" />
-                          <span>Level 1 Gameplay Walkthrough</span>
-                        </span>
-                      </div>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 font-mono">
-                        Auto Demo
-                      </span>
-                    </div>
-
-                    <div className="relative rounded-xl overflow-hidden bg-slate-950 border border-slate-800 shadow-2xl group aspect-video max-h-[260px]">
-                      <video
-                        src={gameplayDemoVideo}
-                        autoPlay
-                        loop
-                        muted
-                        playsInline
-                        controls
-                        className="w-full h-full object-cover rounded-xl"
-                      />
-                      <div className="absolute top-2 left-2 bg-slate-950/85 backdrop-blur-md px-2 py-0.5 rounded-md text-[10px] text-cyan-300 font-mono border border-cyan-500/30 flex items-center gap-1 pointer-events-none">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        <span>Watch Solution: Add Redis ➔ Rewire ➔ 800 RPS SLA Victory</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
 
                 {/* Tactical Directives / Hints */}
                 {modalMode === 'CAMPAIGN' && selectedLvl.hints && selectedLvl.hints.length > 0 && (
