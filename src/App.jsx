@@ -6,10 +6,11 @@ import {
   FastForward, Eye, Sliders, Share2, Lock, Unlock, Box, HardDrive, Network,
   ArrowRight, Sparkles, Info, X, RefreshCw, ZoomIn, ZoomOut, Maximize2, Move,
   BookOpen, Search, Bot, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
-  ChevronLeft, Star, Trophy, Radio, Target
+  ChevronLeft, Star, Trophy, Radio, Target, Volume2, VolumeX
 } from 'lucide-react';
 import mentorAdaImg from './assets/mentor_ada.jpg';
 import chaosMonkeyImg from './assets/chaos_monkey.jpg';
+import { sound } from './audioEngine.js';
 
 // ============================================================================
 // 1. TRAFFIC TYPES (6 REALISTIC CLOUD TRAFFIC FLOWS)
@@ -848,6 +849,14 @@ export default function App() {
   const [levelBriefingModal, setLevelBriefingModal] = useState(null); // { mode: 'CAMPAIGN' | 'SURVIVAL' | 'SANDBOX', levelIdx?: number }
   const [detailModalComponent, setDetailModalComponent] = useState(null);
 
+  // Game Audio Synthesizer State
+  const [isSoundMuted, setIsSoundMuted] = useState(() => sound.isMuted);
+  const toggleSound = () => {
+    const next = sound.toggleMute();
+    setIsSoundMuted(next);
+    if (!next) sound.playClick();
+  };
+
   // Simulation State
   const [isRunning, setIsRunning] = useState(false);
   const [simSpeed, setSimSpeed] = useState(1);
@@ -899,6 +908,7 @@ export default function App() {
 
   // Select node and smoothly bring Component Inspector into screen view in right panel
   const handleSelectNode = useCallback((nodeId) => {
+    sound.playClick();
     setSelectedNodeId(nodeId);
     if (rightPanelCollapsed) {
       setRightPanelCollapsed(false);
@@ -915,6 +925,7 @@ export default function App() {
   // Load level when switched (validates unlocked levels)
   const selectLevel = useCallback((idx) => {
     if (idx > unlockedLevelIdx) return;
+    sound.playSelect();
     const lvl = CAMPAIGN_LEVELS[idx];
     setCurrentLevelIdx(idx);
     setNodes(JSON.parse(JSON.stringify(lvl.initialNodes)));
@@ -929,6 +940,7 @@ export default function App() {
   }, [unlockedLevelIdx]);
 
   const switchMode = (mode) => {
+    sound.playSelect();
     setGameMode(mode);
     setIsRunning(false);
     setWaveProgress(0);
@@ -1168,8 +1180,15 @@ export default function App() {
           triggerManualChaos();
         }
 
+        // Radar warning ping if system is experiencing severe SLA pressure
+        const targetLat = gameMode === 'CAMPAIGN' ? currentLevel.maxLatencyMs : 250;
+        if ((evaluation.p99Latency > targetLat || evaluation.uptimePct < 98) && Math.floor(next) % 25 === 0 && Math.floor(prev) % 25 !== 0) {
+          sound.playWarning();
+        }
+
         if (next >= 100) {
           setIsRunning(false);
+          sound.stopAmbientDrone();
           // Evaluate wave outcome
           const passedSLA =
             evaluation.uptimePct >= (gameMode === 'CAMPAIGN' ? currentLevel.minUptimePct : 98.0) &&
@@ -1179,6 +1198,7 @@ export default function App() {
           if (gameMode === 'CAMPAIGN') {
             const isWon = passedSLA && passedBudget;
             if (isWon) {
+              sound.playVictory();
               setUnlockedLevelIdx((prev) => {
                 const updated = Math.min(CAMPAIGN_LEVELS.length - 1, Math.max(prev, currentLevelIdx + 1));
                 try {
@@ -1187,6 +1207,8 @@ export default function App() {
                 } catch (e) {}
                 return updated;
               });
+            } else {
+              sound.playDefeat();
             }
             const stars = isWon ? 1 + (passedSLA ? 1 : 0) + (passedBudget ? 1 : 0) : 0;
             setPostMortemModal({
@@ -1200,10 +1222,12 @@ export default function App() {
             });
           } else if (gameMode === 'SURVIVAL') {
             if (passedSLA) {
+              sound.playVictory();
               setSurvivalWave((w) => w + 1);
               setWaveProgress(0);
               setIsRunning(true);
             } else {
+              sound.playDefeat();
               setPostMortemModal({
                 won: false,
                 survivalWave,
@@ -1224,6 +1248,7 @@ export default function App() {
 
   // Component Actions & Dragging
   const handleAddService = (type, explicitX, explicitY) => {
+    sound.playPlaceNode();
     const spec = COMPONENT_CATALOG[type];
     if (!spec) return;
 
@@ -1260,6 +1285,7 @@ export default function App() {
 
   const deleteNode = (nodeId) => {
     if (nodeId === 'src') return;
+    sound.playDelete();
     setNodes((prev) => prev.filter((n) => n.id !== nodeId));
     setEdges((prev) => prev.filter((e) => e.from !== nodeId && e.to !== nodeId));
     if (selectedNodeId === nodeId) setSelectedNodeId('src');
@@ -1269,10 +1295,12 @@ export default function App() {
   const handlePortClick = (e, nodeId, portType) => {
     e.stopPropagation();
     if (portType === 'out') {
+      sound.playClick();
       setConnectingFromId(connectingFromId === nodeId ? null : nodeId);
     } else if (portType === 'in' && connectingFromId && connectingFromId !== nodeId) {
       const exists = edges.some((ed) => ed.from === connectingFromId && ed.to === nodeId);
       if (!exists) {
+        sound.playConnectWire();
         setEdges((prev) => [
           ...prev,
           { id: `e_${Date.now()}`, from: connectingFromId, to: nodeId }
@@ -1447,6 +1475,7 @@ export default function App() {
   const triggerManualChaos = () => {
     const candidates = nodes.filter((n) => n.type !== 'SOURCE' && !n.crashed);
     if (candidates.length === 0) {
+      sound.playUpgrade();
       setNodes((prev) => prev.map((n) => ({ ...n, crashed: false })));
       setChaosBanner({
         message: 'All damaged nodes rebooted and restored to nominal service.',
@@ -1455,6 +1484,8 @@ export default function App() {
       setTimeout(() => setChaosBanner(null), 3500);
       return;
     }
+    sound.playChaosStrike();
+    sound.playCrash();
     const victim = candidates[Math.floor(Math.random() * candidates.length)];
     setNodes((prev) => prev.map((n) => (n.id === victim.id ? { ...n, crashed: true } : n)));
     setChaosBanner({
@@ -1466,6 +1497,8 @@ export default function App() {
   };
 
   const resetWave = () => {
+    sound.playClick();
+    sound.stopAmbientDrone();
     setIsRunning(false);
     setWaveProgress(0);
     setPostMortemModal(null);
@@ -1641,7 +1674,17 @@ export default function App() {
           {/* Simulation Controls */}
           <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
             <button
-              onClick={() => setIsRunning(!isRunning)}
+              onClick={() => {
+                const next = !isRunning;
+                setIsRunning(next);
+                if (next) {
+                  sound.playSimStart();
+                  sound.startAmbientDrone();
+                } else {
+                  sound.playSimPause();
+                  sound.stopAmbientDrone();
+                }
+              }}
               className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition ${
                 isRunning
                   ? 'bg-amber-500 text-slate-950 hover:bg-amber-400'
@@ -1652,7 +1695,10 @@ export default function App() {
               {isRunning ? 'Pause Wave' : 'Simulate Peak Wave'}
             </button>
             <button
-              onClick={() => setSimSpeed(simSpeed === 1 ? 2 : simSpeed === 2 ? 5 : 1)}
+              onClick={() => {
+                sound.playClick();
+                setSimSpeed(simSpeed === 1 ? 2 : simSpeed === 2 ? 5 : 1);
+              }}
               className="px-2 py-1 rounded-lg text-xs font-mono text-slate-300 hover:text-white hover:bg-slate-800"
               title="Simulation Speed"
             >
@@ -1694,6 +1740,20 @@ export default function App() {
               {rightPanelCollapsed ? <PanelRightOpen className="w-3.5 h-3.5" /> : <PanelRightClose className="w-3.5 h-3.5" />}
             </button>
           </div>
+
+          {/* Audio Synthesizer Mute / Unmute Button */}
+          <button
+            onClick={toggleSound}
+            className={`px-2.5 py-1 rounded-xl border text-xs flex items-center gap-1.5 transition active:scale-95 shadow-md ${
+              isSoundMuted
+                ? 'bg-slate-900/90 border-slate-800 text-slate-500 hover:text-slate-300'
+                : 'bg-gradient-to-r from-indigo-950/80 to-purple-950/80 border-indigo-500/40 text-indigo-300 hover:text-white shadow-indigo-950/40'
+            }`}
+            title={isSoundMuted ? 'Game Audio is Muted — Click to Enable Sound' : 'Game Audio is Active — Click to Mute'}
+          >
+            {isSoundMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4 animate-pulse text-indigo-400" />}
+            <span className="font-bold hidden sm:inline">{isSoundMuted ? 'Muted' : 'Sound ON'}</span>
+          </button>
 
           {/* Chaos Monkey Incident Trigger */}
           <button
@@ -2276,6 +2336,7 @@ export default function App() {
                       className="cursor-pointer"
                       onClick={(e) => {
                         e.stopPropagation();
+                        sound.playDelete();
                         setEdges((prev) => prev.filter((ed) => ed.id !== edge.id));
                       }}
                     />
@@ -2343,6 +2404,7 @@ export default function App() {
                       className="cursor-pointer group/label"
                       onClick={(e) => {
                         e.stopPropagation();
+                        sound.playDelete();
                         setEdges((prev) => prev.filter((ed) => ed.id !== edge.id));
                       }}
                     >
@@ -3062,6 +3124,7 @@ export default function App() {
                             value={currentVal}
                             onChange={(e) => {
                               const val = Number(e.target.value);
+                              sound.playUpgrade();
                               setNodes((prev) =>
                                 prev.map((n) =>
                                   n.id === selectedNode.id
@@ -3210,7 +3273,17 @@ export default function App() {
 
         <button
           type="button"
-          onClick={() => setIsRunning(!isRunning)}
+          onClick={() => {
+            const next = !isRunning;
+            setIsRunning(next);
+            if (next) {
+              sound.playSimStart();
+              sound.startAmbientDrone();
+            } else {
+              sound.playSimPause();
+              sound.stopAmbientDrone();
+            }
+          }}
           className={`flex flex-col items-center gap-1 text-[11px] font-bold px-3 py-1 rounded-xl transition ${
             isRunning ? 'text-amber-300 bg-amber-500/20' : 'text-emerald-400 bg-emerald-500/15'
           }`}
@@ -3222,15 +3295,13 @@ export default function App() {
         <button
           type="button"
           onClick={() => {
-            setLeftPanelCollapsed(true);
-            setRightPanelCollapsed(!rightPanelCollapsed);
+            sound.playSelect();
+            setLevelBriefingModal({ mode: gameMode, levelIdx: currentLevelIdx });
           }}
-          className={`flex flex-col items-center gap-1 text-[11px] font-bold px-3 py-1 rounded-xl transition ${
-            !rightPanelCollapsed ? 'text-indigo-400 bg-indigo-500/15' : 'text-slate-400 hover:text-white'
-          }`}
+          className="flex flex-col items-center gap-1 text-[11px] font-bold px-3 py-1 rounded-xl transition text-slate-400 hover:text-white"
         >
-          <AlertTriangle className="w-4 h-4" />
-          <span>Mission</span>
+          <Target className="w-4 h-4" />
+          <span>Targets</span>
         </button>
       </nav>
 
