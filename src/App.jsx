@@ -6,12 +6,13 @@ import {
   FastForward, Eye, Sliders, Share2, Lock, Unlock, Box, HardDrive, Network,
   ArrowRight, Sparkles, Info, X, RefreshCw, ZoomIn, ZoomOut, Maximize2, Move,
   BookOpen, Search, Bot, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
-  ChevronLeft, Star, Trophy, Radio, Target, Volume2, VolumeX
+  ChevronLeft, Star, Trophy, Radio, Target, Volume2, VolumeX, Music, Headphones, Mic
 } from 'lucide-react';
 import mentorAdaImg from './assets/mentor_ada.jpg';
 import chaosMonkeyImg from './assets/chaos_monkey.jpg';
 import gameplayDemoVideo from './assets/gameplay_demo.mp4';
 import { sound } from './audioEngine.js';
+import { introAudioTour, INTRO_TOUR_STEPS } from './introAudioTour.js';
 
 // ============================================================================
 // 1. TRAFFIC TYPES (6 REALISTIC CLOUD TRAFFIC FLOWS)
@@ -857,6 +858,47 @@ export default function App() {
     setIsSoundMuted(next);
     if (!next) sound.playClick();
   };
+
+  // Intro Audio Tour & Saviour Background Music State
+  const [audioTourState, setAudioTourState] = useState({ isPlaying: false, currentStepIdx: 0 });
+  const [isSaviourMusicPlaying, setIsSaviourMusicPlaying] = useState(false);
+
+  useEffect(() => {
+    const unsub = introAudioTour.subscribe((state) => {
+      setAudioTourState({
+        isPlaying: state.isPlaying,
+        currentStepIdx: state.currentStepIdx
+      });
+    });
+    return () => unsub();
+  }, []);
+
+  // When Welcome modal is visible, listen for user gesture to auto-start Saviour music
+  useEffect(() => {
+    if (showWelcomeModal) {
+      const handleUserGesture = () => {
+        sound.ensureContext();
+        if (!sound.isMuted && !sound.isSaviourMusicPlaying) {
+          sound.startSaviourTheme();
+          setIsSaviourMusicPlaying(true);
+        }
+      };
+
+      window.addEventListener('click', handleUserGesture, { once: true });
+      window.addEventListener('keydown', handleUserGesture, { once: true });
+      window.addEventListener('touchstart', handleUserGesture, { once: true });
+
+      return () => {
+        window.removeEventListener('click', handleUserGesture);
+        window.removeEventListener('keydown', handleUserGesture);
+        window.removeEventListener('touchstart', handleUserGesture);
+      };
+    } else {
+      introAudioTour.stop();
+      sound.stopSaviourTheme();
+      setIsSaviourMusicPlaying(false);
+    }
+  }, [showWelcomeModal]);
 
   // Simulation State
   const [isRunning, setIsRunning] = useState(false);
@@ -3314,15 +3356,27 @@ export default function App() {
           <div className="relative max-w-4xl w-full bg-slate-900 border border-indigo-500/40 rounded-3xl p-6 sm:p-8 shadow-2xl my-auto text-slate-100 max-h-[92vh] flex flex-col">
             {/* Close Button */}
             <button
-              onClick={() => setShowWelcomeModal(false)}
-              className="absolute top-5 right-5 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
+              onClick={() => {
+                introAudioTour.stop();
+                sound.stopSaviourTheme();
+                setIsSaviourMusicPlaying(false);
+                setShowWelcomeModal(false);
+              }}
+              className="absolute top-5 right-5 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition z-10"
               title="Close Guide"
             >
               <X className="w-5 h-5" />
             </button>
 
             {/* Modal Header with Ada Mentor Briefing */}
-            <div className="flex items-center gap-4 mb-5 p-4 rounded-2xl bg-gradient-to-r from-indigo-950/70 via-slate-900 to-cyan-950/70 border border-cyan-500/40 shadow-xl shrink-0">
+            <div
+              id="intro-header-card"
+              className={`flex items-start sm:items-center gap-4 mb-3 p-4 rounded-2xl bg-gradient-to-r from-indigo-950/70 via-slate-900 to-cyan-950/70 border shadow-xl shrink-0 transition-all duration-300 ${
+                audioTourState.isPlaying && audioTourState.currentStepIdx === 0
+                  ? 'border-cyan-400 ring-2 ring-cyan-400/80 shadow-cyan-500/30'
+                  : 'border-cyan-500/40'
+              }`}
+            >
               <div className="relative shrink-0">
                 <img
                   src={mentorAdaImg}
@@ -3339,6 +3393,12 @@ export default function App() {
                   <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
                     Mission Briefing
                   </span>
+                  {audioTourState.isPlaying && audioTourState.currentStepIdx === 0 && (
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-400 text-slate-950 font-bold flex items-center gap-1 animate-pulse">
+                      <Volume2 className="w-3 h-3" />
+                      Ada Speaking
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs sm:text-sm text-cyan-100 mt-1 leading-snug">
                   &ldquo;Greetings, Architect! I&apos;m <strong>Ada</strong>, your Principal SRE Lead. Welcome to our distributed systems simulator. Ready to design battle-hardened architectures?&rdquo;
@@ -3346,10 +3406,142 @@ export default function App() {
               </div>
             </div>
 
+            {/* Audio Mode Guide & Saviour Music Control Bar */}
+            <div className="mb-4 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-indigo-500/30 p-2.5 sm:p-3 shadow-xl flex flex-wrap items-center justify-between gap-2.5 shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="relative shrink-0">
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center border transition-all ${
+                    audioTourState.isPlaying 
+                      ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300 shadow-lg shadow-cyan-500/30 ring-1 ring-cyan-400' 
+                      : 'bg-slate-900 border-slate-700 text-slate-400'
+                  }`}>
+                    <Headphones className="w-4 h-4" />
+                  </div>
+                  {audioTourState.isPlaying && (
+                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+                  )}
+                </div>
+
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold text-white flex items-center gap-1">
+                      <Mic className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Audio Guide Mode:</span>
+                    </span>
+                    <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 truncate max-w-[220px]">
+                      {audioTourState.isPlaying 
+                        ? INTRO_TOUR_STEPS[audioTourState.currentStepIdx]?.badge
+                        : 'Interactive Voice Tour Ready'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 truncate max-w-sm sm:max-w-md">
+                    {audioTourState.isPlaying
+                      ? INTRO_TOUR_STEPS[audioTourState.currentStepIdx]?.shortDesc
+                      : 'Listen to Ada explain every component, text, and level walkthrough.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Buttons: Play/Pause, Prev, Next, Saviour Music Toggle */}
+              <div className="flex items-center gap-2 flex-wrap ml-auto">
+                {/* Play / Pause Voice Tour Button */}
+                <button
+                  onClick={() => {
+                    sound.playClick();
+                    if (audioTourState.isPlaying) {
+                      introAudioTour.pause();
+                    } else {
+                      introAudioTour.start(audioTourState.currentStepIdx);
+                      setIsSaviourMusicPlaying(true);
+                    }
+                  }}
+                  className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition shadow-lg ${
+                    audioTourState.isPlaying
+                      ? 'bg-rose-500/20 border border-rose-500/50 text-rose-300 hover:bg-rose-500/30'
+                      : 'bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-slate-950 font-black shadow-cyan-500/25 ring-1 ring-cyan-300'
+                  }`}
+                >
+                  {audioTourState.isPlaying ? (
+                    <>
+                      <Pause className="w-3.5 h-3.5" />
+                      <span>Pause Voice Tour</span>
+                    </>
+                  ) : (
+                    <>
+                      <Volume2 className="w-3.5 h-3.5 text-slate-950" />
+                      <span>Explain Screen (Voice)</span>
+                    </>
+                  )}
+                </button>
+
+                {/* Tour navigation buttons (Prev / Next) */}
+                <div className="flex items-center gap-1 bg-slate-900 border border-slate-700 rounded-xl p-0.5">
+                  <button
+                    onClick={() => {
+                      sound.playClick();
+                      introAudioTour.prev();
+                    }}
+                    disabled={audioTourState.currentStepIdx === 0}
+                    className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:hover:bg-transparent transition"
+                    title="Previous Tour Step"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                  </button>
+                  <span className="text-[10px] font-mono text-slate-400 px-1">
+                    {audioTourState.currentStepIdx + 1}/{INTRO_TOUR_STEPS.length}
+                  </span>
+                  <button
+                    onClick={() => {
+                      sound.playClick();
+                      introAudioTour.next();
+                    }}
+                    disabled={audioTourState.currentStepIdx >= INTRO_TOUR_STEPS.length - 1}
+                    className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:hover:bg-transparent transition"
+                    title="Next Tour Step"
+                  >
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* Saviour Video Game Music Toggle */}
+                <button
+                  onClick={() => {
+                    sound.playClick();
+                    sound.ensureContext();
+                    const nextPlaying = sound.toggleSaviourTheme();
+                    setIsSaviourMusicPlaying(nextPlaying);
+                  }}
+                  className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 border transition ${
+                    isSaviourMusicPlaying
+                      ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300 shadow-md shadow-emerald-500/20'
+                      : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-slate-200'
+                  }`}
+                  title="Toggle 124 BPM Saviour Theme Background Music"
+                >
+                  <Music className={`w-3.5 h-3.5 ${isSaviourMusicPlaying ? 'animate-bounce text-emerald-400' : ''}`} />
+                  <span>Saviour Music: {isSaviourMusicPlaying ? 'ON' : 'OFF'}</span>
+                  {isSaviourMusicPlaying && (
+                    <div className="flex items-center gap-0.5 h-2.5">
+                      <span className="w-0.5 h-2 bg-emerald-400 animate-pulse" />
+                      <span className="w-0.5 h-3 bg-cyan-400 animate-ping" />
+                      <span className="w-0.5 h-1.5 bg-emerald-400 animate-pulse" />
+                    </div>
+                  )}
+                </button>
+              </div>
+            </div>
+
             {/* Modal Body (Scrollable) */}
             <div className="flex-1 overflow-y-auto space-y-6 pr-2 min-h-0 text-xs sm:text-sm">
               {/* Gameplay Preview Video Section (First Level Demo) */}
-              <div className="rounded-2xl bg-gradient-to-b from-slate-900 to-slate-950 border border-indigo-500/40 p-3 sm:p-4 shadow-2xl space-y-3">
+              <div
+                id="intro-video-card"
+                className={`rounded-2xl bg-gradient-to-b from-slate-900 to-slate-950 border p-3 sm:p-4 shadow-2xl space-y-3 transition-all duration-300 ${
+                  audioTourState.isPlaying && audioTourState.currentStepIdx === 1
+                    ? 'border-cyan-400 ring-2 ring-cyan-400/80 shadow-cyan-500/30'
+                    : 'border-indigo-500/40'
+                }`}
+              >
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
@@ -3358,9 +3550,17 @@ export default function App() {
                       <span>Level 1 Gameplay Walkthrough (The Garage Startup)</span>
                     </span>
                   </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 font-mono">
-                    HD Gameplay Preview
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {audioTourState.isPlaying && audioTourState.currentStepIdx === 1 && (
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-400 text-slate-950 font-bold flex items-center gap-1 animate-pulse">
+                        <Volume2 className="w-3 h-3" />
+                        Ada Explaining Video
+                      </span>
+                    )}
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 font-mono">
+                      HD Gameplay Preview
+                    </span>
+                  </div>
                 </div>
 
                 <div className="relative rounded-xl overflow-hidden bg-slate-950 border border-slate-800 shadow-2xl group aspect-video max-h-[300px]">
@@ -3385,11 +3585,26 @@ export default function App() {
               </div>
 
               {/* What You Will Get Section */}
-              <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-400 mb-2.5 flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 text-indigo-400" />
-                  <span>What You Will Gain By Playing</span>
-                </h3>
+              <div
+                id="intro-learning-grid"
+                className={`transition-all duration-300 p-2.5 rounded-2xl ${
+                  audioTourState.isPlaying && audioTourState.currentStepIdx === 2
+                    ? 'ring-2 ring-cyan-400/80 bg-cyan-950/20 shadow-cyan-500/20'
+                    : ''
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2.5">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-400 flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-indigo-400" />
+                    <span>What You Will Gain By Playing</span>
+                  </h3>
+                  {audioTourState.isPlaying && audioTourState.currentStepIdx === 2 && (
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-400 text-slate-950 font-bold flex items-center gap-1 animate-pulse">
+                      <Volume2 className="w-3 h-3" />
+                      Ada Explaining Skills
+                    </span>
+                  )}
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-1">
                     <div className="font-bold text-white flex items-center gap-2">
@@ -3430,11 +3645,26 @@ export default function App() {
               </div>
 
               {/* Game Modes Section */}
-              <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-purple-400 mb-2.5 flex items-center gap-1.5">
-                  <Layers className="w-4 h-4 text-purple-400" />
-                  <span>3 Game Modes Available</span>
-                </h3>
+              <div
+                id="intro-modes-grid"
+                className={`transition-all duration-300 p-2.5 rounded-2xl ${
+                  audioTourState.isPlaying && audioTourState.currentStepIdx === 3
+                    ? 'ring-2 ring-cyan-400/80 bg-purple-950/20 shadow-purple-500/20'
+                    : ''
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2.5">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
+                    <Layers className="w-4 h-4 text-purple-400" />
+                    <span>3 Game Modes Available</span>
+                  </h3>
+                  {audioTourState.isPlaying && audioTourState.currentStepIdx === 3 && (
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-400 text-slate-950 font-bold flex items-center gap-1 animate-pulse">
+                      <Volume2 className="w-3 h-3" />
+                      Ada Explaining Modes
+                    </span>
+                  )}
+                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   {/* Campaign */}
@@ -3455,6 +3685,9 @@ export default function App() {
                     </div>
                     <button
                       onClick={() => {
+                        introAudioTour.stop();
+                        sound.stopSaviourTheme();
+                        setIsSaviourMusicPlaying(false);
                         setShowWelcomeModal(false);
                         setLevelBriefingModal({ mode: 'CAMPAIGN', levelIdx: currentLevelIdx });
                       }}
@@ -3490,6 +3723,9 @@ export default function App() {
                     </div>
                     <button
                       onClick={() => {
+                        introAudioTour.stop();
+                        sound.stopSaviourTheme();
+                        setIsSaviourMusicPlaying(false);
                         setShowWelcomeModal(false);
                         setLevelBriefingModal({ mode: 'SURVIVAL' });
                       }}
@@ -3518,6 +3754,9 @@ export default function App() {
                     </div>
                     <button
                       onClick={() => {
+                        introAudioTour.stop();
+                        sound.stopSaviourTheme();
+                        setIsSaviourMusicPlaying(false);
                         setShowWelcomeModal(false);
                         setLevelBriefingModal({ mode: 'SANDBOX' });
                       }}
@@ -3531,9 +3770,24 @@ export default function App() {
               </div>
 
               {/* Quick How to Play */}
-              <div className="p-4 rounded-2xl bg-indigo-950/30 border border-indigo-500/30 space-y-2">
-                <div className="font-bold text-indigo-300 text-xs uppercase tracking-wider">
-                  Quickstart Guide (4 Steps):
+              <div
+                id="intro-footer-card"
+                className={`p-4 rounded-2xl border space-y-2 transition-all duration-300 ${
+                  audioTourState.isPlaying && audioTourState.currentStepIdx === 4
+                    ? 'bg-indigo-950/60 border-cyan-400 ring-2 ring-cyan-400/80 shadow-cyan-500/30'
+                    : 'bg-indigo-950/30 border-indigo-500/30'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="font-bold text-indigo-300 text-xs uppercase tracking-wider">
+                    Quickstart Guide (4 Steps):
+                  </div>
+                  {audioTourState.isPlaying && audioTourState.currentStepIdx === 4 && (
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-400 text-slate-950 font-bold flex items-center gap-1 animate-pulse">
+                      <Volume2 className="w-3 h-3" />
+                      Ada Explaining Steps
+                    </span>
+                  )}
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs text-slate-300">
                   <div>
@@ -3559,7 +3813,12 @@ export default function App() {
                 <span>Choose any game mode above to inspect its <strong>mission targets &amp; level briefing</strong> before entering the arena.</span>
               </span>
               <button
-                onClick={() => setShowWelcomeModal(false)}
+                onClick={() => {
+                  introAudioTour.stop();
+                  sound.stopSaviourTheme();
+                  setIsSaviourMusicPlaying(false);
+                  setShowWelcomeModal(false);
+                }}
                 className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs transition border border-slate-700"
               >
                 Close Guide
