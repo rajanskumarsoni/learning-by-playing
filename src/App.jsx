@@ -3729,41 +3729,53 @@ export default function App() {
           {/* BIG BACKGROUND HERO (LEFT) & DEVIL (RIGHT)                        */}
           {/* ================================================================= */}
           {/* BIG HERO IN BACKGROUND (LEFT) */}
-          <div className="fixed left-0 xl:left-4 2xl:left-10 top-1/2 -translate-y-1/2 z-20 pointer-events-none select-none flex flex-col items-center">
+          <div className="fixed -left-8 sm:-left-4 lg:left-0 2xl:left-6 top-1/2 -translate-y-1/2 z-20 pointer-events-none select-none flex flex-col items-start">
             <div className="relative">
               <div className="absolute -inset-14 bg-cyan-500/30 rounded-full blur-3xl animate-pulse pointer-events-none" />
               <img
                 src={heroImg}
                 alt="System Saviour Hero"
-                className="w-72 sm:w-88 md:w-[440px] lg:w-[520px] xl:w-[620px] 2xl:w-[720px] max-h-[94vh] object-contain animate-hero-zoom drop-shadow-[0_0_60px_rgba(56,189,248,0.8)]"
+                className="w-72 sm:w-88 md:w-[440px] lg:w-[500px] xl:w-[580px] 2xl:w-[680px] max-h-[94vh] object-contain animate-hero-zoom drop-shadow-[0_0_60px_rgba(56,189,248,0.8)]"
               />
             </div>
-            <div className="mt-3 px-4 py-1.5 rounded-full bg-slate-950/85 border border-cyan-400/80 text-cyan-300 font-black text-xs sm:text-sm uppercase tracking-wider backdrop-blur-md shadow-2xl flex items-center gap-2 ring-2 ring-cyan-500/40">
+          </div>
+
+          {/* ARCHITECT HERO NAME BADGE - MOVED FAR LEFT */}
+          <div className="fixed left-3 sm:left-6 md:left-8 xl:left-12 bottom-5 sm:bottom-7 z-40 pointer-events-auto select-none flex flex-col items-start">
+            <div className="px-3 sm:px-4 py-1.5 rounded-full bg-slate-950/90 border border-cyan-400 text-cyan-300 font-black text-xs sm:text-sm uppercase tracking-wider backdrop-blur-md shadow-[0_0_30px_rgba(34,211,238,0.5)] flex items-center gap-2 ring-2 ring-cyan-500/50 whitespace-nowrap">
               <Shield className="w-4 h-4 text-cyan-400" />
               <span>Architect Hero</span>
             </div>
-            <span className="text-xs font-mono text-cyan-400/90 mt-1 font-bold">High Availability Guardian</span>
+            <span className="text-[10px] sm:text-xs font-mono text-cyan-300/90 mt-1 font-bold pl-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap">
+              High Availability Guardian
+            </span>
           </div>
 
           {/* BIG DEVIL IN BACKGROUND (RIGHT) */}
-          <div className="fixed right-0 xl:right-4 2xl:right-10 top-1/2 -translate-y-1/2 z-20 pointer-events-none select-none flex flex-col items-center">
+          <div className="fixed -right-8 sm:-right-4 lg:right-0 2xl:right-6 top-1/2 -translate-y-1/2 z-20 pointer-events-none select-none flex flex-col items-end">
             <div className="relative">
               <div className="absolute -inset-14 bg-red-500/30 rounded-full blur-3xl animate-pulse pointer-events-none" />
               <img
                 src={devilImg}
                 alt="Chaos Outage Devil"
-                className="w-72 sm:w-88 md:w-[440px] lg:w-[520px] xl:w-[620px] 2xl:w-[720px] max-h-[94vh] object-contain animate-devil-zoom drop-shadow-[0_0_60px_rgba(239,68,68,0.8)]"
+                className="w-72 sm:w-88 md:w-[440px] lg:w-[500px] xl:w-[580px] 2xl:w-[680px] max-h-[94vh] object-contain animate-devil-zoom drop-shadow-[0_0_60px_rgba(239,68,68,0.8)]"
               />
             </div>
-            <div className="mt-3 px-4 py-1.5 rounded-full bg-slate-950/85 border border-red-500/80 text-red-300 font-black text-xs sm:text-sm uppercase tracking-wider backdrop-blur-md shadow-2xl flex items-center gap-2 ring-2 ring-red-500/40">
+          </div>
+
+          {/* CHAOS DEVIL NAME BADGE - MOVED FAR RIGHT */}
+          <div className="fixed right-3 sm:right-6 md:right-8 xl:right-12 bottom-5 sm:bottom-7 z-40 pointer-events-auto select-none flex flex-col items-end">
+            <div className="px-3 sm:px-4 py-1.5 rounded-full bg-slate-950/90 border border-red-500 text-red-300 font-black text-xs sm:text-sm uppercase tracking-wider backdrop-blur-md shadow-[0_0_30px_rgba(239,68,68,0.5)] flex items-center gap-2 ring-2 ring-red-500/50 whitespace-nowrap">
               <Flame className="w-4 h-4 text-red-400" />
               <span>Chaos Devil</span>
             </div>
-            <span className="text-xs font-mono text-red-400/90 mt-1 font-bold">Outages &amp; Chaos Demon</span>
+            <span className="text-[10px] sm:text-xs font-mono text-red-300/90 mt-1 font-bold pr-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap">
+              Outages &amp; Chaos Demon
+            </span>
           </div>
 
           {/* Transparent Glass Info Pane */}
-          <div className="relative max-w-4xl w-full bg-slate-950/30 border border-indigo-400/35 rounded-3xl p-6 sm:p-8 shadow-[0_0_60px_rgba(0,0,0,0.6)] my-auto text-slate-100 max-h-[92vh] flex flex-col z-30 backdrop-blur-sm">
+          <div className="relative max-w-3xl xl:max-w-4xl w-full bg-slate-950/30 border border-indigo-400/35 rounded-3xl p-6 sm:p-8 shadow-[0_0_60px_rgba(0,0,0,0.6)] my-auto text-slate-100 max-h-[92vh] flex flex-col z-30 backdrop-blur-sm">
             {/* Close Button */}
             <button
               onClick={() => {
