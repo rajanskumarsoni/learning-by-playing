@@ -248,11 +248,119 @@ class CloudflareBackendService {
   }
 
   /**
+   * Run Authoritative Cloudflare Edge Simulation
+   */
+  async evaluateArchitecture(nodes, edges, incomingRps, trafficMix, maxBudgetHr) {
+    if (this.config.workerUrl) {
+      try {
+        const res = await fetch(`${this.config.workerUrl}/api/evaluate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nodes, edges, incomingRps, trafficMix, maxBudgetHr }),
+          signal: AbortSignal.timeout(3000)
+        });
+        if (res.ok) {
+          const body = await res.json();
+          if (body.success && body.evaluation) {
+            return body.evaluation;
+          }
+        }
+      } catch (err) {
+        console.warn('Backend evaluation timed out, falling back to local simulator:', err.message);
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Authoritative Level Victory & Star Validation on Cloudflare Edge
+   */
+  async validateLevel(levelId, nodes, edges, elapsedSeconds = 20) {
+    if (this.config.workerUrl) {
+      try {
+        const res = await fetch(`${this.config.workerUrl}/api/levels/${levelId}/validate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nodes, edges, elapsedSeconds }),
+          signal: AbortSignal.timeout(3500)
+        });
+        if (res.ok) {
+          const body = await res.json();
+          if (body.success && body.validation) {
+            return body.validation;
+          }
+        }
+      } catch (err) {
+        console.warn('Backend validation request failed:', err.message);
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Fetch Authoritative Catalog from Cloudflare Edge
+   */
+  async getCatalog() {
+    if (this.config.workerUrl) {
+      try {
+        const res = await fetch(`${this.config.workerUrl}/api/catalog`, {
+          signal: AbortSignal.timeout(3000)
+        });
+        if (res.ok) {
+          return await res.json();
+        }
+      } catch {}
+    }
+    return null;
+  }
+
+  /**
+   * Fetch Deterministic Daily Incident from Cloudflare Edge
+   */
+  async getDailyIncident() {
+    if (this.config.workerUrl) {
+      try {
+        const res = await fetch(`${this.config.workerUrl}/api/daily/today`, {
+          signal: AbortSignal.timeout(3000)
+        });
+        if (res.ok) {
+          const body = await res.json();
+          if (body.success && body.daily) {
+            return body.daily;
+          }
+        }
+      } catch {}
+    }
+    return null;
+  }
+
+  /**
+   * Authoritative Chaos Monkey Trigger from Cloudflare Edge
+   */
+  async triggerChaos(nodes, preferredType = null) {
+    if (this.config.workerUrl) {
+      try {
+        const res = await fetch(`${this.config.workerUrl}/api/chaos/trigger`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nodes, preferredType }),
+          signal: AbortSignal.timeout(3000)
+        });
+        if (res.ok) {
+          return await res.json();
+        }
+      } catch {}
+    }
+    return null;
+  }
+
+  /**
    * Get sync status overview
    */
   getStatus() {
     return {
       ...this.status,
+      backendEngine: 'Cloudflare Workers Edge v2.0 (Authoritative)',
       accountIdMasked: this.config.accountId
         ? `${this.config.accountId.substring(0, 6)}...${this.config.accountId.substring(this.config.accountId.length - 4)}`
         : 'Not Set',
