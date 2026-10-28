@@ -7,7 +7,7 @@ import {
   ArrowRight, Sparkles, Info, X, RefreshCw, ZoomIn, ZoomOut, Maximize2, Move,
   BookOpen, Search, Bot, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
   ChevronLeft, Star, Trophy, Radio, Target, Volume2, VolumeX, Music, Headphones, Mic,
-  Link as LinkIcon, Calendar
+  Link as LinkIcon, Calendar, Crown, Medal
 } from 'lucide-react';
 import mentorAdaImg from './assets/mentor_ada.jpg';
 import chaosMonkeyImg from './assets/chaos_monkey.jpg';
@@ -998,10 +998,205 @@ function getDailyIncident() {
   };
 }
 
+// ============================================================================
+// 4.3. ARCHITECT LEADERBOARD & HALL OF FAME DATA GENERATOR
+// ============================================================================
+function getDailyLeaderboardEntries(dayNumber, playerPersonalBest, playerStreak) {
+  const baseEntries = [
+    {
+      id: 'ada-1',
+      name: 'Ada Lovelace',
+      role: 'Staff Reliability Lead',
+      company: 'Hyperscale Cloud',
+      avatar: '👩‍💻',
+      baseLatency: 28,
+      uptime: 99.98,
+      cost: 210,
+      streak: 19,
+      stack: ['WAF', 'CDN', 'CACHE', 'WEB', 'SQL']
+    },
+    {
+      id: 'linus-2',
+      name: 'Linus T.',
+      role: 'Kernel Core Architect',
+      company: 'Kernel.org',
+      avatar: '🐧',
+      baseLatency: 34,
+      uptime: 99.92,
+      cost: 185,
+      streak: 14,
+      stack: ['LB', 'WEB', 'CACHE', 'KAFKA', 'WORKER']
+    },
+    {
+      id: 'grace-3',
+      name: 'Grace Hopper',
+      role: 'Distributed Systems Pioneer',
+      company: 'Naval Cyber Ops',
+      avatar: '⚡',
+      baseLatency: 39,
+      uptime: 99.88,
+      cost: 235,
+      streak: 12,
+      stack: ['WAF', 'LB', 'WEB', 'CACHE', 'SQL']
+    },
+    {
+      id: 'margaret-4',
+      name: 'Margaret H.',
+      role: 'Flight Systems SRE',
+      company: 'Mission Control',
+      avatar: '🚀',
+      baseLatency: 45,
+      uptime: 99.84,
+      cost: 170,
+      streak: 9,
+      stack: ['CDN', 'LB', 'WEB', 'CACHE']
+    },
+    {
+      id: 'satoshi-5',
+      name: 'Satoshi N.',
+      role: 'Decentralized Architect',
+      company: 'Consensus Lab',
+      avatar: '🪙',
+      baseLatency: 52,
+      uptime: 99.78,
+      cost: 160,
+      streak: 7,
+      stack: ['KAFKA', 'WORKER', 'SQL', 'CACHE']
+    },
+    {
+      id: 'kelsey-6',
+      name: 'Kelsey H.',
+      role: 'Cloud Native Advocate',
+      company: 'Open Infra',
+      avatar: '☸️',
+      baseLatency: 58,
+      uptime: 99.72,
+      cost: 215,
+      streak: 11,
+      stack: ['WAF', 'CDN', 'LB', 'WEB', 'CACHE']
+    },
+    {
+      id: 'werner-7',
+      name: 'Werner V.',
+      role: 'Global Cloud CTO',
+      company: 'Amazon Web',
+      avatar: '☁️',
+      baseLatency: 64,
+      uptime: 99.65,
+      cost: 230,
+      streak: 6,
+      stack: ['CDN', 'STORAGE', 'LB', 'WEB', 'SQL']
+    },
+    {
+      id: 'leslie-8',
+      name: 'Leslie L.',
+      role: 'Paxos Consensus Lead',
+      company: 'TLA+ Reliability',
+      avatar: '📜',
+      baseLatency: 71,
+      uptime: 99.58,
+      cost: 195,
+      streak: 4,
+      stack: ['LB', 'WEB', 'SQL', 'STORAGE']
+    }
+  ];
+
+  // Adjust base latencies by dayNumber so scores vary slightly per day's incident difficulty
+  const dayShift = (dayNumber * 7) % 11;
+  const list = baseEntries.map((e) => ({
+    ...e,
+    latency: e.baseLatency + dayShift
+  }));
+
+  if (playerPersonalBest !== null && playerPersonalBest !== undefined && playerPersonalBest > 0) {
+    list.push({
+      id: 'player-you',
+      name: 'You (Lead Architect)',
+      role: 'System Saviour',
+      company: 'Your Organization',
+      avatar: '⭐',
+      badge: 'YOU',
+      latency: Math.round(playerPersonalBest),
+      uptime: 99.8,
+      cost: 190,
+      streak: playerStreak || 1,
+      isUser: true,
+      stack: ['Active Cluster']
+    });
+  }
+
+  list.sort((a, b) => a.latency - b.latency);
+
+  // Re-assign rank badges
+  return list.map((item, idx) => {
+    let rankBadge = `#${idx + 1}`;
+    if (idx === 0) rankBadge = '🥇 #1';
+    else if (idx === 1) rankBadge = '🥈 #2';
+    else if (idx === 2) rankBadge = '🥉 #3';
+    return {
+      ...item,
+      rank: idx + 1,
+      rankBadge: item.isUser ? 'YOU' : rankBadge
+    };
+  });
+}
+
+function getSurvivalLeaderboardEntries(playerBestWave) {
+  const list = [
+    { name: 'Chaos Conqueror', role: 'Staff SRE Lead', wave: 19, rps: '50,500', badge: '🥇 #1', streak: 16, avatar: '🛡️' },
+    { name: 'Zero Downtime Dan', role: 'Principal Infra', wave: 16, rps: '43,000', badge: '🥈 #2', streak: 11, avatar: '⚡' },
+    { name: 'High Availability Hannah', role: 'Cloud Architect', wave: 14, rps: '38,000', badge: '🥉 #3', streak: 14, avatar: '👑' },
+    { name: 'Sub-Zero Latency', role: 'Performance Eng', wave: 12, rps: '33,000', badge: '#4', streak: 8, avatar: '🚀' },
+    { name: 'Circuit Breaker Chris', role: 'Senior SRE', wave: 10, rps: '28,000', badge: '#5', streak: 5, avatar: '🔌' },
+    { name: 'Load Shedder Sam', role: 'DevOps Architect', wave: 8, rps: '23,000', badge: '#6', streak: 6, avatar: '⚖️' }
+  ];
+
+  if (playerBestWave && playerBestWave > 1) {
+    list.push({
+      name: 'You (Lead Architect)',
+      role: 'Active Challenger',
+      wave: playerBestWave,
+      rps: `${(3000 + playerBestWave * 2500).toLocaleString()}`,
+      badge: 'YOU',
+      isUser: true,
+      streak: 1,
+      avatar: '⭐'
+    });
+  }
+
+  list.sort((a, b) => b.wave - a.wave);
+
+  return list.map((item, idx) => {
+    let rankBadge = `#${idx + 1}`;
+    if (idx === 0) rankBadge = '🥇 #1';
+    else if (idx === 1) rankBadge = '🥈 #2';
+    else if (idx === 2) rankBadge = '🥉 #3';
+    return {
+      ...item,
+      rank: idx + 1,
+      rankBadge: item.isUser ? 'YOU' : rankBadge
+    };
+  });
+}
+
 // Helper to parse challenge from current URL hash or search params
 function getChallengeFromUrl() {
   try {
     if (typeof window === 'undefined') return null;
+
+    // Check for direct #leaderboard hash
+    if (window.location.hash === '#leaderboard' || (window.location.search && window.location.search.includes('tab=leaderboard'))) {
+      const daily = getDailyIncident();
+      return {
+        isLeaderboardDirect: true,
+        gameMode: 'DAILY',
+        author: 'Leaderboard',
+        levelIdx: 0,
+        survivalWave: 1,
+        nodes: JSON.parse(JSON.stringify(daily.initialNodes)),
+        edges: JSON.parse(JSON.stringify(daily.initialEdges))
+      };
+    }
 
     // Check for direct #daily hash
     if (window.location.hash === '#daily' || (window.location.search && window.location.search.includes('mode=daily'))) {
@@ -1388,6 +1583,9 @@ export default function App() {
   const [showWelcomeModal, setShowWelcomeModal] = useState(() => !initialChallengeRef.current);
   const [levelBriefingModal, setLevelBriefingModal] = useState(null); // { mode: 'CAMPAIGN' | 'SURVIVAL' | 'SANDBOX', levelIdx?: number }
   const [detailModalComponent, setDetailModalComponent] = useState(null);
+  const [showLeaderboardModal, setShowLeaderboardModal] = useState(() => initialChallengeRef.current?.isLeaderboardDirect || false);
+  const [leaderboardTab, setLeaderboardTab] = useState('DAILY'); // 'DAILY' | 'SURVIVAL'
+  const [isLeaderboardShareCopied, setIsLeaderboardShareCopied] = useState(false);
 
   // Game Audio Synthesizer State
   const [isSoundMuted, setIsSoundMuted] = useState(() => sound.isMuted);
@@ -1447,7 +1645,7 @@ export default function App() {
 
   // Handle shared challenge deep linking & live hash navigation
   useEffect(() => {
-    if (initialChallengeRef.current) {
+    if (initialChallengeRef.current && !initialChallengeRef.current.isLeaderboardDirect) {
       sound.playUpgrade();
       setToastNotification({
         type: 'success',
@@ -1457,8 +1655,16 @@ export default function App() {
     }
 
     const handleHashChange = () => {
+      if (window.location.hash === '#leaderboard') {
+        setShowLeaderboardModal(true);
+        return;
+      }
       const challenge = getChallengeFromUrl();
       if (challenge) {
+        if (challenge.isLeaderboardDirect) {
+          setShowLeaderboardModal(true);
+          return;
+        }
         setGameMode(challenge.gameMode);
         setCurrentLevelIdx(challenge.levelIdx);
         setNodes(challenge.nodes);
@@ -1582,6 +1788,68 @@ export default function App() {
       xp
     };
   }, [unlockedLevelIdx, survivalWave]);
+
+  // Personal Best and Leaderboard Calculations
+  const playerDailyBest = useMemo(() => {
+    try {
+      const v = localStorage.getItem(`systemsaviour_daily_best_${dailyIncident.dayNumber}`);
+      return v ? parseFloat(v) : null;
+    } catch {
+      return null;
+    }
+  }, [dailyIncident.dayNumber, isDailyCompletedToday]);
+
+  const dailyLeaderboardEntries = useMemo(() => {
+    return getDailyLeaderboardEntries(dailyIncident.dayNumber, playerDailyBest, dailyStreak);
+  }, [dailyIncident.dayNumber, playerDailyBest, dailyStreak]);
+
+  const survivalLeaderboardEntries = useMemo(() => {
+    return getSurvivalLeaderboardEntries(bestSurvivalWave);
+  }, [bestSurvivalWave]);
+
+  const userDailyStanding = useMemo(() => {
+    const userEntry = dailyLeaderboardEntries.find((e) => e.isUser);
+    if (!userEntry) return null;
+    const rank = userEntry.rank;
+    const percentile = Math.max(1, Math.min(99, Math.round((rank / (dailyLeaderboardEntries.length + 80)) * 100)));
+    return {
+      rank,
+      percentile,
+      latency: userEntry.latency,
+      streak: userEntry.streak,
+      userEntry
+    };
+  }, [dailyLeaderboardEntries]);
+
+  const handleCopyLeaderboardShare = () => {
+    sound.playClick();
+    const rankText = userDailyStanding
+      ? `🏆 Ranked #${userDailyStanding.rank} (Top ${userDailyStanding.percentile}%) on System Saviour Daily Incident #${dailyIncident.dayNumber}!\n⏱️ P99 Latency: ${userDailyStanding.latency}ms • 🔥 Streak: ${dailyStreak} Days\n\nCan your architecture beat my score? Test it in your browser:\n👉 ${window.location.origin + window.location.pathname}#daily`
+      : `⚡ System Saviour Distributed Architecture Challenge\n📅 Daily Incident #${dailyIncident.dayNumber}: ${dailyIncident.title}\n🔥 Current Streak: ${dailyStreak} Days\n\nTest your distributed systems skills in your browser:\n👉 ${window.location.origin + window.location.pathname}#daily`;
+
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(rankText);
+    }
+    setIsLeaderboardShareCopied(true);
+    setToastNotification({
+      type: 'success',
+      message: 'Leaderboard rank copied to clipboard! Share on Twitter or Discord 📋'
+    });
+    setTimeout(() => {
+      setIsLeaderboardShareCopied(false);
+      setToastNotification(null);
+    }, 3500);
+  };
+
+  const handleTweetLeaderboardShare = () => {
+    sound.playClick();
+    const rankText = userDailyStanding
+      ? `🏆 Ranked #${userDailyStanding.rank} (Top ${userDailyStanding.percentile}%) on System Saviour Daily Incident #${dailyIncident.dayNumber}!\n⏱️ P99 Latency: ${userDailyStanding.latency}ms • 🔥 Streak: ${dailyStreak} Days\n\nCan your architecture beat my score? Test it in your browser:`
+      : `⚡ System Saviour Distributed Architecture Challenge\n📅 Daily Incident #${dailyIncident.dayNumber}: ${dailyIncident.title}\n🔥 Current Streak: ${dailyStreak} Days\n\nTest your distributed systems skills in your browser:`;
+    const shareUrl = `${window.location.origin + window.location.pathname}#daily`;
+    const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(rankText)}&url=${encodeURIComponent(shareUrl)}`;
+    window.open(tweetUrl, '_blank', 'noopener,noreferrer');
+  };
 
 
   // Select node and smoothly bring Component Inspector into screen view in right panel
@@ -2746,6 +3014,19 @@ Can your architecture beat this? Test it in your browser:
             <span className="font-bold text-rose-300 hidden sm:inline">Chaos</span>
           </button>
 
+          {/* Global Architect Leaderboard Button */}
+          <button
+            onClick={() => {
+              sound.playClick();
+              setShowLeaderboardModal(true);
+            }}
+            className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-amber-950/80 to-yellow-950/80 backdrop-blur-md border border-amber-500/50 hover:border-amber-400 text-xs text-amber-200 flex items-center gap-1.5 transition shadow-md shadow-amber-950/30 group active:scale-95"
+            title="View Daily Incident & Survival Leaderboard / Hall of Fame"
+          >
+            <Trophy className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
+            <span className="font-bold text-amber-300 hidden sm:inline">Leaderboard</span>
+          </button>
+
           {/* Ada AI Mentor Guide Trigger */}
           <button
             onClick={() => setShowWelcomeModal(true)}
@@ -3789,6 +4070,17 @@ Can your architecture beat this? Test it in your browser:
                       <span className="font-mono font-bold text-white">${postMortemModal.totalCost}/hr</span>
                     </div>
                   )}
+                  {userDailyStanding?.userEntry && (
+                    <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-700/60">
+                      <span className="flex items-center gap-1.5 text-amber-300 font-semibold">
+                        <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Global Benchmark:</span>
+                      </span>
+                      <span className="font-mono font-bold text-amber-300 bg-amber-950/60 border border-amber-500/30 px-2 py-0.5 rounded-full text-[11px]">
+                        Rank #{userDailyStanding.rank} (Top {userDailyStanding.percentile}%)
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Viral Shareable Architect Scorecard (Wordle Style) */}
@@ -3835,12 +4127,20 @@ Can your architecture beat this? Test it in your browser:
                   </div>
                 </div>
 
-                <div className="mt-4 flex items-center justify-center gap-3">
+                <div className="mt-4 flex items-center justify-center gap-2.5 flex-wrap">
                   <button
                     onClick={resetWave}
                     className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs active:scale-95 transition"
                   >
                     🔄 Replay Wave
+                  </button>
+                  <button
+                    onClick={() => setShowLeaderboardModal(true)}
+                    className="px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 font-bold text-xs active:scale-95 transition flex items-center gap-1.5"
+                    title="View Daily Incident & Survival Leaderboards"
+                  >
+                    <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Leaderboard</span>
                   </button>
                   {postMortemModal.won && gameMode === 'CAMPAIGN' && currentLevelIdx < CAMPAIGN_LEVELS.length - 1 && (
                     <button
@@ -5532,6 +5832,292 @@ Can your architecture beat this? Test it in your browser:
           </div>
         );
       })()}
+
+      {/* ========================================================================= */}
+      {/* ARCHITECT HALL OF FAME & DAILY INCIDENT LEADERBOARD MODAL                 */}
+      {/* ========================================================================= */}
+      {showLeaderboardModal && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setShowLeaderboardModal(false)}
+        >
+          <div
+            className="w-full max-w-3xl max-h-[92vh] flex flex-col rounded-3xl bg-slate-900/95 border border-indigo-500/40 shadow-2xl shadow-indigo-950/60 overflow-hidden text-slate-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="p-5 pb-4 border-b border-slate-800/80 bg-gradient-to-r from-slate-900 via-indigo-950/60 to-slate-900 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-300 flex items-center justify-center text-slate-950 shadow-lg shadow-amber-500/25">
+                  <Trophy className="w-6 h-6 fill-slate-950" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xl font-black font-display tracking-tight text-white">
+                      Architect Hall of Fame
+                    </h2>
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300">
+                      Global Benchmark
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    Compare your P99 latency and system uptime against legendary cloud architects
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowLeaderboardModal(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Tab selector & Peer Benchmark Card */}
+            <div className="p-4 bg-slate-950/60 border-b border-slate-800/60 space-y-3">
+              {/* Tabs */}
+              <div className="flex p-1 rounded-2xl bg-slate-900 border border-slate-800 max-w-md mx-auto">
+                <button
+                  onClick={() => setLeaderboardTab('DAILY')}
+                  className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                    leaderboardTab === 'DAILY'
+                      ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 shadow-md font-black'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>Daily Incident #{dailyIncident.dayNumber}</span>
+                </button>
+                <button
+                  onClick={() => setLeaderboardTab('SURVIVAL')}
+                  className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                    leaderboardTab === 'SURVIVAL'
+                      ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-md font-black'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Shield className="w-3.5 h-3.5" />
+                  <span>Survival Waves</span>
+                </button>
+              </div>
+
+              {/* User Benchmark Summary Card */}
+              {leaderboardTab === 'DAILY' ? (
+                <div className="p-3.5 rounded-2xl bg-gradient-to-r from-indigo-950/60 via-slate-900 to-slate-950 border border-indigo-500/30 flex flex-wrap items-center justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <div className="text-[11px] font-mono uppercase tracking-wider text-indigo-400 flex items-center gap-1.5">
+                      <Sparkles className="w-3 h-3 text-amber-400" />
+                      <span>Your Benchmark Status</span>
+                    </div>
+                    {userDailyStanding?.userEntry ? (
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-lg font-black text-amber-300 font-display">
+                          Rank #{userDailyStanding.rank}
+                        </span>
+                        <span className="text-xs text-slate-300">
+                          • Better than <span className="text-emerald-400 font-bold">{100 - userDailyStanding.percentile}%</span> of cloud engineers (Top {userDailyStanding.percentile}%)
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="text-xs text-slate-300">
+                        No run logged for Day #{dailyIncident.dayNumber} yet! Solve today's incident to record your rank.
+                      </div>
+                    )}
+                    <div className="text-[11px] text-slate-400 flex items-center gap-3 pt-0.5 font-mono">
+                      <span>⏱️ Best P99: <strong className="text-cyan-300">{playerDailyBest ? `${Math.round(playerDailyBest)}ms` : 'None'}</strong></span>
+                      <span>🔥 Daily Streak: <strong className="text-amber-400">{dailyStreak} Days</strong></span>
+                    </div>
+                  </div>
+
+                  {/* Share Rank Actions */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleCopyLeaderboardShare}
+                      className="py-1.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition active:scale-95 shadow flex items-center gap-1.5"
+                      title="Copy your rank and benchmark to clipboard"
+                    >
+                      {isLeaderboardShareCopied ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{isLeaderboardShareCopied ? 'Rank Copied!' : 'Copy Rank'}</span>
+                    </button>
+                    <button
+                      onClick={handleTweetLeaderboardShare}
+                      className="py-1.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-400 border border-sky-500/30 font-bold text-xs transition active:scale-95 flex items-center gap-1.5"
+                      title="Share your rank on Twitter / X"
+                    >
+                      <Share2 className="w-3.5 h-3.5" />
+                      <span>Post</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3.5 rounded-2xl bg-gradient-to-r from-purple-950/60 via-slate-900 to-slate-950 border border-purple-500/30 flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[11px] font-mono uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
+                      <Shield className="w-3 h-3 text-purple-300" />
+                      <span>Survival Endurance Record</span>
+                    </div>
+                    <div className="text-lg font-black text-purple-300 font-display">
+                      Personal Record: Wave {bestSurvivalWave}
+                    </div>
+                    <p className="text-xs text-slate-400">
+                      Defend against endless escalating traffic surges to climb the leaderboard!
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowLeaderboardModal(false);
+                      switchMode('SURVIVAL');
+                    }}
+                    className="py-2 px-3.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition active:scale-95 shadow-md flex items-center gap-1.5"
+                  >
+                    <Play className="w-3.5 h-3.5" />
+                    <span>Play Survival</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Podium for Top 3 */}
+            <div className="px-5 py-3 bg-slate-950/40 border-b border-slate-800/40 grid grid-cols-3 gap-3">
+              {(leaderboardTab === 'DAILY' ? dailyLeaderboardEntries : survivalLeaderboardEntries).slice(0, 3).map((podiumEntry, idx) => {
+                const podiumColors = [
+                  'from-amber-500/20 border-amber-500/40 text-amber-300',
+                  'from-slate-400/20 border-slate-400/40 text-slate-300',
+                  'from-amber-700/20 border-amber-700/40 text-amber-500'
+                ];
+                const podiumIcons = ['🥇 1st', '🥈 2nd', '🥉 3rd'];
+                return (
+                  <div
+                    key={idx}
+                    className={`p-2.5 rounded-2xl bg-gradient-to-b ${podiumColors[idx]} border flex flex-col items-center text-center relative overflow-hidden`}
+                  >
+                    <span className="text-xs font-black uppercase font-mono tracking-wider">{podiumIcons[idx]}</span>
+                    <div className="text-2xl my-1">{podiumEntry.avatar || '👨‍💻'}</div>
+                    <div className="text-xs font-bold text-white truncate max-w-full flex items-center gap-1">
+                      <span>{podiumEntry.name}</span>
+                      {podiumEntry.isUser && (
+                        <span className="text-[9px] bg-indigo-500 text-white px-1.5 py-0.2 rounded-full font-bold">YOU</span>
+                      )}
+                    </div>
+                    <div className="text-[10px] text-slate-400 truncate max-w-full">{podiumEntry.role}</div>
+                    <div className="mt-1.5 text-xs font-mono font-bold text-cyan-300">
+                      {leaderboardTab === 'DAILY' ? `${podiumEntry.latency}ms P99` : `Wave ${podiumEntry.wave}`}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Leaderboard Entries List / Table */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-2 min-h-0">
+              {(leaderboardTab === 'DAILY' ? dailyLeaderboardEntries : survivalLeaderboardEntries).map((entry, index) => {
+                const isUser = entry.isUser;
+                return (
+                  <div
+                    key={entry.id || index}
+                    className={`flex items-center justify-between p-3 rounded-2xl border transition-all ${
+                      isUser
+                        ? 'bg-indigo-950/70 border-indigo-400/80 ring-2 ring-indigo-500/30 shadow-lg'
+                        : 'bg-slate-900/60 border-slate-800/80 hover:bg-slate-800/50'
+                    }`}
+                  >
+                    {/* Left: Rank & Info */}
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-8 text-center font-mono font-black text-sm ${
+                        index === 0 ? 'text-amber-400' : index === 1 ? 'text-slate-300' : index === 2 ? 'text-amber-600' : 'text-slate-500'
+                      }`}>
+                        {entry.rankBadge || `#${index + 1}`}
+                      </div>
+                      <div className="text-xl">{entry.avatar || '👨‍💻'}</div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-sm font-bold truncate ${isUser ? 'text-indigo-200' : 'text-white'}`}>
+                            {entry.name}
+                          </span>
+                          {isUser && (
+                            <span className="text-[10px] font-black bg-indigo-500 text-white px-2 py-0.5 rounded-full shadow-sm">
+                              YOU
+                            </span>
+                          )}
+                          {entry.streak && entry.streak > 1 && (
+                            <span className="text-[10px] font-mono text-amber-400 bg-amber-950/60 border border-amber-500/30 px-1.5 py-0.2 rounded-full">
+                              🔥 {entry.streak}d
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-slate-400 truncate">
+                          {entry.role} • {entry.company || (entry.rps ? `${entry.rps} RPS Peak` : '')}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right: Architecture Stack & Latency / Wave */}
+                    <div className="flex items-center gap-4 shrink-0 text-right">
+                      {entry.stack && (
+                        <div className="hidden sm:flex items-center gap-1">
+                          {entry.stack.map((s, sIdx) => (
+                            <span key={sIdx} className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                              {s}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <div className="min-w-[70px]">
+                        {leaderboardTab === 'DAILY' ? (
+                          <div>
+                            <div className="font-mono font-black text-sm text-cyan-300">
+                              {entry.latency}ms
+                            </div>
+                            <div className="text-[10px] font-mono text-emerald-400">
+                              {entry.uptime}% SLA
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            <div className="font-mono font-black text-sm text-purple-300">
+                              Wave {entry.wave}
+                            </div>
+                            <div className="text-[10px] font-mono text-slate-400">
+                              {entry.rps} RPS
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-3.5 border-t border-slate-800 bg-slate-950/80 flex items-center justify-between text-xs text-slate-400">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Leaderboard updates deterministically daily at 00:00 UTC</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {gameMode !== 'DAILY' && (
+                  <button
+                    onClick={() => {
+                      setShowLeaderboardModal(false);
+                      switchMode('DAILY');
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 font-bold text-xs transition"
+                  >
+                    ⚡ Play Today's Incident
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowLeaderboardModal(false)}
+                  className="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Hidden File Input for Blueprint Import */}
       <input
