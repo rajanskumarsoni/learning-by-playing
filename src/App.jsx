@@ -3808,83 +3808,8 @@ export default function App() {
               </button>
             </div>
 
-            {/* Modal Header with Ada Mentor Briefing (Transparent Glass) */}
-            <div
-              id="intro-header-card"
-              className={`flex items-start sm:items-center gap-4 mb-3 p-4 rounded-2xl bg-indigo-950/25 backdrop-blur-sm border shadow-lg transition-all duration-300 ${
-                audioTourState.isPlaying && audioTourState.currentStepIdx === 0
-                  ? 'border-cyan-400 ring-2 ring-cyan-400/80 shadow-cyan-500/30'
-                  : 'border-cyan-500/30'
-              }`}
-            >
-              <div className="relative shrink-0">
-                <img
-                  src={mentorAdaImg}
-                  alt="Ada Chief Systems Architect"
-                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover ring-2 ring-cyan-400 shadow-xl shadow-cyan-950/50"
-                />
-                <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-400 border-2 border-slate-900" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="text-lg sm:text-2xl font-black text-white tracking-wide font-display">
-                    Welcome to System Saviour
-                  </h2>
-                  <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
-                    Mission Briefing
-                  </span>
-                  {audioTourState.isPlaying && audioTourState.currentStepIdx === 0 && (
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-400 text-slate-950 font-bold flex items-center gap-1 animate-pulse">
-                      <Volume2 className="w-3 h-3" />
-                      Ada Speaking
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs sm:text-sm text-cyan-100 mt-1 leading-snug">
-                  &ldquo;Greetings, Architect! I&apos;m <strong>Ada</strong>, your Principal SRE Lead. Welcome to our distributed systems simulator. Ready to design battle-hardened architectures?&rdquo;
-                </p>
-              </div>
-            </div>
-
-            {/* Immediate Sound Activation Prompt (Transparent Glass) */}
-            {!isAudioActive && (
-              <div
-                onClick={() => {
-                  sound.unlockAudio();
-                  setIsAudioActive(true);
-                }}
-                className="mb-3 px-3.5 py-2.5 rounded-2xl bg-amber-950/25 backdrop-blur-sm border border-amber-400/60 shadow-lg shadow-amber-950/30 flex items-center justify-between gap-3 cursor-pointer hover:border-amber-300 transition-all group animate-pulse"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-amber-400 text-slate-950 flex items-center justify-center font-bold">
-                    <Music className="w-4 h-4 animate-bounce" />
-                  </div>
-                  <div>
-                    <div className="text-xs font-black text-amber-200 flex items-center gap-1.5">
-                      <span>WARRIOR BATTLE SOUNDTRACK READY</span>
-                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-red-500/30 text-red-200 border border-red-500/40">75% Volume</span>
-                    </div>
-                    <div className="text-[11px] text-slate-300">
-                      Tap or click anywhere on the screen to unleash the background soundtrack!
-                    </div>
-                  </div>
-                </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    sound.unlockAudio();
-                    setIsAudioActive(true);
-                  }}
-                  className="px-3 py-1.5 rounded-xl bg-amber-400 group-hover:bg-amber-300 text-slate-950 font-black text-xs shadow-md transition active:scale-95 shrink-0 flex items-center gap-1"
-                >
-                  <span>Start Music</span>
-                  <Volume2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            )}
-
-            {/* Audio Mode Guide & Saviour Music Control Bar (Transparent Glass) */}
-            <div className="mb-4 rounded-2xl bg-slate-950/30 backdrop-blur-sm border border-indigo-500/25 p-2.5 sm:p-3 shadow-lg flex flex-wrap items-center justify-between gap-2.5">
+            {/* 1. TOP BAR: AUDIO GUIDE MODE & SAVIOUR WARRIOR MUSIC CONTROLS */}
+            <div className="rounded-2xl bg-slate-950/50 backdrop-blur-sm border border-indigo-500/30 p-2.5 sm:p-3 shadow-xl flex flex-wrap items-center justify-between gap-2.5">
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="relative shrink-0">
                   <div className={`w-9 h-9 rounded-xl flex items-center justify-center border transition-all ${
@@ -4006,6 +3931,81 @@ export default function App() {
                     </div>
                   )}
                 </button>
+              </div>
+            </div>
+
+            {/* Immediate Sound Activation Prompt (Transparent Glass) */}
+            {!isAudioActive && (
+              <div
+                onClick={() => {
+                  sound.unlockAudio();
+                  setIsAudioActive(true);
+                }}
+                className="px-3.5 py-2.5 rounded-2xl bg-amber-950/25 backdrop-blur-sm border border-amber-400/60 shadow-lg shadow-amber-950/30 flex items-center justify-between gap-3 cursor-pointer hover:border-amber-300 transition-all group animate-pulse"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-7 h-7 rounded-lg bg-amber-400 text-slate-950 flex items-center justify-center font-bold">
+                    <Music className="w-4 h-4 animate-bounce" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-black text-amber-200 flex items-center gap-1.5">
+                      <span>WARRIOR BATTLE SOUNDTRACK READY</span>
+                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-red-500/30 text-red-200 border border-red-500/40">75% Volume</span>
+                    </div>
+                    <div className="text-[11px] text-slate-300">
+                      Tap or click anywhere on the screen to unleash the background soundtrack!
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    sound.unlockAudio();
+                    setIsAudioActive(true);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-amber-400 group-hover:bg-amber-300 text-slate-950 font-black text-xs shadow-md transition active:scale-95 shrink-0 flex items-center gap-1"
+                >
+                  <span>Start Music</span>
+                  <Volume2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
+            {/* 2. MODAL HEADER WITH ADA MENTOR BRIEFING */}
+            <div
+              id="intro-header-card"
+              className={`flex items-start sm:items-center gap-4 p-4 rounded-2xl bg-indigo-950/25 backdrop-blur-sm border shadow-lg transition-all duration-300 ${
+                audioTourState.isPlaying && audioTourState.currentStepIdx === 0
+                  ? 'border-cyan-400 ring-2 ring-cyan-400/80 shadow-cyan-500/30'
+                  : 'border-cyan-500/30'
+              }`}
+            >
+              <div className="relative shrink-0">
+                <img
+                  src={mentorAdaImg}
+                  alt="Ada Chief Systems Architect"
+                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover ring-2 ring-cyan-400 shadow-xl shadow-cyan-950/50"
+                />
+                <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-400 border-2 border-slate-900" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-lg sm:text-2xl font-black text-white tracking-wide font-display">
+                    Welcome to System Saviour
+                  </h2>
+                  <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                    Mission Briefing
+                  </span>
+                  {audioTourState.isPlaying && audioTourState.currentStepIdx === 0 && (
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-400 text-slate-950 font-bold flex items-center gap-1 animate-pulse">
+                      <Volume2 className="w-3 h-3" />
+                      Ada Speaking
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs sm:text-sm text-cyan-100 mt-1 leading-snug">
+                  &ldquo;Greetings, Architect! I&apos;m <strong>Ada</strong>, your Principal SRE Lead. Welcome to our distributed systems simulator. Ready to design battle-hardened architectures?&rdquo;
+                </p>
               </div>
             </div>
 
