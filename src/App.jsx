@@ -7,7 +7,7 @@ import {
   ArrowRight, Sparkles, Info, X, RefreshCw, ZoomIn, ZoomOut, Maximize2, Move,
   BookOpen, Search, Bot, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
   ChevronLeft, Star, Trophy, Radio, Target, Volume2, VolumeX, Music, Headphones, Mic,
-  Link as LinkIcon
+  Link as LinkIcon, Calendar
 } from 'lucide-react';
 import mentorAdaImg from './assets/mentor_ada.jpg';
 import chaosMonkeyImg from './assets/chaos_monkey.jpg';
@@ -858,10 +858,165 @@ function decodeChallengePayload(base64Str) {
   }
 }
 
+// Deterministic daily incident generator based on UTC calendar day
+function getDailyIncident() {
+  const epoch = new Date('2025-01-01T00:00:00Z').getTime();
+  const now = Date.now();
+  const dayNumber = Math.max(1, Math.floor((now - epoch) / 86400000));
+
+  const INCIDENT_TEMPLATES = [
+    {
+      subTitle: 'The Midnight Botnet Wave',
+      concept: 'L7 DDoS Scrubbing & Rate Limiting',
+      brief: 'An extortionist botnet is flooding your API gateway at 3 AM! 50% of incoming traffic is malicious bot floods, while 35% is legitimate user reads. Filter bad actors at the perimeter without spiking latency.',
+      targetRps: 6500,
+      trafficMix: { BOT: 0.50, READ: 0.35, WRITE: 0.15, STATIC: 0.0, SEARCH: 0.0, AI_PROMPT: 0.0 },
+      maxLatencyMs: 75,
+      minUptimePct: 99.0,
+      maxBudgetHr: 320,
+      allowedComponents: ['WAF', 'CDN', 'LB', 'WEB', 'CACHE', 'SQL'],
+      initialNodes: [
+        { id: 'src', type: 'SOURCE', x: 60, y: 220, config: {} },
+        { id: 'lb-1', type: 'LB', x: 280, y: 220, config: { algorithm: 0 } },
+        { id: 'web-1', type: 'WEB', x: 500, y: 160, config: { tier: 0 } },
+        { id: 'web-2', type: 'WEB', x: 500, y: 280, config: { tier: 0 } },
+        { id: 'sql-1', type: 'SQL', x: 740, y: 220, config: { scaling: 0 } }
+      ],
+      initialEdges: [
+        { id: 'e1', from: 'src', to: 'lb-1' },
+        { id: 'e2', from: 'lb-1', to: 'web-1' },
+        { id: 'e3', from: 'lb-1', to: 'web-2' },
+        { id: 'e4', from: 'web-1', to: 'sql-1' },
+        { id: 'e5', from: 'web-2', to: 'sql-1' }
+      ]
+    },
+    {
+      subTitle: 'Black Friday Write Stampede',
+      concept: 'Write Buffering & Async Decoupling',
+      brief: 'The Black Friday doors opened! 9,000 shoppers per second are slamming the checkout cart. Database writes threaten total lock contention. Buffer persistent writes and decouple async workers.',
+      targetRps: 9000,
+      trafficMix: { WRITE: 0.55, READ: 0.30, STATIC: 0.15, SEARCH: 0.0, BOT: 0.0, AI_PROMPT: 0.0 },
+      maxLatencyMs: 90,
+      minUptimePct: 98.5,
+      maxBudgetHr: 480,
+      allowedComponents: ['WAF', 'CDN', 'LB', 'WEB', 'CACHE', 'KAFKA', 'WORKER', 'SQL'],
+      initialNodes: [
+        { id: 'src', type: 'SOURCE', x: 50, y: 220, config: {} },
+        { id: 'lb-1', type: 'LB', x: 260, y: 220, config: { algorithm: 1 } },
+        { id: 'web-1', type: 'WEB', x: 480, y: 220, config: { tier: 1 } },
+        { id: 'sql-1', type: 'SQL', x: 760, y: 220, config: { scaling: 0 } }
+      ],
+      initialEdges: [
+        { id: 'e1', from: 'src', to: 'lb-1' },
+        { id: 'e2', from: 'lb-1', to: 'web-1' },
+        { id: 'e3', from: 'web-1', to: 'sql-1' }
+      ]
+    },
+    {
+      subTitle: 'Viral Influencer Media Surge',
+      concept: 'Global Edge Caching & Origin Protection',
+      brief: 'A TikTok video went viral with 15 million views! Heavy video media chunks and thumbnail requests are swamping the cluster. Offload at the edge before compute instances crash.',
+      targetRps: 8000,
+      trafficMix: { STATIC: 0.65, READ: 0.25, WRITE: 0.10, SEARCH: 0.0, BOT: 0.0, AI_PROMPT: 0.0 },
+      maxLatencyMs: 65,
+      minUptimePct: 99.2,
+      maxBudgetHr: 350,
+      allowedComponents: ['CDN', 'STORAGE', 'LB', 'WEB', 'CACHE', 'SQL'],
+      initialNodes: [
+        { id: 'src', type: 'SOURCE', x: 50, y: 220, config: {} },
+        { id: 'web-1', type: 'WEB', x: 380, y: 220, config: { tier: 0 } },
+        { id: 'sql-1', type: 'SQL', x: 700, y: 220, config: { scaling: 0 } }
+      ],
+      initialEdges: [
+        { id: 'e1', from: 'src', to: 'web-1' },
+        { id: 'e2', from: 'web-1', to: 'sql-1' }
+      ]
+    },
+    {
+      subTitle: 'The RAG Inference AI Stampede',
+      concept: 'Vector DB Acceleration & LLM Compute',
+      brief: 'Your new AI Copilot launched! Users are submitting 5,500 prompt queries/sec. Heavy vector embeddings choke standard relational tables. Route AI prompts to specialized Vector DB & GPU nodes.',
+      targetRps: 5500,
+      trafficMix: { AI_PROMPT: 0.50, READ: 0.35, WRITE: 0.15, STATIC: 0.0, SEARCH: 0.0, BOT: 0.0 },
+      maxLatencyMs: 110,
+      minUptimePct: 98.8,
+      maxBudgetHr: 520,
+      allowedComponents: ['AI', 'LB', 'WEB', 'CACHE', 'SQL', 'SEARCH'],
+      initialNodes: [
+        { id: 'src', type: 'SOURCE', x: 50, y: 220, config: {} },
+        { id: 'lb-1', type: 'LB', x: 260, y: 220, config: { algorithm: 1 } },
+        { id: 'web-1', type: 'WEB', x: 480, y: 220, config: { tier: 1 } },
+        { id: 'sql-1', type: 'SQL', x: 760, y: 220, config: { scaling: 0 } }
+      ],
+      initialEdges: [
+        { id: 'e1', from: 'src', to: 'lb-1' },
+        { id: 'e2', from: 'lb-1', to: 'web-1' },
+        { id: 'e3', from: 'web-1', to: 'sql-1' }
+      ]
+    },
+    {
+      subTitle: 'Catalog Search Index Meltdown',
+      concept: 'Full-Text Inverted Index Offloading',
+      brief: 'Shoppers are running complex multi-term search filters. The SQL database CPU spiked to 100% trying to execute LIKE queries. Stand up an Elasticsearch cluster to absorb search volume.',
+      targetRps: 6000,
+      trafficMix: { SEARCH: 0.50, READ: 0.30, WRITE: 0.20, STATIC: 0.0, BOT: 0.0, AI_PROMPT: 0.0 },
+      maxLatencyMs: 80,
+      minUptimePct: 99.0,
+      maxBudgetHr: 440,
+      allowedComponents: ['SEARCH', 'CACHE', 'LB', 'WEB', 'SQL', 'CDN'],
+      initialNodes: [
+        { id: 'src', type: 'SOURCE', x: 50, y: 220, config: {} },
+        { id: 'lb-1', type: 'LB', x: 260, y: 220, config: { algorithm: 0 } },
+        { id: 'web-1', type: 'WEB', x: 480, y: 220, config: { tier: 1 } },
+        { id: 'sql-1', type: 'SQL', x: 760, y: 220, config: { scaling: 0 } }
+      ],
+      initialEdges: [
+        { id: 'e1', from: 'src', to: 'lb-1' },
+        { id: 'e2', from: 'lb-1', to: 'web-1' },
+        { id: 'e3', from: 'web-1', to: 'sql-1' }
+      ]
+    }
+  ];
+
+  const template = INCIDENT_TEMPLATES[(dayNumber - 1) % INCIDENT_TEMPLATES.length];
+  const dateKey = new Date().toISOString().split('T')[0];
+
+  return {
+    dayNumber,
+    dateKey,
+    title: `Daily Incident #${dayNumber}: ${template.subTitle}`,
+    concept: template.concept,
+    brief: template.brief,
+    targetRps: template.targetRps,
+    trafficMix: template.trafficMix,
+    maxLatencyMs: template.maxLatencyMs,
+    minUptimePct: template.minUptimePct,
+    maxBudgetHr: template.maxBudgetHr,
+    allowedComponents: template.allowedComponents,
+    initialNodes: template.initialNodes,
+    initialEdges: template.initialEdges
+  };
+}
+
 // Helper to parse challenge from current URL hash or search params
 function getChallengeFromUrl() {
   try {
     if (typeof window === 'undefined') return null;
+
+    // Check for direct #daily hash
+    if (window.location.hash === '#daily' || (window.location.search && window.location.search.includes('mode=daily'))) {
+      const daily = getDailyIncident();
+      return {
+        gameMode: 'DAILY',
+        isDailyDirect: true,
+        author: 'Daily Incident Director',
+        levelIdx: 0,
+        survivalWave: 1,
+        nodes: JSON.parse(JSON.stringify(daily.initialNodes)),
+        edges: JSON.parse(JSON.stringify(daily.initialEdges))
+      };
+    }
+
     let encoded = null;
     if (window.location.hash) {
       const hashStr = window.location.hash.replace(/^#/, '');
@@ -880,7 +1035,7 @@ function getChallengeFromUrl() {
     const parsed = decodeChallengePayload(decodeURIComponent(encoded));
     if (parsed && Array.isArray(parsed.n) && Array.isArray(parsed.e)) {
       const validMode =
-        parsed.m === 'SURVIVAL' || parsed.m === 'SANDBOX' || parsed.m === 'CAMPAIGN' ? parsed.m : 'CAMPAIGN';
+        parsed.m === 'SURVIVAL' || parsed.m === 'SANDBOX' || parsed.m === 'DAILY' || parsed.m === 'CAMPAIGN' ? parsed.m : 'CAMPAIGN';
       const validLevel =
         typeof parsed.l === 'number' && parsed.l >= 0 && parsed.l < CAMPAIGN_LEVELS.length ? parsed.l : 0;
       return {
@@ -921,8 +1076,14 @@ function getChallengeFromUrl() {
 
 // Helper to load saved topology from localStorage with fallback to default scenario layout
 function getSavedTopology(mode, levelIdx) {
+  const daily = getDailyIncident();
   try {
-    const key = mode === 'CAMPAIGN' ? `systemsaviour_arch_CAMPAIGN_${levelIdx}` : `systemsaviour_arch_${mode}`;
+    const key =
+      mode === 'CAMPAIGN'
+        ? `systemsaviour_arch_CAMPAIGN_${levelIdx}`
+        : mode === 'DAILY'
+        ? `systemsaviour_arch_DAILY_${daily.dayNumber}`
+        : `systemsaviour_arch_${mode}`;
     const raw = localStorage.getItem(key);
     if (raw) {
       const parsed = JSON.parse(raw);
@@ -935,7 +1096,12 @@ function getSavedTopology(mode, levelIdx) {
   }
 
   // Fallbacks:
-  if (mode === 'CAMPAIGN') {
+  if (mode === 'DAILY') {
+    return {
+      nodes: JSON.parse(JSON.stringify(daily.initialNodes)),
+      edges: JSON.parse(JSON.stringify(daily.initialEdges))
+    };
+  } else if (mode === 'CAMPAIGN') {
     const lvl = CAMPAIGN_LEVELS[levelIdx] || CAMPAIGN_LEVELS[0];
     return {
       nodes: JSON.parse(JSON.stringify(lvl.initialNodes)),
@@ -1076,6 +1242,50 @@ function ConfettiOverlay() {
 // ============================================================================
 export default function App() {
   const initialChallengeRef = useRef(getChallengeFromUrl());
+  const dailyIncident = useMemo(() => getDailyIncident(), []);
+
+  // Daily Streak and Today's completion state
+  const [dailyStreak, setDailyStreak] = useState(() => {
+    try {
+      const s = localStorage.getItem('systemsaviour_daily_streak');
+      return s ? parseInt(s, 10) : 0;
+    } catch {
+      return 0;
+    }
+  });
+
+  const [isDailyCompletedToday, setIsDailyCompletedToday] = useState(() => {
+    try {
+      const lastDate = localStorage.getItem('systemsaviour_daily_last_completed_date');
+      return lastDate === dailyIncident.dateKey;
+    } catch {
+      return false;
+    }
+  });
+
+  const recordDailyCompletion = useCallback((p99) => {
+    try {
+      const today = dailyIncident.dateKey;
+      const lastDate = localStorage.getItem('systemsaviour_daily_last_completed_date');
+      let newStreak = dailyStreak;
+      if (lastDate !== today) {
+        const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+        newStreak = lastDate === yesterday ? dailyStreak + 1 : 1;
+        localStorage.setItem('systemsaviour_daily_streak', newStreak.toString());
+        localStorage.setItem('systemsaviour_daily_last_completed_date', today);
+        setDailyStreak(newStreak);
+        setIsDailyCompletedToday(true);
+      }
+      const bestKey = `systemsaviour_daily_best_${dailyIncident.dayNumber}`;
+      const prevBest = localStorage.getItem(bestKey);
+      if (!prevBest || p99 < parseFloat(prevBest)) {
+        localStorage.setItem(bestKey, p99.toString());
+      }
+    } catch (err) {
+      console.warn('Failed recording daily completion:', err);
+    }
+  }, [dailyIncident, dailyStreak]);
+
   const [activeChallengeBanner, setActiveChallengeBanner] = useState(() => {
     if (initialChallengeRef.current) {
       return {
@@ -1094,7 +1304,7 @@ export default function App() {
     }
     try {
       const saved = localStorage.getItem('systemsaviour_active_mode');
-      return saved === 'SURVIVAL' || saved === 'SANDBOX' || saved === 'CAMPAIGN' ? saved : 'CAMPAIGN';
+      return saved === 'SURVIVAL' || saved === 'SANDBOX' || saved === 'DAILY' || saved === 'CAMPAIGN' ? saved : 'CAMPAIGN';
     } catch {
       return 'CAMPAIGN';
     }
@@ -1113,7 +1323,10 @@ export default function App() {
     }
   });
 
-  const currentLevel = CAMPAIGN_LEVELS[currentLevelIdx];
+  const currentLevel = useMemo(() => {
+    if (gameMode === 'DAILY') return dailyIncident;
+    return CAMPAIGN_LEVELS[currentLevelIdx] || CAMPAIGN_LEVELS[0];
+  }, [gameMode, currentLevelIdx, dailyIncident]);
 
   // Topology State (Restored from URL challenge or localStorage)
   const [nodes, setNodes] = useState(() => {
@@ -1123,7 +1336,7 @@ export default function App() {
     const initMode = (() => {
       try {
         const saved = localStorage.getItem('systemsaviour_active_mode');
-        return saved === 'SURVIVAL' || saved === 'SANDBOX' || saved === 'CAMPAIGN' ? saved : 'CAMPAIGN';
+        return saved === 'SURVIVAL' || saved === 'SANDBOX' || saved === 'DAILY' || saved === 'CAMPAIGN' ? saved : 'CAMPAIGN';
       } catch { return 'CAMPAIGN'; }
     })();
     const initLvl = (() => {
@@ -1143,7 +1356,7 @@ export default function App() {
     const initMode = (() => {
       try {
         const saved = localStorage.getItem('systemsaviour_active_mode');
-        return saved === 'SURVIVAL' || saved === 'SANDBOX' || saved === 'CAMPAIGN' ? saved : 'CAMPAIGN';
+        return saved === 'SURVIVAL' || saved === 'SANDBOX' || saved === 'DAILY' || saved === 'CAMPAIGN' ? saved : 'CAMPAIGN';
       } catch { return 'CAMPAIGN'; }
     })();
     const initLvl = (() => {
@@ -1391,7 +1604,12 @@ export default function App() {
   useEffect(() => {
     if (!nodes || nodes.length === 0) return;
     try {
-      const key = gameMode === 'CAMPAIGN' ? `systemsaviour_arch_CAMPAIGN_${currentLevelIdx}` : `systemsaviour_arch_${gameMode}`;
+      const key =
+        gameMode === 'CAMPAIGN'
+          ? `systemsaviour_arch_CAMPAIGN_${currentLevelIdx}`
+          : gameMode === 'DAILY'
+          ? `systemsaviour_arch_DAILY_${dailyIncident.dayNumber}`
+          : `systemsaviour_arch_${gameMode}`;
       localStorage.setItem(key, JSON.stringify({ nodes, edges, savedAt: Date.now() }));
       localStorage.setItem('systemsaviour_active_mode', gameMode);
       if (gameMode === 'CAMPAIGN') {
@@ -1401,7 +1619,7 @@ export default function App() {
     } catch (e) {
       console.warn('Auto-save to localStorage failed:', e);
     }
-  }, [nodes, edges, gameMode, currentLevelIdx]);
+  }, [nodes, edges, gameMode, currentLevelIdx, dailyIncident.dayNumber]);
 
   // Load level when switched (validates unlocked levels and restores saved progress)
   const selectLevel = useCallback((idx) => {
@@ -1440,6 +1658,11 @@ export default function App() {
       setNodes(saved.nodes);
       setEdges(saved.edges);
       setSelectedNodeId(saved.nodes[1]?.id || saved.nodes[0]?.id || 'src');
+    } else if (mode === 'DAILY') {
+      const saved = getSavedTopology('DAILY', 0);
+      setNodes(saved.nodes);
+      setEdges(saved.edges);
+      setSelectedNodeId(saved.nodes[1]?.id || saved.nodes[0]?.id || 'src');
     } else {
       const saved = getSavedTopology(mode, 0);
       setNodes(saved.nodes);
@@ -1451,7 +1674,12 @@ export default function App() {
   // Reset current scenario or sandbox layout back to default starting architecture
   const resetCurrentTopology = () => {
     sound.playClick();
-    const key = gameMode === 'CAMPAIGN' ? `systemsaviour_arch_CAMPAIGN_${currentLevelIdx}` : `systemsaviour_arch_${gameMode}`;
+    const key =
+      gameMode === 'CAMPAIGN'
+        ? `systemsaviour_arch_CAMPAIGN_${currentLevelIdx}`
+        : gameMode === 'DAILY'
+        ? `systemsaviour_arch_DAILY_${dailyIncident.dayNumber}`
+        : `systemsaviour_arch_${gameMode}`;
     try {
       localStorage.removeItem(key);
     } catch (e) {}
@@ -1463,6 +1691,9 @@ export default function App() {
       const lvl = CAMPAIGN_LEVELS[currentLevelIdx];
       defaultNodes = JSON.parse(JSON.stringify(lvl.initialNodes));
       defaultEdges = JSON.parse(JSON.stringify(lvl.initialEdges));
+    } else if (gameMode === 'DAILY') {
+      defaultNodes = JSON.parse(JSON.stringify(dailyIncident.initialNodes));
+      defaultEdges = JSON.parse(JSON.stringify(dailyIncident.initialEdges));
     } else if (gameMode === 'SURVIVAL') {
       defaultNodes = [
         { id: 'src', type: 'SOURCE', x: 50, y: 220, config: {} },
@@ -1622,6 +1853,8 @@ export default function App() {
     const modeName =
       gameMode === 'CAMPAIGN'
         ? CAMPAIGN_LEVELS[currentLevelIdx]?.title?.split(':')[0] || 'Level 1'
+        : gameMode === 'DAILY'
+        ? `Daily Incident #${dailyIncident.dayNumber} (${dailyIncident.dateKey})`
         : gameMode === 'SURVIVAL'
         ? `Survival Wave ${survivalWave}`
         : 'Sandbox Lab';
@@ -1636,17 +1869,18 @@ export default function App() {
       .slice(0, 5)
       .join(' + ');
 
+    const streakLine = gameMode === 'DAILY' ? `\n🔥 Streak: ${dailyStreak} Day${dailyStreak === 1 ? '' : 's'}` : '';
     const challengeUrl = generateChallengeUrl();
 
     return `⚡ System Saviour Distributed Simulator
 🎮 ${modeName} — ${starsEmoji}
 🟢 Availability: ${postMortemModal.uptimePct}%
-⏱️ P99 Latency: ${postMortemModal.p99Latency}ms${postMortemModal.totalCost ? `\n💰 Cost: $${postMortemModal.totalCost}/hr` : ''}
+⏱️ P99 Latency: ${postMortemModal.p99Latency}ms${postMortemModal.totalCost ? `\n💰 Cost: $${postMortemModal.totalCost}/hr` : ''}${streakLine}
 🧠 Stack: ${activeComponents || 'Custom Cluster'}
 
 Can your architecture beat this? Test it in your browser:
 👉 ${challengeUrl}`;
-  }, [postMortemModal, gameMode, currentLevelIdx, survivalWave, nodes, generateChallengeUrl]);
+  }, [postMortemModal, gameMode, currentLevelIdx, survivalWave, nodes, dailyIncident, dailyStreak, generateChallengeUrl]);
 
   const handleCopyScorecard = () => {
     sound.playClick();
@@ -1674,13 +1908,13 @@ Can your architecture beat this? Test it in your browser:
 
   // Calculate live RPS and active traffic mix
   const targetPeakRps = useMemo(() => {
-    if (gameMode === 'CAMPAIGN') return currentLevel.targetRps;
+    if (gameMode === 'CAMPAIGN' || gameMode === 'DAILY') return currentLevel.targetRps;
     if (gameMode === 'SURVIVAL') return 3000 + survivalWave * 2500;
     return sandboxRps;
   }, [gameMode, currentLevel, survivalWave, sandboxRps]);
 
   const activeTrafficMix = useMemo(() => {
-    if (gameMode === 'CAMPAIGN') return currentLevel.trafficMix;
+    if (gameMode === 'CAMPAIGN' || gameMode === 'DAILY') return currentLevel.trafficMix;
     if (gameMode === 'SURVIVAL') {
       const botRatio = Math.min(0.25, survivalWave * 0.04);
       const aiRatio = survivalWave >= 3 ? 0.25 : 0;
@@ -1717,7 +1951,7 @@ Can your architecture beat this? Test it in your browser:
     return Math.round(targetPeakRps * rampFactor * jitter);
   }, [isRunning, waveProgress, targetPeakRps, idleTick]);
 
-  const currentMaxBudget = gameMode === 'CAMPAIGN' ? currentLevel.maxBudgetHr : null;
+  const currentMaxBudget = (gameMode === 'CAMPAIGN' || gameMode === 'DAILY') ? currentLevel.maxBudgetHr : null;
 
   // Run real-time simulation evaluation
   const evaluation = useMemo(() => {
@@ -1725,8 +1959,8 @@ Can your architecture beat this? Test it in your browser:
   }, [nodes, edges, currentLiveRps, activeTrafficMix, currentMaxBudget]);
 
   // Real-time pass criteria evaluation
-  const targetLatency = gameMode === 'CAMPAIGN' ? currentLevel.maxLatencyMs : 250;
-  const targetMinUptime = gameMode === 'CAMPAIGN' ? currentLevel.minUptimePct : 98.0;
+  const targetLatency = (gameMode === 'CAMPAIGN' || gameMode === 'DAILY') ? currentLevel.maxLatencyMs : 250;
+  const targetMinUptime = (gameMode === 'CAMPAIGN' || gameMode === 'DAILY') ? currentLevel.minUptimePct : 98.0;
   const passedLatency = evaluation.p99Latency <= targetLatency;
   const passedUptime = evaluation.uptimePct >= targetMinUptime;
   const passedBudget = !currentMaxBudget || evaluation.totalHourlyCost <= currentMaxBudget;
@@ -1742,8 +1976,8 @@ Can your architecture beat this? Test it in your browser:
         action: 'Check Outage'
       };
     }
-    const targetLat = gameMode === 'CAMPAIGN' ? currentLevel.maxLatencyMs : 250;
-    const targetUptime = gameMode === 'CAMPAIGN' ? currentLevel.minUptimePct : 98.0;
+    const targetLat = (gameMode === 'CAMPAIGN' || gameMode === 'DAILY') ? currentLevel.maxLatencyMs : 250;
+    const targetUptime = (gameMode === 'CAMPAIGN' || gameMode === 'DAILY') ? currentLevel.minUptimePct : 98.0;
     const budgetLimit = currentMaxBudget;
 
     if (evaluation.p99Latency > targetLat) {
@@ -1866,7 +2100,7 @@ Can your architecture beat this? Test it in your browser:
         }
 
         // Radar warning ping & subtle screen shake if system is experiencing severe SLA pressure
-        const targetLat = gameMode === 'CAMPAIGN' ? currentLevel.maxLatencyMs : 250;
+        const targetLat = (gameMode === 'CAMPAIGN' || gameMode === 'DAILY') ? currentLevel.maxLatencyMs : 250;
         if ((evaluation.p99Latency > targetLat || evaluation.uptimePct < 98) && Math.floor(next) % 25 === 0 && Math.floor(prev) % 25 !== 0) {
           sound.playWarning();
           triggerScreenShake(false);
@@ -1877,22 +2111,26 @@ Can your architecture beat this? Test it in your browser:
           sound.stopAmbientDrone();
           // Evaluate wave outcome
           const passedSLA =
-            evaluation.uptimePct >= (gameMode === 'CAMPAIGN' ? currentLevel.minUptimePct : 98.0) &&
-            evaluation.p99Latency <= (gameMode === 'CAMPAIGN' ? currentLevel.maxLatencyMs : 250);
+            evaluation.uptimePct >= ((gameMode === 'CAMPAIGN' || gameMode === 'DAILY') ? currentLevel.minUptimePct : 98.0) &&
+            evaluation.p99Latency <= ((gameMode === 'CAMPAIGN' || gameMode === 'DAILY') ? currentLevel.maxLatencyMs : 250);
           const passedBudget = !currentMaxBudget || evaluation.totalHourlyCost <= currentMaxBudget;
 
-          if (gameMode === 'CAMPAIGN') {
+          if (gameMode === 'CAMPAIGN' || gameMode === 'DAILY') {
             const isWon = passedSLA && passedBudget;
             if (isWon) {
               sound.playVictory();
-              setUnlockedLevelIdx((prev) => {
-                const updated = Math.min(CAMPAIGN_LEVELS.length - 1, Math.max(prev, currentLevelIdx + 1));
-                try {
-                  localStorage.setItem('systemsaviour_unlocked_level', updated.toString());
-                  localStorage.setItem('archquest_unlocked_level', updated.toString());
-                } catch (e) {}
-                return updated;
-              });
+              if (gameMode === 'CAMPAIGN') {
+                setUnlockedLevelIdx((prev) => {
+                  const updated = Math.min(CAMPAIGN_LEVELS.length - 1, Math.max(prev, currentLevelIdx + 1));
+                  try {
+                    localStorage.setItem('systemsaviour_unlocked_level', updated.toString());
+                    localStorage.setItem('archquest_unlocked_level', updated.toString());
+                  } catch (e) {}
+                  return updated;
+                });
+              } else if (gameMode === 'DAILY') {
+                recordDailyCompletion(evaluation.p99Latency);
+              }
             } else {
               sound.playDefeat();
             }
@@ -2269,6 +2507,7 @@ Can your architecture beat this? Test it in your browser:
               className="glass-subpanel text-indigo-300 text-xs font-bold rounded-lg px-2 py-1 outline-none font-display"
             >
               <option value="CAMPAIGN">🎓 Campaign</option>
+              <option value="DAILY">📅 Daily #{dailyIncident.dayNumber} {dailyStreak > 0 ? `🔥${dailyStreak}` : ''}</option>
               <option value="SURVIVAL">🔥 Survival Wave</option>
               <option value="SANDBOX">🧪 Sandbox</option>
             </select>
@@ -2277,7 +2516,11 @@ Can your architecture beat this? Test it in your browser:
           {/* Desktop Mode Switcher */}
           <div className="hidden md:flex glass-subpanel p-1 rounded-xl ml-2">
             {[
-              { id: 'CAMPAIGN', label: '🎓 Campaign (5 Scenarios)' },
+              { id: 'CAMPAIGN', label: '🎓 Campaign' },
+              {
+                id: 'DAILY',
+                label: `📅 Daily #${dailyIncident.dayNumber}${dailyStreak > 0 ? ` (🔥${dailyStreak})` : ''}`
+              },
               { id: 'SURVIVAL', label: '🔥 Survival Wave' },
               { id: 'SANDBOX', label: '🧪 Sandbox Lab' }
             ].map((tab) => (
@@ -3656,17 +3899,38 @@ Can your architecture beat this? Test it in your browser:
           {/* =============================================================== */}
           {/* 1. SCENARIO PROBLEM STATEMENT (TOP OF RIGHT PANEL)              */}
           {/* =============================================================== */}
-          {gameMode === 'CAMPAIGN' ? (
+          {gameMode === 'CAMPAIGN' || gameMode === 'DAILY' ? (
             <div className="glass-subpanel rounded-2xl p-4 space-y-3 shadow-xl">
               {/* Header */}
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 flex items-center gap-1.5">
-                  <AlertTriangle className="w-3 h-3 text-amber-400" />
-                  <span>Problem Statement</span>
-                </span>
-                <span className="text-[11px] font-mono text-indigo-400 font-bold">
-                  {currentLevel.title.split(':')[0]}
-                </span>
+                {gameMode === 'DAILY' ? (
+                  <>
+                    <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 flex items-center gap-1.5">
+                      <Calendar className="w-3 h-3 text-purple-400" />
+                      <span>Daily Incident #{dailyIncident.dayNumber}</span>
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-mono text-amber-400 font-bold">
+                        🔥 Streak: {dailyStreak}d
+                      </span>
+                      {isDailyCompletedToday && (
+                        <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/40 px-2 py-0.5 rounded-lg">
+                          ✅ Solved
+                        </span>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 flex items-center gap-1.5">
+                      <AlertTriangle className="w-3 h-3 text-amber-400" />
+                      <span>Problem Statement</span>
+                    </span>
+                    <span className="text-[11px] font-mono text-indigo-400 font-bold">
+                      {currentLevel.title.split(':')[0]}
+                    </span>
+                  </>
+                )}
               </div>
 
               {/* Title & Core Concept */}
@@ -4615,7 +4879,7 @@ Can your architecture beat this? Test it in your browser:
                 <div className="flex items-center justify-between mb-2.5">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
                     <Layers className="w-4 h-4 text-purple-400" />
-                    <span>3 Game Modes Available</span>
+                    <span>4 Game Modes Available</span>
                   </h3>
                   {audioTourState.isPlaying && audioTourState.currentStepIdx === 3 && (
                     <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-400 text-slate-950 font-bold flex items-center gap-1 animate-pulse">
@@ -4625,21 +4889,21 @@ Can your architecture beat this? Test it in your browser:
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   {/* Campaign */}
                   <div className="p-4 rounded-2xl bg-slate-950/30 backdrop-blur-sm border border-indigo-500/30 flex flex-col justify-between space-y-3">
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
-                        <span className="font-bold text-sm text-indigo-300">🎓 1. Campaign Mode</span>
+                        <span className="font-bold text-sm text-indigo-300">🎓 1. Campaign</span>
                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-200">
-                          Progressive Lock
+                          5 Levels
                         </span>
                       </div>
                       <p className="text-xs text-slate-400 leading-relaxed">
-                        5 progressive real-world scenarios: Viral Launch ➔ Influencer CDN ➔ Black Friday Checkout ➔ Bot Attack ➔ Global AI Search.
+                        Progressive real-world scenarios: Viral Launch ➔ Influencer CDN ➔ Black Friday ➔ DDoS ➔ AI Copilot.
                       </p>
                       <div className="text-[11px] text-amber-300/90 pt-1 border-t border-slate-800/80">
-                        🔒 <strong>Progression Rule:</strong> Each level stays locked until you pass the preceding scenario&apos;s SLA and budget!
+                        🔒 <strong>Rule:</strong> Clear preceding SLAs to unlock!
                       </div>
                     </div>
                     <button
@@ -4651,7 +4915,37 @@ Can your architecture beat this? Test it in your browser:
                       className="w-full py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition shadow flex items-center justify-center gap-1.5"
                     >
                       <Target className="w-3.5 h-3.5" />
-                      <span>Select Level &amp; View Targets &rarr;</span>
+                      <span>Select Level &rarr;</span>
+                    </button>
+                  </div>
+
+                  {/* Daily Incident Challenge */}
+                  <div className="p-4 rounded-2xl bg-slate-950/30 backdrop-blur-sm border border-purple-500/40 flex flex-col justify-between space-y-3">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-sm text-purple-300">📅 2. Daily Incident</span>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-200">
+                          Rotates 24h
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 leading-relaxed">
+                        Deterministic 24h global outage challenge! Build daily streaks and share Wordle-style scorecards.
+                      </p>
+                      <div className="text-[11px] text-purple-300/90 pt-1 border-t border-slate-800/80 flex items-center justify-between">
+                        <span>🔥 Streak: {dailyStreak}d</span>
+                        {isDailyCompletedToday && <span className="text-emerald-400 font-bold">✅ Solved</span>}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        introAudioTour.stop();
+                        setShowWelcomeModal(false);
+                        setLevelBriefingModal({ mode: 'DAILY' });
+                      }}
+                      className="w-full py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition shadow flex items-center justify-center gap-1.5"
+                    >
+                      <Calendar className="w-3.5 h-3.5" />
+                      <span>Daily Briefing &rarr;</span>
                     </button>
                   </div>
 
@@ -4663,19 +4957,19 @@ Can your architecture beat this? Test it in your browser:
                           <img
                             src={chaosMonkeyImg}
                             alt="Chaos Monkey"
-                            className="w-6 h-6 rounded-lg object-cover ring-1 ring-amber-400"
+                            className="w-5 h-5 rounded-lg object-cover ring-1 ring-amber-400"
                           />
-                          <span className="font-bold text-sm text-amber-300">2. Survival Wave</span>
+                          <span className="font-bold text-sm text-amber-300">3. Survival Wave</span>
                         </div>
                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-200">
-                          Chaos Mode
+                          Chaos
                         </span>
                       </div>
                       <p className="text-xs text-slate-400 leading-relaxed">
-                        Endless scaling stress test waves! Traffic surges by +2,500 RPS each wave while <strong>Chaos Monkey</strong> injects random server crashes and bot swarms.
+                        Endless scaling stress test waves! Traffic surges by +2,500 RPS while Chaos Monkey randomly terminates servers.
                       </p>
                       <div className="text-[11px] text-slate-400 pt-1 border-t border-slate-800/80">
-                        ⚡ <strong>Goal:</strong> Test your cluster&apos;s breaking point. How many waves can you survive?
+                        ⚡ <strong>Goal:</strong> How many waves can you survive?
                       </div>
                     </div>
                     <button
@@ -4687,7 +4981,7 @@ Can your architecture beat this? Test it in your browser:
                       className="w-full py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs transition shadow flex items-center justify-center gap-1.5"
                     >
                       <Flame className="w-3.5 h-3.5" />
-                      <span>Inspect Survival Targets &rarr;</span>
+                      <span>Survival Targets &rarr;</span>
                     </button>
                   </div>
 
@@ -4695,16 +4989,16 @@ Can your architecture beat this? Test it in your browser:
                   <div className="p-4 rounded-2xl bg-slate-950/30 backdrop-blur-sm border border-emerald-500/30 flex flex-col justify-between space-y-3">
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
-                        <span className="font-bold text-sm text-emerald-300">🧪 3. Sandbox Lab</span>
+                        <span className="font-bold text-sm text-emerald-300">🧪 4. Sandbox Lab</span>
                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-200">
-                          Unrestricted
+                          Freeform
                         </span>
                       </div>
                       <p className="text-xs text-slate-400 leading-relaxed">
-                        Freeform open architect workbench. Zero budget ceilings, custom traffic slider from 1,000 to 35,000+ RPS, and all 11 components unlocked.
+                        Freeform open architect workbench. Zero budget ceilings, custom traffic slider from 1k to 35k+ RPS.
                       </p>
                       <div className="text-[11px] text-slate-400 pt-1 border-t border-slate-800/80">
-                        🛠️ <strong>Freedom:</strong> Experiment freely with sharding, caching, and GPU AI inference pipelines.
+                        🛠️ <strong>Freedom:</strong> Sharding, caching &amp; AI vector pipelines.
                       </div>
                     </div>
                     <button
@@ -4716,7 +5010,7 @@ Can your architecture beat this? Test it in your browser:
                       className="w-full py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold text-xs transition shadow flex items-center justify-center gap-1.5"
                     >
                       <Sliders className="w-3.5 h-3.5" />
-                      <span>Review Sandbox Specs &rarr;</span>
+                      <span>Open Sandbox &rarr;</span>
                     </button>
                   </div>
                 </div>
@@ -4785,7 +5079,7 @@ Can your architecture beat this? Test it in your browser:
       {levelBriefingModal && (() => {
         const modalMode = levelBriefingModal.mode;
         const selectedLvlIdx = levelBriefingModal.levelIdx !== undefined ? levelBriefingModal.levelIdx : currentLevelIdx;
-        const selectedLvl = CAMPAIGN_LEVELS[selectedLvlIdx] || CAMPAIGN_LEVELS[0];
+        const selectedLvl = modalMode === 'DAILY' ? dailyIncident : (CAMPAIGN_LEVELS[selectedLvlIdx] || CAMPAIGN_LEVELS[0]);
 
         return (
           <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
@@ -4859,6 +5153,30 @@ Can your architecture beat this? Test it in your browser:
                     })}
                   </div>
                 </div>
+              ) : modalMode === 'DAILY' ? (
+                <div className="flex items-center gap-3.5 mb-4 p-4 rounded-2xl bg-gradient-to-r from-purple-950/80 via-slate-900 to-indigo-950/80 border border-purple-500/40 shadow-xl">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-purple-500/20 border border-purple-400 flex items-center justify-center text-purple-300 shrink-0">
+                    <Calendar className="w-8 h-8" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40">
+                        Rotates Every 24h UTC
+                      </span>
+                      <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                        🔥 Streak: {dailyStreak} Day{dailyStreak === 1 ? '' : 's'}
+                      </span>
+                      {isDailyCompletedToday && (
+                        <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                          ✅ Cleared Today
+                        </span>
+                      )}
+                    </div>
+                    <h2 className="text-lg sm:text-2xl font-black text-white tracking-tight mt-1 truncate">
+                      {dailyIncident.title}
+                    </h2>
+                  </div>
+                </div>
               ) : modalMode === 'SURVIVAL' ? (
                 <div className="flex items-center gap-3.5 mb-4 p-4 rounded-2xl bg-gradient-to-r from-amber-950/80 via-slate-900 to-rose-950/80 border border-amber-500/40 shadow-xl">
                   <img
@@ -4910,7 +5228,7 @@ Can your architecture beat this? Test it in your browser:
                     <span>Mission Scenario</span>
                   </div>
                   <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                    {modalMode === 'CAMPAIGN'
+                    {modalMode === 'CAMPAIGN' || modalMode === 'DAILY'
                       ? selectedLvl.brief
                       : modalMode === 'SURVIVAL'
                       ? 'Endless scaling stress test waves! Traffic surges by +2,500 RPS each wave while Chaos Monkey randomly terminates active servers and unleashes DDoS bot swarms. Test your cluster failover resilience and see how many waves you can withstand.'
@@ -4934,14 +5252,14 @@ Can your architecture beat this? Test it in your browser:
                     <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col justify-between">
                       <span className="text-[10px] text-slate-400 font-bold uppercase">Peak Traffic</span>
                       <div className="text-base sm:text-lg font-black font-mono text-cyan-300 mt-1">
-                        {modalMode === 'CAMPAIGN'
+                        {modalMode === 'CAMPAIGN' || modalMode === 'DAILY'
                           ? `${selectedLvl.targetRps.toLocaleString()} RPS`
                           : modalMode === 'SURVIVAL'
                           ? '3,000+ RPS'
                           : 'Up to 35k RPS'}
                       </div>
                       <span className="text-[10px] text-slate-500 mt-1">
-                        {modalMode === 'CAMPAIGN' ? 'Client request surge' : modalMode === 'SURVIVAL' ? '+2.5k RPS / wave' : 'Adjustable slider'}
+                        {modalMode === 'CAMPAIGN' || modalMode === 'DAILY' ? 'Client request surge' : modalMode === 'SURVIVAL' ? '+2.5k RPS / wave' : 'Adjustable slider'}
                       </span>
                     </div>
 
@@ -4949,7 +5267,7 @@ Can your architecture beat this? Test it in your browser:
                     <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col justify-between">
                       <span className="text-[10px] text-slate-400 font-bold uppercase">P99 Latency SLA</span>
                       <div className="text-base sm:text-lg font-black font-mono text-indigo-300 mt-1">
-                        {modalMode === 'CAMPAIGN' ? `< ${selectedLvl.maxLatencyMs} ms` : modalMode === 'SURVIVAL' ? '< 250 ms' : 'Live Benchmark'}
+                        {modalMode === 'CAMPAIGN' || modalMode === 'DAILY' ? `< ${selectedLvl.maxLatencyMs} ms` : modalMode === 'SURVIVAL' ? '< 250 ms' : 'Live Benchmark'}
                       </div>
                       <span className="text-[10px] text-slate-500 mt-1">
                         {modalMode === 'SANDBOX' ? 'Telemetry tracking' : 'Max allowable SLA'}
@@ -4960,7 +5278,7 @@ Can your architecture beat this? Test it in your browser:
                     <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col justify-between">
                       <span className="text-[10px] text-slate-400 font-bold uppercase">Uptime SLA</span>
                       <div className="text-base sm:text-lg font-black font-mono text-emerald-300 mt-1">
-                        {modalMode === 'CAMPAIGN' ? `≥ ${selectedLvl.minUptimePct}%` : modalMode === 'SURVIVAL' ? '≥ 98.0%' : 'Live Telemetry'}
+                        {modalMode === 'CAMPAIGN' || modalMode === 'DAILY' ? `≥ ${selectedLvl.minUptimePct}%` : modalMode === 'SURVIVAL' ? '≥ 98.0%' : 'Live Telemetry'}
                       </div>
                       <span className="text-[10px] text-slate-500 mt-1">
                         Zero dropped requests
@@ -4971,17 +5289,17 @@ Can your architecture beat this? Test it in your browser:
                     <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col justify-between">
                       <span className="text-[10px] text-slate-400 font-bold uppercase">Hourly Budget</span>
                       <div className="text-base sm:text-lg font-black font-mono text-amber-300 mt-1">
-                        {modalMode === 'CAMPAIGN' ? `≤ $${selectedLvl.maxBudgetHr}/hr` : 'Unlimited ($∞)'}
+                        {modalMode === 'CAMPAIGN' || modalMode === 'DAILY' ? `≤ $${selectedLvl.maxBudgetHr}/hr` : 'Unlimited ($∞)'}
                       </div>
                       <span className="text-[10px] text-slate-500 mt-1">
-                        {modalMode === 'CAMPAIGN' ? 'Cost SLA constraint' : 'Zero budget limit'}
+                        {modalMode === 'CAMPAIGN' || modalMode === 'DAILY' ? 'Cost SLA constraint' : 'Zero budget limit'}
                       </span>
                     </div>
                   </div>
                 </div>
 
-                {/* Traffic Breakdown for Campaign */}
-                {modalMode === 'CAMPAIGN' && (
+                {/* Traffic Breakdown for Campaign & Daily */}
+                {(modalMode === 'CAMPAIGN' || modalMode === 'DAILY') && (
                   <div>
                     <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
                       Incoming Traffic Composition:
@@ -5057,6 +5375,8 @@ Can your architecture beat this? Test it in your browser:
                   className={`px-6 py-2.5 rounded-xl font-black text-xs shadow-xl transition flex items-center gap-2 ${
                     modalMode === 'CAMPAIGN'
                       ? 'bg-gradient-to-r from-indigo-500 via-indigo-600 to-purple-600 hover:from-indigo-400 hover:to-purple-500 text-white shadow-indigo-500/30'
+                      : modalMode === 'DAILY'
+                      ? 'bg-gradient-to-r from-purple-500 via-indigo-600 to-pink-600 hover:from-purple-400 hover:to-pink-500 text-white shadow-purple-500/30'
                       : modalMode === 'SURVIVAL'
                       ? 'bg-gradient-to-r from-amber-500 to-rose-600 hover:from-amber-400 hover:to-rose-500 text-white shadow-amber-500/30'
                       : 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-emerald-500/30'
@@ -5065,6 +5385,8 @@ Can your architecture beat this? Test it in your browser:
                   <span>
                     {modalMode === 'CAMPAIGN'
                       ? `🚀 Open Game Arena for Level ${selectedLvl.id}`
+                      : modalMode === 'DAILY'
+                      ? `📅 Enter Daily Incident Arena #${dailyIncident.dayNumber}`
                       : modalMode === 'SURVIVAL'
                       ? '🔥 Open Survival Arena & Challenge Chaos Monkey'
                       : '🧪 Open Sandbox Arena & Build Architecture'}
