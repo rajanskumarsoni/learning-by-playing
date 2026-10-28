@@ -1024,6 +1024,24 @@ export default function App() {
     }
   }, [showWelcomeModal]);
 
+  // Auto-scroll welcome modal pane to active card when voice tour plays
+  useEffect(() => {
+    if (showWelcomeModal && audioTourState.isPlaying) {
+      const stepIds = [
+        'intro-header-card',
+        'intro-video-card',
+        'intro-learning-grid',
+        'intro-modes-grid',
+        'intro-footer-card'
+      ];
+      const targetId = stepIds[audioTourState.currentStepIdx];
+      if (targetId) {
+        const el = document.getElementById(targetId);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+  }, [showWelcomeModal, audioTourState.isPlaying, audioTourState.currentStepIdx]);
+
   // Simulation State
   const [isRunning, setIsRunning] = useState(false);
   const [simSpeed, setSimSpeed] = useState(1);
@@ -3774,24 +3792,26 @@ export default function App() {
             </span>
           </div>
 
-          {/* Transparent Glass Info Pane */}
-          <div className="relative max-w-3xl xl:max-w-4xl w-full bg-slate-950/30 border border-indigo-400/35 rounded-3xl p-6 sm:p-8 shadow-[0_0_60px_rgba(0,0,0,0.6)] my-auto text-slate-100 max-h-[92vh] flex flex-col z-30 backdrop-blur-sm">
-            {/* Close Button */}
-            <button
-              onClick={() => {
-                introAudioTour.stop();
-                setShowWelcomeModal(false);
-              }}
-              className="absolute top-5 right-5 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800/50 transition z-10"
-              title="Close Guide"
-            >
-              <X className="w-5 h-5" />
-            </button>
+          {/* Transparent Glass Info Pane (Entire Content Scrollable) */}
+          <div className="relative max-w-3xl xl:max-w-4xl w-full bg-slate-950/40 border border-indigo-400/35 rounded-3xl p-5 sm:p-7 shadow-[0_0_60px_rgba(0,0,0,0.6)] my-auto text-slate-100 max-h-[90vh] overflow-y-auto z-30 backdrop-blur-md space-y-4">
+            {/* Sticky Floating Close Button */}
+            <div className="sticky top-0 z-50 flex justify-end -mt-1 -mr-1 pointer-events-none">
+              <button
+                onClick={() => {
+                  introAudioTour.stop();
+                  setShowWelcomeModal(false);
+                }}
+                className="pointer-events-auto p-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 text-slate-400 hover:text-white transition shadow-xl backdrop-blur-md active:scale-95"
+                title="Close Guide"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
             {/* Modal Header with Ada Mentor Briefing (Transparent Glass) */}
             <div
               id="intro-header-card"
-              className={`flex items-start sm:items-center gap-4 mb-3 p-4 rounded-2xl bg-indigo-950/25 backdrop-blur-sm border shadow-lg shrink-0 transition-all duration-300 ${
+              className={`flex items-start sm:items-center gap-4 mb-3 p-4 rounded-2xl bg-indigo-950/25 backdrop-blur-sm border shadow-lg transition-all duration-300 ${
                 audioTourState.isPlaying && audioTourState.currentStepIdx === 0
                   ? 'border-cyan-400 ring-2 ring-cyan-400/80 shadow-cyan-500/30'
                   : 'border-cyan-500/30'
@@ -3833,7 +3853,7 @@ export default function App() {
                   sound.unlockAudio();
                   setIsAudioActive(true);
                 }}
-                className="mb-3 px-3.5 py-2.5 rounded-2xl bg-amber-950/25 backdrop-blur-sm border border-amber-400/60 shadow-lg shadow-amber-950/30 flex items-center justify-between gap-3 cursor-pointer hover:border-amber-300 transition-all group animate-pulse shrink-0"
+                className="mb-3 px-3.5 py-2.5 rounded-2xl bg-amber-950/25 backdrop-blur-sm border border-amber-400/60 shadow-lg shadow-amber-950/30 flex items-center justify-between gap-3 cursor-pointer hover:border-amber-300 transition-all group animate-pulse"
               >
                 <div className="flex items-center gap-2.5">
                   <div className="w-7 h-7 rounded-lg bg-amber-400 text-slate-950 flex items-center justify-center font-bold">
@@ -3864,7 +3884,7 @@ export default function App() {
             )}
 
             {/* Audio Mode Guide & Saviour Music Control Bar (Transparent Glass) */}
-            <div className="mb-4 rounded-2xl bg-slate-950/30 backdrop-blur-sm border border-indigo-500/25 p-2.5 sm:p-3 shadow-lg flex flex-wrap items-center justify-between gap-2.5 shrink-0">
+            <div className="mb-4 rounded-2xl bg-slate-950/30 backdrop-blur-sm border border-indigo-500/25 p-2.5 sm:p-3 shadow-lg flex flex-wrap items-center justify-between gap-2.5">
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="relative shrink-0">
                   <div className={`w-9 h-9 rounded-xl flex items-center justify-center border transition-all ${
@@ -3989,8 +4009,8 @@ export default function App() {
               </div>
             </div>
 
-            {/* Modal Body (Scrollable) */}
-            <div className="flex-1 overflow-y-auto space-y-6 pr-2 min-h-0 text-xs sm:text-sm">
+            {/* Modal Body (Scrolls together seamlessly) */}
+            <div className="space-y-6 text-xs sm:text-sm">
               {/* Gameplay Preview Video Section (First Level Demo - Transparent Glass) */}
               <div
                 id="intro-video-card"
@@ -4259,7 +4279,7 @@ export default function App() {
             </div>
 
             {/* Modal Footer CTA */}
-            <div className="pt-4 mt-4 border-t border-slate-800/60 flex flex-wrap items-center justify-between gap-3 shrink-0">
+            <div className="pt-4 mt-4 border-t border-slate-800/60 flex flex-wrap items-center justify-between gap-3">
               <span className="text-xs text-slate-400 flex items-center gap-1.5">
                 <Info className="w-4 h-4 text-indigo-400 shrink-0" />
                 <span>Choose any game mode above to inspect its <strong>mission targets &amp; level briefing</strong> before entering the arena.</span>
