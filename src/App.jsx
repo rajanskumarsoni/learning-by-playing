@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import {
   Server, Database, Shield, Globe, Cpu, Layers, Activity, Zap, Play, Pause,
   RotateCcw, AlertTriangle, CheckCircle2, HelpCircle, Github, Plus, Trash2,
-  Settings, Award, Terminal, Flame, ChevronRight, Copy, Check, Download,
+  Settings, Award, Terminal, Flame, ChevronRight, Copy, Check, Download, Upload,
   FastForward, Eye, Sliders, Share2, Lock, Unlock, Box, HardDrive, Network,
   ArrowRight, Sparkles, Info, X, RefreshCw, ZoomIn, ZoomOut, Maximize2, Move,
   BookOpen, Search, Bot, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
@@ -823,20 +823,128 @@ function evaluateArchitecture(nodes, edges, incomingRps, trafficMix, maxBudgetHr
   };
 }
 
+// Helper to load saved topology from localStorage with fallback to default scenario layout
+function getSavedTopology(mode, levelIdx) {
+  try {
+    const key = mode === 'CAMPAIGN' ? `systemsaviour_arch_CAMPAIGN_${levelIdx}` : `systemsaviour_arch_${mode}`;
+    const raw = localStorage.getItem(key);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed.nodes) && Array.isArray(parsed.edges) && parsed.nodes.length > 0) {
+        return { nodes: parsed.nodes, edges: parsed.edges };
+      }
+    }
+  } catch (e) {
+    console.error('Error reading saved architecture from localStorage:', e);
+  }
+
+  // Fallbacks:
+  if (mode === 'CAMPAIGN') {
+    const lvl = CAMPAIGN_LEVELS[levelIdx] || CAMPAIGN_LEVELS[0];
+    return {
+      nodes: JSON.parse(JSON.stringify(lvl.initialNodes)),
+      edges: JSON.parse(JSON.stringify(lvl.initialEdges))
+    };
+  } else if (mode === 'SURVIVAL') {
+    return {
+      nodes: [
+        { id: 'src', type: 'SOURCE', x: 50, y: 220, config: {} },
+        { id: 'lb-1', type: 'LB', x: 260, y: 220, config: { algorithm: 0 } },
+        { id: 'web-1', type: 'WEB', x: 480, y: 220, config: { tier: 1 } },
+        { id: 'sql-1', type: 'SQL', x: 760, y: 220, config: { scaling: 0 } }
+      ],
+      edges: [
+        { id: 'e1', from: 'src', to: 'lb-1' },
+        { id: 'e2', from: 'lb-1', to: 'web-1' },
+        { id: 'e3', from: 'web-1', to: 'sql-1' }
+      ]
+    };
+  } else {
+    return {
+      nodes: [
+        { id: 'src', type: 'SOURCE', x: 50, y: 220, config: {} },
+        { id: 'cdn-1', type: 'CDN', x: 230, y: 220, config: { hitRatio: 1 } },
+        { id: 'lb-1', type: 'LB', x: 410, y: 220, config: { algorithm: 1 } },
+        { id: 'web-1', type: 'WEB', x: 590, y: 220, config: { tier: 1 } },
+        { id: 'cache-1', type: 'REDIS', x: 770, y: 150, config: { cacheSize: 1 } },
+        { id: 'sql-1', type: 'SQL', x: 770, y: 290, config: { scaling: 0 } }
+      ],
+      edges: [
+        { id: 'e1', from: 'src', to: 'cdn-1' },
+        { id: 'e2', from: 'cdn-1', to: 'lb-1' },
+        { id: 'e3', from: 'lb-1', to: 'web-1' },
+        { id: 'e4', from: 'web-1', to: 'cache-1' },
+        { id: 'e5', from: 'web-1', to: 'sql-1' }
+      ]
+    };
+  }
+}
+
 // ============================================================================
 // 5. MAIN REACT APPLICATION COMPONENT
 // ============================================================================
 export default function App() {
-  // Mode & Level State
-  const [gameMode, setGameMode] = useState('CAMPAIGN'); // 'CAMPAIGN' | 'SURVIVAL' | 'SANDBOX'
-  const [currentLevelIdx, setCurrentLevelIdx] = useState(0);
+  // Mode & Level State (Persisted in localStorage)
+  const [gameMode, setGameMode] = useState(() => {
+    try {
+      const saved = localStorage.getItem('systemsaviour_active_mode');
+      return saved === 'SURVIVAL' || saved === 'SANDBOX' || saved === 'CAMPAIGN' ? saved : 'CAMPAIGN';
+    } catch {
+      return 'CAMPAIGN';
+    }
+  });
+
+  const [currentLevelIdx, setCurrentLevelIdx] = useState(() => {
+    try {
+      const saved = localStorage.getItem('systemsaviour_active_level');
+      const idx = saved !== null ? parseInt(saved, 10) : 0;
+      return !isNaN(idx) && idx >= 0 && idx < CAMPAIGN_LEVELS.length ? idx : 0;
+    } catch {
+      return 0;
+    }
+  });
+
   const currentLevel = CAMPAIGN_LEVELS[currentLevelIdx];
 
-  // Topology State
-  const [nodes, setNodes] = useState(CAMPAIGN_LEVELS[0].initialNodes);
-  const [edges, setEdges] = useState(CAMPAIGN_LEVELS[0].initialEdges);
+  // Topology State (Restored from localStorage)
+  const [nodes, setNodes] = useState(() => {
+    const initMode = (() => {
+      try {
+        const saved = localStorage.getItem('systemsaviour_active_mode');
+        return saved === 'SURVIVAL' || saved === 'SANDBOX' || saved === 'CAMPAIGN' ? saved : 'CAMPAIGN';
+      } catch { return 'CAMPAIGN'; }
+    })();
+    const initLvl = (() => {
+      try {
+        const saved = localStorage.getItem('systemsaviour_active_level');
+        const idx = saved !== null ? parseInt(saved, 10) : 0;
+        return !isNaN(idx) && idx >= 0 && idx < CAMPAIGN_LEVELS.length ? idx : 0;
+      } catch { return 0; }
+    })();
+    return getSavedTopology(initMode, initLvl).nodes;
+  });
+
+  const [edges, setEdges] = useState(() => {
+    const initMode = (() => {
+      try {
+        const saved = localStorage.getItem('systemsaviour_active_mode');
+        return saved === 'SURVIVAL' || saved === 'SANDBOX' || saved === 'CAMPAIGN' ? saved : 'CAMPAIGN';
+      } catch { return 'CAMPAIGN'; }
+    })();
+    const initLvl = (() => {
+      try {
+        const saved = localStorage.getItem('systemsaviour_active_level');
+        const idx = saved !== null ? parseInt(saved, 10) : 0;
+        return !isNaN(idx) && idx >= 0 && idx < CAMPAIGN_LEVELS.length ? idx : 0;
+      } catch { return 0; }
+    })();
+    return getSavedTopology(initMode, initLvl).edges;
+  });
+
   const [selectedNodeId, setSelectedNodeId] = useState('web-1');
   const [connectingFromId, setConnectingFromId] = useState(null);
+  const [toastNotification, setToastNotification] = useState(null);
+  const [lastSavedTimestamp, setLastSavedTimestamp] = useState(Date.now());
 
   // Progressive Level Unlocking State (Persisted in localStorage)
   const [unlockedLevelIdx, setUnlockedLevelIdx] = useState(() => {
@@ -922,12 +1030,21 @@ export default function App() {
   const [waveProgress, setWaveProgress] = useState(0); // 0 to 100%
   const [chaosActive, setChaosActive] = useState(false);
   const [survivalWave, setSurvivalWave] = useState(1);
+  const [bestSurvivalWave, setBestSurvivalWave] = useState(() => {
+    try {
+      const saved = localStorage.getItem('systemsaviour_best_survival_wave');
+      return saved !== null ? parseInt(saved, 10) : 1;
+    } catch {
+      return 1;
+    }
+  });
   const [sandboxRps, setSandboxRps] = useState(12000);
   const [postMortemModal, setPostMortemModal] = useState(null);
   const [showBeginnerHints, setShowBeginnerHints] = useState(true);
 
   // Canvas Pan, Zoom & Drag State
   const canvasRef = useRef(null);
+  const fileInputRef = useRef(null);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [isPanning, setIsPanning] = useState(false);
@@ -981,15 +1098,34 @@ export default function App() {
     setTimeout(() => setHighlightInspector(false), 2200);
   }, [rightPanelCollapsed]);
 
-  // Load level when switched (validates unlocked levels)
+  // Auto-Save Architecture State to localStorage whenever nodes or edges change
+  useEffect(() => {
+    if (!nodes || nodes.length === 0) return;
+    try {
+      const key = gameMode === 'CAMPAIGN' ? `systemsaviour_arch_CAMPAIGN_${currentLevelIdx}` : `systemsaviour_arch_${gameMode}`;
+      localStorage.setItem(key, JSON.stringify({ nodes, edges, savedAt: Date.now() }));
+      localStorage.setItem('systemsaviour_active_mode', gameMode);
+      if (gameMode === 'CAMPAIGN') {
+        localStorage.setItem('systemsaviour_active_level', currentLevelIdx.toString());
+      }
+      setLastSavedTimestamp(Date.now());
+    } catch (e) {
+      console.warn('Auto-save to localStorage failed:', e);
+    }
+  }, [nodes, edges, gameMode, currentLevelIdx]);
+
+  // Load level when switched (validates unlocked levels and restores saved progress)
   const selectLevel = useCallback((idx) => {
     if (idx > unlockedLevelIdx) return;
     sound.playSelect();
-    const lvl = CAMPAIGN_LEVELS[idx];
     setCurrentLevelIdx(idx);
-    setNodes(JSON.parse(JSON.stringify(lvl.initialNodes)));
-    setEdges(JSON.parse(JSON.stringify(lvl.initialEdges)));
-    setSelectedNodeId(lvl.initialNodes[1]?.id || 'src');
+    try {
+      localStorage.setItem('systemsaviour_active_level', idx.toString());
+    } catch (e) {}
+    const saved = getSavedTopology('CAMPAIGN', idx);
+    setNodes(saved.nodes);
+    setEdges(saved.edges);
+    setSelectedNodeId(saved.nodes[1]?.id || saved.nodes[0]?.id || 'src');
     setConnectingFromId(null);
     setIsRunning(false);
     setWaveProgress(0);
@@ -1001,6 +1137,9 @@ export default function App() {
   const switchMode = (mode) => {
     sound.playSelect();
     setGameMode(mode);
+    try {
+      localStorage.setItem('systemsaviour_active_mode', mode);
+    } catch (e) {}
     setIsRunning(false);
     setWaveProgress(0);
     setPostMortemModal(null);
@@ -1008,23 +1147,47 @@ export default function App() {
     setZoom(1);
 
     if (mode === 'CAMPAIGN') {
-      selectLevel(currentLevelIdx);
-    } else if (mode === 'SURVIVAL') {
-      setSurvivalWave(1);
-      setNodes([
+      const saved = getSavedTopology('CAMPAIGN', currentLevelIdx);
+      setNodes(saved.nodes);
+      setEdges(saved.edges);
+      setSelectedNodeId(saved.nodes[1]?.id || saved.nodes[0]?.id || 'src');
+    } else {
+      const saved = getSavedTopology(mode, 0);
+      setNodes(saved.nodes);
+      setEdges(saved.edges);
+      setSelectedNodeId(saved.nodes[1]?.id || saved.nodes[0]?.id || 'src');
+    }
+  };
+
+  // Reset current scenario or sandbox layout back to default starting architecture
+  const resetCurrentTopology = () => {
+    sound.playClick();
+    const key = gameMode === 'CAMPAIGN' ? `systemsaviour_arch_CAMPAIGN_${currentLevelIdx}` : `systemsaviour_arch_${gameMode}`;
+    try {
+      localStorage.removeItem(key);
+    } catch (e) {}
+
+    let defaultNodes = [];
+    let defaultEdges = [];
+
+    if (gameMode === 'CAMPAIGN') {
+      const lvl = CAMPAIGN_LEVELS[currentLevelIdx];
+      defaultNodes = JSON.parse(JSON.stringify(lvl.initialNodes));
+      defaultEdges = JSON.parse(JSON.stringify(lvl.initialEdges));
+    } else if (gameMode === 'SURVIVAL') {
+      defaultNodes = [
         { id: 'src', type: 'SOURCE', x: 50, y: 220, config: {} },
         { id: 'lb-1', type: 'LB', x: 260, y: 220, config: { algorithm: 0 } },
         { id: 'web-1', type: 'WEB', x: 480, y: 220, config: { tier: 1 } },
         { id: 'sql-1', type: 'SQL', x: 760, y: 220, config: { scaling: 0 } }
-      ]);
-      setEdges([
+      ];
+      defaultEdges = [
         { id: 'e1', from: 'src', to: 'lb-1' },
         { id: 'e2', from: 'lb-1', to: 'web-1' },
         { id: 'e3', from: 'web-1', to: 'sql-1' }
-      ]);
-      setSelectedNodeId('web-1');
-    } else if (mode === 'SANDBOX') {
-      setNodes([
+      ];
+    } else {
+      defaultNodes = [
         { id: 'src', type: 'SOURCE', x: 50, y: 220, config: {} },
         { id: 'cdn-1', type: 'CDN', x: 230, y: 220, config: { hitRatio: 1 } },
         { id: 'lb-1', type: 'LB', x: 410, y: 220, config: { algorithm: 1 } },
@@ -1032,8 +1195,8 @@ export default function App() {
         { id: 'web-2', type: 'WEB', x: 590, y: 300, config: { tier: 1 } },
         { id: 'cache-1', type: 'CACHE', x: 770, y: 220, config: { eviction: 1 } },
         { id: 'sql-1', type: 'SQL', x: 940, y: 220, config: { scaling: 2 } }
-      ]);
-      setEdges([
+      ];
+      defaultEdges = [
         { id: 'e1', from: 'src', to: 'cdn-1' },
         { id: 'e2', from: 'cdn-1', to: 'lb-1' },
         { id: 'e3', from: 'lb-1', to: 'web-1' },
@@ -1041,9 +1204,83 @@ export default function App() {
         { id: 'e5', from: 'web-1', to: 'cache-1' },
         { id: 'e6', from: 'web-2', to: 'cache-1' },
         { id: 'e7', from: 'cache-1', to: 'sql-1' }
-      ]);
-      setSelectedNodeId('web-1');
+      ];
     }
+
+    setNodes(defaultNodes);
+    setEdges(defaultEdges);
+    setSelectedNodeId(defaultNodes[1]?.id || defaultNodes[0]?.id || 'src');
+    setConnectingFromId(null);
+    setIsRunning(false);
+    setWaveProgress(0);
+    setToastNotification({
+      type: 'info',
+      message: 'Layout reset to starting blueprint.'
+    });
+    setTimeout(() => setToastNotification(null), 3000);
+  };
+
+  // Export current architecture graph as a downloadable .json blueprint
+  const exportArchitectureBlueprint = () => {
+    sound.playClick();
+    const blueprint = {
+      appName: 'System Saviour',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      gameMode,
+      levelIdx: currentLevelIdx,
+      levelTitle: gameMode === 'CAMPAIGN' ? CAMPAIGN_LEVELS[currentLevelIdx].title : gameMode,
+      nodes,
+      edges
+    };
+    const blob = new Blob([JSON.stringify(blueprint, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const cleanMode = gameMode.toLowerCase();
+    const fileName = `systemsaviour_${cleanMode}${gameMode === 'CAMPAIGN' ? `_lvl${currentLevelIdx + 1}` : ''}_blueprint.json`;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    setToastNotification({
+      type: 'success',
+      message: `Blueprint downloaded: ${fileName}`
+    });
+    setTimeout(() => setToastNotification(null), 3500);
+  };
+
+  // Import architecture graph from a .json blueprint file
+  const handleImportBlueprintFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = JSON.parse(event.target.result);
+        if (Array.isArray(data.nodes) && Array.isArray(data.edges) && data.nodes.length > 0) {
+          sound.playUpgrade();
+          setNodes(data.nodes);
+          setEdges(data.edges);
+          setSelectedNodeId(data.nodes[0]?.id || null);
+          setIsRunning(false);
+          setWaveProgress(0);
+          setToastNotification({
+            type: 'success',
+            message: `Blueprint loaded: ${data.nodes.length} nodes & ${data.edges.length} wires restored!`
+          });
+          setTimeout(() => setToastNotification(null), 3500);
+        } else {
+          alert('Invalid blueprint format: Must contain nodes and edges arrays.');
+        }
+      } catch (err) {
+        alert('Error parsing JSON blueprint file: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
   };
 
   // Calculate live RPS and active traffic mix
@@ -1282,11 +1519,28 @@ export default function App() {
           } else if (gameMode === 'SURVIVAL') {
             if (passedSLA) {
               sound.playVictory();
-              setSurvivalWave((w) => w + 1);
+              setSurvivalWave((w) => {
+                const nextWave = w + 1;
+                setBestSurvivalWave((prevBest) => {
+                  const updatedBest = Math.max(prevBest, nextWave);
+                  try {
+                    localStorage.setItem('systemsaviour_best_survival_wave', updatedBest.toString());
+                  } catch (e) {}
+                  return updatedBest;
+                });
+                return nextWave;
+              });
               setWaveProgress(0);
               setIsRunning(true);
             } else {
               sound.playDefeat();
+              setBestSurvivalWave((prevBest) => {
+                const updatedBest = Math.max(prevBest, survivalWave);
+                try {
+                  localStorage.setItem('systemsaviour_best_survival_wave', updatedBest.toString());
+                } catch (e) {}
+                return updatedBest;
+              });
               setPostMortemModal({
                 won: false,
                 survivalWave,
@@ -1929,6 +2183,38 @@ export default function App() {
               <span className="font-mono text-[11px] text-slate-300">{Math.round(waveProgress)}%</span>
             </div>
 
+            {/* Auto-Save & Blueprint Controls */}
+            <div className="hidden md:flex items-center gap-1.5 glass-subpanel px-2 py-1 rounded-xl">
+              <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-mono" title="Architectural layout and progress are automatically saved to your browser localStorage">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Auto-Saved
+              </span>
+              <div className="w-px h-3 bg-indigo-500/20" />
+              <button
+                onClick={resetCurrentTopology}
+                className="px-2 py-0.5 rounded text-[11px] text-slate-400 hover:text-white hover:bg-slate-800/80 transition"
+                title="Reset current architecture to initial level blueprint"
+              >
+                Reset
+              </button>
+              <button
+                onClick={exportArchitectureBlueprint}
+                className="px-2 py-0.5 rounded text-[11px] text-slate-400 hover:text-indigo-300 hover:bg-slate-800/80 transition flex items-center gap-1"
+                title="Export blueprint as JSON file"
+              >
+                <Download className="w-3 h-3" />
+                <span>Export</span>
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="px-2 py-0.5 rounded text-[11px] text-slate-400 hover:text-indigo-300 hover:bg-slate-800/80 transition flex items-center gap-1"
+                title="Import blueprint from JSON file"
+              >
+                <Upload className="w-3 h-3" />
+                <span>Import</span>
+              </button>
+            </div>
+
             <button
               onClick={() => setShowBeginnerHints(!showBeginnerHints)}
               className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold flex items-center gap-1.5 transition ${
@@ -2343,14 +2629,43 @@ export default function App() {
             >
               <RotateCcw className="w-3.5 h-3.5" />
             </button>
+            <div className="w-px h-4 bg-indigo-500/20 mx-0.5" />
+            <button
+              onClick={resetCurrentTopology}
+              className="px-2 py-1 rounded-lg bg-slate-800/60 hover:bg-rose-900/40 text-[11px] text-slate-300 hover:text-rose-300 transition flex items-center gap-1 font-medium"
+              title="Reset layout to starting blueprint"
+            >
+              <RotateCcw className="w-3 h-3 text-rose-400" />
+              <span className="hidden sm:inline">Reset Layout</span>
+            </button>
+            <button
+              onClick={exportArchitectureBlueprint}
+              className="px-2 py-1 rounded-lg bg-slate-800/60 hover:bg-indigo-900/50 text-[11px] text-slate-300 hover:text-indigo-300 transition flex items-center gap-1 font-medium"
+              title="Export architecture blueprint (.json)"
+            >
+              <Download className="w-3 h-3 text-indigo-400" />
+              <span className="hidden sm:inline">Export</span>
+            </button>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="px-2 py-1 rounded-lg bg-slate-800/60 hover:bg-indigo-900/50 text-[11px] text-slate-300 hover:text-indigo-300 transition flex items-center gap-1 font-medium"
+              title="Import architecture blueprint (.json)"
+            >
+              <Upload className="w-3 h-3 text-indigo-400" />
+              <span className="hidden sm:inline">Import</span>
+            </button>
           </div>
 
           {/* FLOATING STATUS PILL (BOTTOM-LEFT) */}
           <div className="absolute bottom-16 lg:bottom-3 left-3 z-30 pointer-events-none flex items-center gap-2">
             <div className="glass-pill px-2.5 py-1 rounded-lg text-[10px] text-slate-300 font-mono flex items-center gap-2 shadow-lg">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
               <span>({Math.round(pan.x)}, {Math.round(pan.y)})</span>
               <span className="hidden sm:inline text-slate-400">• Pan anywhere</span>
+            </div>
+            <div className="glass-pill px-2.5 py-1 rounded-lg text-[10px] text-emerald-400 font-mono flex items-center gap-1.5 shadow-lg hidden md:flex" title="Changes auto-saved to browser localStorage">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Auto-Saved</span>
             </div>
           </div>
 
@@ -3073,9 +3388,14 @@ export default function App() {
                   <Flame className="w-3 h-3 text-amber-400" />
                   <span>Survival Mission</span>
                 </span>
-                <span className="text-[11px] font-mono text-amber-400 font-bold">
-                  Wave {survivalWave}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono text-slate-400">
+                    Best: <span className="text-amber-400 font-bold">Wave {bestSurvivalWave}</span>
+                  </span>
+                  <span className="text-[11px] font-mono text-amber-300 font-extrabold bg-amber-950/60 border border-amber-500/40 px-2 py-0.5 rounded-lg">
+                    Wave {survivalWave}
+                  </span>
+                </div>
               </div>
               <h3 className="text-sm font-extrabold text-white">
                 Infinite Escalating Traffic Surge
@@ -4377,6 +4697,25 @@ export default function App() {
           </div>
         );
       })()}
+
+      {/* Hidden File Input for Blueprint Import */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleImportBlueprintFile}
+        accept=".json,application/json"
+        className="hidden"
+      />
+
+      {/* Floating Glass Toast Notification Banner */}
+      {toastNotification && (
+        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 pointer-events-none transition-all duration-300">
+          <div className="px-4 py-2 rounded-xl backdrop-blur-xl bg-slate-900/95 border border-indigo-500/50 text-white text-xs font-semibold shadow-2xl flex items-center gap-2.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+            <span className="text-slate-100">{toastNotification.message}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
