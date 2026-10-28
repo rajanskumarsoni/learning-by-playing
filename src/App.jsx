@@ -6,7 +6,8 @@ import {
   FastForward, Eye, Sliders, Share2, Lock, Unlock, Box, HardDrive, Network,
   ArrowRight, Sparkles, Info, X, RefreshCw, ZoomIn, ZoomOut, Maximize2, Move,
   BookOpen, Search, Bot, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
-  ChevronLeft, Star, Trophy, Radio, Target, Volume2, VolumeX, Music, Headphones, Mic
+  ChevronLeft, Star, Trophy, Radio, Target, Volume2, VolumeX, Music, Headphones, Mic,
+  Link as LinkIcon
 } from 'lucide-react';
 import mentorAdaImg from './assets/mentor_ada.jpg';
 import chaosMonkeyImg from './assets/chaos_monkey.jpg';
@@ -824,6 +825,100 @@ function evaluateArchitecture(nodes, edges, incomingRps, trafficMix, maxBudgetHr
   };
 }
 
+// ============================================================================
+// 4.5. VIRAL CHALLENGE ENCODING & URL DEEP-LINKING HELPERS
+// ============================================================================
+
+// Helper to encode challenge architecture to URL-safe base64
+function encodeChallengePayload(data) {
+  try {
+    const jsonStr = JSON.stringify(data);
+    const bytes = new TextEncoder().encode(jsonStr);
+    let binString = '';
+    for (let i = 0; i < bytes.length; i++) {
+      binString += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binString);
+  } catch (e) {
+    console.error('Failed to encode challenge payload:', e);
+    return null;
+  }
+}
+
+// Helper to decode challenge architecture from URL base64 string
+function decodeChallengePayload(base64Str) {
+  try {
+    const binString = atob(base64Str);
+    const bytes = Uint8Array.from(binString, (m) => m.charCodeAt(0));
+    const jsonStr = new TextDecoder().decode(bytes);
+    return JSON.parse(jsonStr);
+  } catch (e) {
+    console.error('Failed to decode challenge payload:', e);
+    return null;
+  }
+}
+
+// Helper to parse challenge from current URL hash or search params
+function getChallengeFromUrl() {
+  try {
+    if (typeof window === 'undefined') return null;
+    let encoded = null;
+    if (window.location.hash) {
+      const hashStr = window.location.hash.replace(/^#/, '');
+      const hashParams = new URLSearchParams(hashStr);
+      encoded = hashParams.get('challenge');
+      if (!encoded && hashStr.startsWith('challenge=')) {
+        encoded = hashStr.substring('challenge='.length);
+      }
+    }
+    if (!encoded && window.location.search) {
+      const searchParams = new URLSearchParams(window.location.search);
+      encoded = searchParams.get('challenge');
+    }
+    if (!encoded) return null;
+
+    const parsed = decodeChallengePayload(decodeURIComponent(encoded));
+    if (parsed && Array.isArray(parsed.n) && Array.isArray(parsed.e)) {
+      const validMode =
+        parsed.m === 'SURVIVAL' || parsed.m === 'SANDBOX' || parsed.m === 'CAMPAIGN' ? parsed.m : 'CAMPAIGN';
+      const validLevel =
+        typeof parsed.l === 'number' && parsed.l >= 0 && parsed.l < CAMPAIGN_LEVELS.length ? parsed.l : 0;
+      return {
+        gameMode: validMode,
+        levelIdx: validLevel,
+        survivalWave: typeof parsed.w === 'number' ? parsed.w : 1,
+        author: parsed.a || 'Architect',
+        nodes: parsed.n.map((n) => {
+          let nodeType = n.t;
+          if (nodeType === 'REDIS') nodeType = 'CACHE';
+          if (nodeType === 'DATABASE' || nodeType === 'POSTGRES') nodeType = 'SQL';
+          if (!COMPONENT_CATALOG[nodeType]) nodeType = 'WEB';
+          return {
+            id: n.id,
+            type: nodeType,
+            x: n.x,
+            y: n.y,
+            tier: n.tier || 1,
+            config: n.c || {},
+            status: 'healthy',
+            cpu: 0,
+            rps: 0,
+            errors: 0
+          };
+        }),
+        edges: parsed.e.map((e, idx) => ({
+          id: `e-${e.f}-${e.t}-${idx}`,
+          from: e.f,
+          to: e.t
+        }))
+      };
+    }
+  } catch (err) {
+    console.error('Error parsing challenge from URL:', err);
+  }
+  return null;
+}
+
 // Helper to load saved topology from localStorage with fallback to default scenario layout
 function getSavedTopology(mode, levelIdx) {
   try {
@@ -885,8 +980,23 @@ function getSavedTopology(mode, levelIdx) {
 // 5. MAIN REACT APPLICATION COMPONENT
 // ============================================================================
 export default function App() {
-  // Mode & Level State (Persisted in localStorage)
+  const initialChallengeRef = useRef(getChallengeFromUrl());
+  const [activeChallengeBanner, setActiveChallengeBanner] = useState(() => {
+    if (initialChallengeRef.current) {
+      return {
+        author: initialChallengeRef.current.author,
+        levelIdx: initialChallengeRef.current.levelIdx,
+        gameMode: initialChallengeRef.current.gameMode
+      };
+    }
+    return null;
+  });
+
+  // Mode & Level State (Persisted in localStorage or restored from URL challenge)
   const [gameMode, setGameMode] = useState(() => {
+    if (initialChallengeRef.current?.gameMode) {
+      return initialChallengeRef.current.gameMode;
+    }
     try {
       const saved = localStorage.getItem('systemsaviour_active_mode');
       return saved === 'SURVIVAL' || saved === 'SANDBOX' || saved === 'CAMPAIGN' ? saved : 'CAMPAIGN';
@@ -896,6 +1006,9 @@ export default function App() {
   });
 
   const [currentLevelIdx, setCurrentLevelIdx] = useState(() => {
+    if (typeof initialChallengeRef.current?.levelIdx === 'number') {
+      return initialChallengeRef.current.levelIdx;
+    }
     try {
       const saved = localStorage.getItem('systemsaviour_active_level');
       const idx = saved !== null ? parseInt(saved, 10) : 0;
@@ -907,8 +1020,11 @@ export default function App() {
 
   const currentLevel = CAMPAIGN_LEVELS[currentLevelIdx];
 
-  // Topology State (Restored from localStorage)
+  // Topology State (Restored from URL challenge or localStorage)
   const [nodes, setNodes] = useState(() => {
+    if (initialChallengeRef.current?.nodes && initialChallengeRef.current.nodes.length > 0) {
+      return initialChallengeRef.current.nodes;
+    }
     const initMode = (() => {
       try {
         const saved = localStorage.getItem('systemsaviour_active_mode');
@@ -926,6 +1042,9 @@ export default function App() {
   });
 
   const [edges, setEdges] = useState(() => {
+    if (initialChallengeRef.current?.edges && initialChallengeRef.current.edges.length > 0) {
+      return initialChallengeRef.current.edges;
+    }
     const initMode = (() => {
       try {
         const saved = localStorage.getItem('systemsaviour_active_mode');
@@ -957,8 +1076,8 @@ export default function App() {
     }
   });
 
-  // Welcome Screen, Level Targets Briefing & Component Details Modal States
-  const [showWelcomeModal, setShowWelcomeModal] = useState(true);
+  // Welcome Screen, Level Targets Briefing & Component Details Modal States (Skip welcome if loading deep link challenge)
+  const [showWelcomeModal, setShowWelcomeModal] = useState(() => !initialChallengeRef.current);
   const [levelBriefingModal, setLevelBriefingModal] = useState(null); // { mode: 'CAMPAIGN' | 'SURVIVAL' | 'SANDBOX', levelIdx?: number }
   const [detailModalComponent, setDetailModalComponent] = useState(null);
 
@@ -1018,6 +1137,43 @@ export default function App() {
     };
   }, []);
 
+  // Handle shared challenge deep linking & live hash navigation
+  useEffect(() => {
+    if (initialChallengeRef.current) {
+      sound.playUpgrade();
+      setToastNotification({
+        type: 'success',
+        message: `🏆 Challenge Blueprint from ${initialChallengeRef.current.author} Loaded! Click "Start Traffic" to test resilience.`
+      });
+      setTimeout(() => setToastNotification(null), 5000);
+    }
+
+    const handleHashChange = () => {
+      const challenge = getChallengeFromUrl();
+      if (challenge) {
+        setGameMode(challenge.gameMode);
+        setCurrentLevelIdx(challenge.levelIdx);
+        setNodes(challenge.nodes);
+        setEdges(challenge.edges);
+        setIsRunning(false);
+        setWaveProgress(0);
+        setActiveChallengeBanner({
+          author: challenge.author,
+          levelIdx: challenge.levelIdx,
+          gameMode: challenge.gameMode
+        });
+        sound.playUpgrade();
+        setToastNotification({
+          type: 'success',
+          message: `🏆 Shared Challenge Architecture Loaded! Can you beat this system?`
+        });
+        setTimeout(() => setToastNotification(null), 4500);
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
   // When Welcome modal closes, only stop the voiceover tour if active
   useEffect(() => {
     if (!showWelcomeModal) {
@@ -1059,6 +1215,8 @@ export default function App() {
   });
   const [sandboxRps, setSandboxRps] = useState(12000);
   const [postMortemModal, setPostMortemModal] = useState(null);
+  const [isScorecardCopied, setIsScorecardCopied] = useState(false);
+  const [isChallengeLinkCopied, setIsChallengeLinkCopied] = useState(false);
   const [showBeginnerHints, setShowBeginnerHints] = useState(true);
 
   // Canvas Pan, Zoom & Drag State
@@ -1300,6 +1458,106 @@ export default function App() {
     };
     reader.readAsText(file);
     e.target.value = '';
+  };
+
+  // Generate 1-click playable challenge URL with current architecture
+  const generateChallengeUrl = useCallback(() => {
+    const payload = {
+      v: 1,
+      m: gameMode,
+      l: currentLevelIdx,
+      w: survivalWave,
+      a: 'Architect',
+      n: nodes.map((n) => ({
+        id: n.id,
+        t: n.type,
+        x: Math.round(n.x),
+        y: Math.round(n.y),
+        c: n.config || {},
+        tier: n.tier || 1
+      })),
+      e: edges.map((e) => ({
+        f: e.from,
+        t: e.to
+      }))
+    };
+    const b64 = encodeChallengePayload(payload);
+    if (!b64) return window.location.href;
+    const baseUrl = window.location.origin + window.location.pathname;
+    return `${baseUrl}#challenge=${encodeURIComponent(b64)}`;
+  }, [gameMode, currentLevelIdx, survivalWave, nodes, edges]);
+
+  const handleCopyChallengeLink = () => {
+    sound.playClick();
+    const url = generateChallengeUrl();
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(url);
+    }
+    setIsChallengeLinkCopied(true);
+    setToastNotification({
+      type: 'success',
+      message: '🔗 1-Click Challenge Link copied! Send it to anyone to test your architecture.'
+    });
+    setTimeout(() => {
+      setIsChallengeLinkCopied(false);
+      setToastNotification(null);
+    }, 3500);
+  };
+
+  // Generate formatted Wordle-style text scorecard for viral sharing
+  const generateScorecardText = useCallback(() => {
+    if (!postMortemModal) return '';
+    const modeName =
+      gameMode === 'CAMPAIGN'
+        ? CAMPAIGN_LEVELS[currentLevelIdx]?.title?.split(':')[0] || 'Level 1'
+        : gameMode === 'SURVIVAL'
+        ? `Survival Wave ${survivalWave}`
+        : 'Sandbox Lab';
+    const starsEmoji = postMortemModal.won ? '⭐'.repeat(postMortemModal.stars || 3) : '💥 Incident';
+    const activeComponents = Array.from(
+      new Set(
+        nodes
+          .filter((n) => n.type !== 'SOURCE')
+          .map((n) => COMPONENT_CATALOG[n.type]?.name?.split(' ')[0] || n.type)
+      )
+    )
+      .slice(0, 5)
+      .join(' + ');
+
+    const challengeUrl = generateChallengeUrl();
+
+    return `⚡ System Saviour Distributed Simulator
+🎮 ${modeName} — ${starsEmoji}
+🟢 Availability: ${postMortemModal.uptimePct}%
+⏱️ P99 Latency: ${postMortemModal.p99Latency}ms${postMortemModal.totalCost ? `\n💰 Cost: $${postMortemModal.totalCost}/hr` : ''}
+🧠 Stack: ${activeComponents || 'Custom Cluster'}
+
+Can your architecture beat this? Test it in your browser:
+👉 ${challengeUrl}`;
+  }, [postMortemModal, gameMode, currentLevelIdx, survivalWave, nodes, generateChallengeUrl]);
+
+  const handleCopyScorecard = () => {
+    sound.playClick();
+    const text = generateScorecardText();
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+    }
+    setIsScorecardCopied(true);
+    setToastNotification({
+      type: 'success',
+      message: 'Scorecard copied to clipboard! Share on Discord, Twitter, or LinkedIn 📋'
+    });
+    setTimeout(() => {
+      setIsScorecardCopied(false);
+      setToastNotification(null);
+    }, 3500);
+  };
+
+  const handleShareTweet = () => {
+    sound.playClick();
+    const text = generateScorecardText();
+    const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   // Calculate live RPS and active traffic mix
@@ -2238,6 +2496,14 @@ export default function App() {
                 <Upload className="w-3 h-3" />
                 <span>Import</span>
               </button>
+              <button
+                onClick={handleCopyChallengeLink}
+                className="px-2 py-0.5 rounded text-[11px] text-cyan-300 hover:text-cyan-100 hover:bg-cyan-950/60 transition flex items-center gap-1 border border-cyan-500/20"
+                title="Copy 1-click shareable challenge link with current architecture"
+              >
+                {isChallengeLinkCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <LinkIcon className="w-3 h-3 text-cyan-400" />}
+                <span>{isChallengeLinkCopied ? 'Copied!' : 'Share Link'}</span>
+              </button>
             </div>
 
             <button
@@ -2576,6 +2842,40 @@ export default function App() {
             </button>
           )}
 
+          {/* Active Shared Challenge Banner */}
+          {activeChallengeBanner && (
+            <div className="absolute top-12 left-3 right-3 flex items-center justify-between gap-2 px-3.5 py-2 rounded-xl bg-cyan-950/90 backdrop-blur-md border border-cyan-500/50 shadow-2xl shadow-cyan-950/60 z-30 pointer-events-auto">
+              <div className="flex items-center gap-2.5 text-xs text-cyan-200 min-w-0">
+                <span className="text-base shrink-0">🏆</span>
+                <div className="truncate">
+                  <span className="font-bold text-white font-display">Shared Challenge Blueprint</span>
+                  <span className="text-cyan-300 ml-2 hidden sm:inline">
+                    Created by <span className="font-mono font-semibold text-white">{activeChallengeBanner.author}</span>. Test if this cluster survives!
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => {
+                    sound.playClick();
+                    setIsRunning(true);
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs transition shadow-md shadow-cyan-500/30 active:scale-95 flex items-center gap-1"
+                >
+                  <Play className="w-3 h-3 fill-slate-950" />
+                  <span>Test System</span>
+                </button>
+                <button
+                  onClick={() => setActiveChallengeBanner(null)}
+                  className="p-1 rounded-lg text-cyan-400 hover:text-white hover:bg-cyan-900/40 transition"
+                  title="Dismiss challenge banner"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Top Helper / Connection Banner */}
           <div className="absolute top-3 left-3 right-3 flex flex-wrap items-center justify-between gap-2 pointer-events-none z-30">
             <div className="bg-slate-900/90 backdrop-blur border border-slate-800 px-3.5 py-1.5 rounded-xl text-xs text-slate-300 flex items-center gap-2 pointer-events-auto shadow-lg max-w-full overflow-hidden truncate">
@@ -2678,6 +2978,14 @@ export default function App() {
             >
               <Upload className="w-3 h-3 text-indigo-400" />
               <span className="hidden sm:inline">Import</span>
+            </button>
+            <button
+              onClick={handleCopyChallengeLink}
+              className="px-2 py-1 rounded-lg bg-slate-800/60 hover:bg-cyan-900/50 text-[11px] text-cyan-300 hover:text-cyan-200 transition flex items-center gap-1 font-medium border border-cyan-500/20"
+              title="Copy 1-click shareable challenge link"
+            >
+              {isChallengeLinkCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <LinkIcon className="w-3 h-3 text-cyan-400" />}
+              <span className="hidden sm:inline">{isChallengeLinkCopied ? 'Copied!' : 'Share Link'}</span>
             </button>
           </div>
 
@@ -2870,7 +3178,7 @@ export default function App() {
             {/* INFRASTRUCTURE NODES ON CANVAS */}
             <div className="absolute inset-0 pointer-events-none">
               {nodes.map((node) => {
-                const spec = COMPONENT_CATALOG[node.type];
+                const spec = COMPONENT_CATALOG[node.type] || COMPONENT_CATALOG.WEB;
                 const isSelected = selectedNodeId === node.id;
                 const isConnectingSource = connectingFromId === node.id;
                 const m = evaluation.nodeMetrics[node.id] || { totalIn: 0, utilization: 0, effectiveLatency: spec.baseLatency, isCrashed: false };
@@ -3118,7 +3426,51 @@ export default function App() {
                   )}
                 </div>
 
-                <div className="mt-5 flex items-center justify-center gap-3">
+                {/* Viral Shareable Architect Scorecard (Wordle Style) */}
+                <div className="mt-3.5 p-3 rounded-2xl bg-indigo-950/40 border border-indigo-500/40 shadow-lg text-left space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-300 uppercase tracking-wider font-display">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Architect Scorecard</span>
+                    </div>
+                    <span className="text-[10px] font-mono text-emerald-400 font-bold bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                      Ready to Share
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] text-slate-300 leading-snug">
+                    Brag about your SLA stats, latency, and system stack with your engineering friends or community:
+                  </p>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      onClick={handleCopyScorecard}
+                      className="flex-1 py-2 px-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition active:scale-95 shadow-md shadow-indigo-600/30 flex items-center justify-center gap-1.5"
+                      title="Copy formatted scorecard with stats and challenge link to clipboard"
+                    >
+                      {isScorecardCopied ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{isScorecardCopied ? 'Copied!' : 'Scorecard'}</span>
+                    </button>
+                    <button
+                      onClick={handleCopyChallengeLink}
+                      className="flex-1 py-2 px-2.5 rounded-xl bg-cyan-950/80 hover:bg-cyan-900/90 text-cyan-300 border border-cyan-500/40 font-bold text-xs transition active:scale-95 flex items-center justify-center gap-1.5 shadow-md shadow-cyan-950/50"
+                      title="Copy 1-click playable challenge link so anyone can test your exact architecture"
+                    >
+                      {isChallengeLinkCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <LinkIcon className="w-3.5 h-3.5 text-cyan-400" />}
+                      <span>{isChallengeLinkCopied ? 'Link Copied!' : 'Challenge Link'}</span>
+                    </button>
+                    <button
+                      onClick={handleShareTweet}
+                      className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-400 border border-sky-500/40 font-bold text-xs transition active:scale-95 flex items-center gap-1.5"
+                      title="Share directly to Twitter / X"
+                    >
+                      <Share2 className="w-3.5 h-3.5" />
+                      <span>Post</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex items-center justify-center gap-3">
                   <button
                     onClick={resetWave}
                     className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs active:scale-95 transition"
