@@ -1,7 +1,17 @@
 {
   "name": "learning-by-playing",
-  "private": true,
   "version": "1.0.0",
+  "description": "System Saviour: Interactive Distributed Systems & Cloud Architecture Simulator",
+  "license": "MIT",
+  "author": "Rajan Kumar Soni",
+  "homepage": "https://rajanskumarsoni.github.io/learning-by-playing/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rajanskumarsoni/learning-by-playing.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rajanskumarsoni/learning-by-playing/issues"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",
