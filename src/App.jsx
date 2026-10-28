@@ -977,6 +977,101 @@ function getSavedTopology(mode, levelIdx) {
 }
 
 // ============================================================================
+// 4.6. VICTORY CONFETTI CELEBRATION COMPONENT (PURE 2D CANVAS PARTICLES)
+// ============================================================================
+function ConfettiOverlay() {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let width = (canvas.width = canvas.parentElement?.clientWidth || window.innerWidth);
+    let height = (canvas.height = canvas.parentElement?.clientHeight || window.innerHeight);
+
+    const colors = ['#f59e0b', '#10b981', '#38bdf8', '#fbbf24', '#ec4899', '#8b5cf6', '#ffffff'];
+    const particles = [];
+    const count = 90;
+
+    for (let i = 0; i < count; i++) {
+      particles.push({
+        x: width * 0.5 + (Math.random() - 0.5) * 120,
+        y: height * 0.35,
+        vx: (Math.random() - 0.5) * 18,
+        vy: -Math.random() * 16 - 4,
+        size: Math.random() * 8 + 4,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        rotation: Math.random() * 360,
+        rotationSpeed: (Math.random() - 0.5) * 14,
+        wobble: Math.random() * 10,
+        opacity: 1
+      });
+    }
+
+    let animationFrameId;
+    const startTime = Date.now();
+
+    const render = () => {
+      const elapsed = Date.now() - startTime;
+      ctx.clearRect(0, 0, width, height);
+
+      let alive = false;
+      for (const p of particles) {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.38; // gravity
+        p.vx *= 0.98; // air drag
+        p.rotation += p.rotationSpeed;
+        p.wobble += 0.12;
+
+        if (elapsed > 2000) {
+          p.opacity = Math.max(0, 1 - (elapsed - 2000) / 1600);
+        }
+
+        if (p.opacity > 0 && p.y < height + 40) {
+          alive = true;
+          ctx.save();
+          ctx.translate(p.x + Math.sin(p.wobble) * 5, p.y);
+          ctx.rotate((p.rotation * Math.PI) / 180);
+          ctx.globalAlpha = p.opacity;
+          ctx.fillStyle = p.color;
+          ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
+          ctx.restore();
+        }
+      }
+
+      if (alive && elapsed < 3800) {
+        animationFrameId = requestAnimationFrame(render);
+      }
+    };
+
+    animationFrameId = requestAnimationFrame(render);
+
+    const handleResize = () => {
+      if (!canvas || !canvas.parentElement) return;
+      width = canvas.width = canvas.parentElement.clientWidth || window.innerWidth;
+      height = canvas.height = canvas.parentElement.clientHeight || window.innerHeight;
+    };
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="absolute inset-0 z-50 pointer-events-none w-full h-full"
+      style={{ pointerEvents: 'none' }}
+    />
+  );
+}
+
+// ============================================================================
 // 5. MAIN REACT APPLICATION COMPONENT
 // ============================================================================
 export default function App() {
@@ -1218,6 +1313,23 @@ export default function App() {
   const [isScorecardCopied, setIsScorecardCopied] = useState(false);
   const [isChallengeLinkCopied, setIsChallengeLinkCopied] = useState(false);
   const [showBeginnerHints, setShowBeginnerHints] = useState(true);
+
+  // Game Juice & Screen Shake State
+  const [isScreenShaking, setIsScreenShaking] = useState(false);
+  const [isRedAlertActive, setIsRedAlertActive] = useState(false);
+
+  const triggerScreenShake = useCallback((withRedAlert = true) => {
+    setIsScreenShaking(true);
+    if (withRedAlert) setIsRedAlertActive(true);
+    setTimeout(() => {
+      setIsScreenShaking(false);
+    }, 450);
+    if (withRedAlert) {
+      setTimeout(() => {
+        setIsRedAlertActive(false);
+      }, 1200);
+    }
+  }, []);
 
   // Canvas Pan, Zoom & Drag State
   const canvasRef = useRef(null);
@@ -1753,10 +1865,11 @@ Can your architecture beat this? Test it in your browser:
           triggerManualChaos();
         }
 
-        // Radar warning ping if system is experiencing severe SLA pressure
+        // Radar warning ping & subtle screen shake if system is experiencing severe SLA pressure
         const targetLat = gameMode === 'CAMPAIGN' ? currentLevel.maxLatencyMs : 250;
         if ((evaluation.p99Latency > targetLat || evaluation.uptimePct < 98) && Math.floor(next) % 25 === 0 && Math.floor(prev) % 25 !== 0) {
           sound.playWarning();
+          triggerScreenShake(false);
         }
 
         if (next >= 100) {
@@ -2076,11 +2189,13 @@ Can your architecture beat this? Test it in your browser:
     }
     sound.playChaosStrike();
     sound.playCrash();
+    triggerScreenShake(true);
     const victim = candidates[Math.floor(Math.random() * candidates.length)];
+    const victimName = COMPONENT_CATALOG[victim.type]?.name || victim.type;
     setNodes((prev) => prev.map((n) => (n.id === victim.id ? { ...n, crashed: true } : n)));
     setChaosBanner({
-      message: `Chaos Monkey snipped power to ${victim.name}! Instance crashed!`,
-      victimName: victim.name,
+      message: `Chaos Monkey snipped power to ${victimName}! Instance crashed!`,
+      victimName,
       isRestore: false
     });
     setTimeout(() => setChaosBanner(null), 4500);
@@ -2704,13 +2819,13 @@ Can your architecture beat this? Test it in your browser:
               handleAddService(compType, worldX, worldY);
             }
           }}
-          className={`flex-1 min-w-0 h-full relative bg-slate-950 flex flex-col overflow-hidden select-none min-h-0 cyber-grid-overlay transition-all duration-500 ${
+          className={`flex-1 min-w-0 h-full relative bg-slate-950 flex flex-col overflow-hidden select-none min-h-0 cyber-grid-overlay transition-all duration-300 ${
             isPanning ? 'cursor-grabbing' : 'cursor-grab'
           } ${
             isRunning
               ? 'shadow-[inset_0_0_120px_rgba(244,63,94,0.18)] ring-1 ring-rose-500/30'
               : 'shadow-[inset_0_0_80px_rgba(99,102,241,0.06)]'
-          }`}
+          } ${isScreenShaking ? 'animate-screen-shake' : ''}`}
           style={{
             touchAction: 'none',
             backgroundImage: 'radial-gradient(circle, rgba(99, 102, 241, 0.16) 1.2px, transparent 1.2px)',
@@ -2718,6 +2833,11 @@ Can your architecture beat this? Test it in your browser:
             backgroundPosition: `${pan.x}px ${pan.y}px`
           }}
         >
+          {/* Disaster / Chaos Red Perimeter Flash Overlay */}
+          {isRedAlertActive && (
+            <div className="absolute inset-0 z-40 pointer-events-none animate-perimeter-alert border-4 border-rose-500/90 shadow-[inset_0_0_90px_rgba(239,68,68,0.75)]" />
+          )}
+
           {/* Cyber Defense Grid Corner Brackets */}
           <div className="absolute top-2 left-2 pointer-events-none z-10 flex items-center gap-1.5 text-[9px] font-mono text-cyan-500/40 select-none">
             <span className="w-2.5 h-2.5 border-t-2 border-l-2 border-cyan-500/60" />
@@ -3346,8 +3466,10 @@ Can your architecture beat this? Test it in your browser:
 
           {/* Win / Loss Modal with Character Assets & Star Rating */}
           {postMortemModal && (
-            <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 z-40">
-              <div className="max-w-md w-full bg-slate-900 border-2 border-indigo-500/50 rounded-3xl p-6 text-center shadow-2xl relative overflow-hidden">
+            <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 z-40 overflow-hidden">
+              {/* 3-Star Golden Confetti Celebration Burst */}
+              {postMortemModal.won && postMortemModal.stars === 3 && <ConfettiOverlay />}
+              <div className="max-w-md w-full bg-slate-900 border-2 border-indigo-500/50 rounded-3xl p-6 text-center shadow-2xl relative overflow-hidden z-10">
                 {/* Glow backdrop */}
                 <div
                   className={`absolute -top-24 -left-24 w-48 h-48 rounded-full blur-3xl pointer-events-none ${
