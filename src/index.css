@@ -198,3 +198,23 @@ body,
   box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
 }
 
+/* ========================================================================== */
+/* CUSTOM HERO GAME CURSOR                                                    */
+/* ========================================================================== */
+:root {
+  --hero-cursor: url('/hero_cursor.png') 4 6, auto;
+}
+
+html, body, #root, .hero-cursor-game {
+  cursor: var(--hero-cursor, auto);
+}
+
+.hero-cursor-game button:not(:disabled),
+.hero-cursor-game a,
+.hero-cursor-game [role="button"],
+.hero-cursor-game .cursor-pointer,
+.hero-cursor-game .cursor-grab,
+.hero-cursor-game .cursor-grabbing {
+  cursor: var(--hero-cursor, pointer) !important;
+}
+

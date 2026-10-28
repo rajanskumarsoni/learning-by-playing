@@ -13,6 +13,7 @@ import chaosMonkeyImg from './assets/chaos_monkey.jpg';
 import gameplayDemoVideo from './assets/gameplay_demo.mp4';
 import heroImg from './assets/hero.png';
 import devilImg from './assets/devil.png';
+import heroCursorImg from './assets/hero_cursor.png';
 import { sound } from './audioEngine.js';
 import { introAudioTour, INTRO_TOUR_STEPS } from './introAudioTour.js';
 
@@ -1847,7 +1848,13 @@ export default function App() {
   }, [activeCatalogTab]);
 
   return (
-    <div className="h-screen w-screen max-h-screen overflow-hidden bg-slate-950 text-slate-100 flex flex-col font-sans select-none fixed inset-0">
+    <div
+      className="hero-cursor-game h-screen w-screen max-h-screen overflow-hidden bg-slate-950 text-slate-100 flex flex-col font-sans select-none fixed inset-0"
+      style={{
+        '--hero-cursor': `url(${heroCursorImg}) 4 6, auto`,
+        cursor: `url(${heroCursorImg}) 4 6, auto`
+      }}
+    >
       {/* =================================================================== */}
       {/* 1. TOP TELEMETRY & NAVIGATION HEADER                                */}
       {/* =================================================================== */}
