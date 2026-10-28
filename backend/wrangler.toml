@@ -3,10 +3,10 @@ main = "worker.js"
 compatibility_date = "2024-01-01"
 account_id = "d6a573fb6c8125d26bf1e3bea89353c9"
 
-# Cloudflare R2 Storage Binding for Blueprints, Profiles & Leaderboards
-[[r2_buckets]]
-binding = "SYSTEM_SAVIOUR_BUCKET"
-bucket_name = "systemsaviour-data"
+# Cloudflare KV Storage Binding for Blueprints, Profiles & Leaderboards
+[[kv_namespaces]]
+binding = "SYSTEM_SAVIOUR_KV"
+id = "4dc06fdfe907434ab1294b3660fcd164"
 
 [vars]
 ENVIRONMENT = "production"
