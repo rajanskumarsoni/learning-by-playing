@@ -1579,7 +1579,7 @@ export default function App() {
       {/* =================================================================== */}
       {/* 1. TOP TELEMETRY & NAVIGATION HEADER                                */}
       {/* =================================================================== */}
-      <header className="shrink-0 bg-slate-900/95 border-b border-slate-800 px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-2.5 sm:gap-3 z-30 shadow-md">
+      <header className="shrink-0 glass-header px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-2.5 sm:gap-3 z-30 shadow-xl">
         <div className="flex items-center gap-2.5 sm:gap-3">
           <div className="relative">
             <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 text-base sm:text-lg shrink-0">
@@ -1614,7 +1614,7 @@ export default function App() {
             <select
               value={gameMode}
               onChange={(e) => setLevelBriefingModal({ mode: e.target.value, levelIdx: currentLevelIdx })}
-              className="bg-slate-950 text-indigo-300 text-xs font-bold border border-slate-800 rounded-lg px-2 py-1 outline-none font-display"
+              className="glass-subpanel text-indigo-300 text-xs font-bold rounded-lg px-2 py-1 outline-none font-display"
             >
               <option value="CAMPAIGN">🎓 Campaign</option>
               <option value="SURVIVAL">🔥 Survival Wave</option>
@@ -1623,7 +1623,7 @@ export default function App() {
           </div>
 
           {/* Desktop Mode Switcher */}
-          <div className="hidden md:flex bg-slate-950 p-1 rounded-xl border border-slate-800 ml-2">
+          <div className="hidden md:flex glass-subpanel p-1 rounded-xl ml-2">
             {[
               { id: 'CAMPAIGN', label: '🎓 Campaign (5 Scenarios)' },
               { id: 'SURVIVAL', label: '🔥 Survival Wave' },
@@ -1645,7 +1645,7 @@ export default function App() {
         {/* Live Simulation SLA Metrics */}
         <div className="flex items-center gap-2 overflow-x-auto max-w-full pb-0.5 scrollbar-none shrink-0">
           {/* RPS Counter */}
-          <div className="bg-slate-950 border border-slate-800 px-2.5 sm:px-3 py-1.5 rounded-xl flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <div className="glass-subpanel px-2.5 sm:px-3 py-1.5 rounded-xl flex items-center gap-1.5 sm:gap-2 shrink-0">
             <span
               className={`w-2 h-2 rounded-full shrink-0 ${
                 isRunning ? 'bg-amber-400 animate-ping' : 'bg-emerald-400 animate-pulse'
@@ -1659,10 +1659,10 @@ export default function App() {
 
           {/* P99 Latency SLA */}
           <div
-            className={`border px-2.5 sm:px-3 py-1.5 rounded-xl flex items-center gap-1.5 sm:gap-2 shrink-0 ${
+            className={`border px-2.5 sm:px-3 py-1.5 rounded-xl flex items-center gap-1.5 sm:gap-2 shrink-0 backdrop-blur-md ${
               passedLatency
-                ? 'bg-slate-950 border-emerald-500/40 text-emerald-300'
-                : 'bg-rose-950/40 border-rose-500/50 text-rose-300'
+                ? 'bg-slate-950/60 border-emerald-500/40 text-emerald-300'
+                : 'bg-rose-950/50 border-rose-500/50 text-rose-300'
             }`}
             title={`P99 Latency: ${evaluation.p99Latency}ms (Target: < ${targetLatency}ms)`}
           >
@@ -1676,10 +1676,10 @@ export default function App() {
 
           {/* Uptime % */}
           <div
-            className={`border px-2.5 sm:px-3 py-1.5 rounded-xl flex items-center gap-1.5 sm:gap-2 shrink-0 ${
+            className={`border px-2.5 sm:px-3 py-1.5 rounded-xl flex items-center gap-1.5 sm:gap-2 shrink-0 backdrop-blur-md ${
               passedUptime
-                ? 'bg-slate-950 border-emerald-500/40 text-emerald-300'
-                : 'bg-rose-950/40 border-rose-500/50 text-rose-300'
+                ? 'bg-slate-950/60 border-emerald-500/40 text-emerald-300'
+                : 'bg-rose-950/50 border-rose-500/50 text-rose-300'
             }`}
             title={`Uptime: ${evaluation.uptimePct}% (Target: ≥ ${targetMinUptime}%)`}
           >
@@ -1693,10 +1693,10 @@ export default function App() {
 
           {/* Hourly Cost */}
           <div
-            className={`border px-2.5 sm:px-3 py-1.5 rounded-xl flex items-center gap-1.5 shrink-0 ${
+            className={`border px-2.5 sm:px-3 py-1.5 rounded-xl flex items-center gap-1.5 shrink-0 backdrop-blur-md ${
               passedBudget
-                ? 'bg-slate-950 border-emerald-500/40 text-emerald-300'
-                : 'bg-rose-950/40 border-rose-500/50 text-rose-300'
+                ? 'bg-slate-950/60 border-emerald-500/40 text-emerald-300'
+                : 'bg-rose-950/50 border-rose-500/50 text-rose-300'
             }`}
             title={`Hourly Cost: $${evaluation.totalHourlyCost}/hr ${currentMaxBudget ? `(Budget: ≤ $${currentMaxBudget})` : ''}`}
           >
@@ -1715,7 +1715,7 @@ export default function App() {
           {/* Overall Level Readiness Pill (Campaign Mode) */}
           {gameMode === 'CAMPAIGN' && (
             <div
-              className={`hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-[11px] font-bold shrink-0 ${
+              className={`hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-[11px] font-bold shrink-0 backdrop-blur-md ${
                 isLevelPassing
                   ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300'
                   : 'bg-rose-950/60 border-rose-500/50 text-rose-300'
@@ -1731,7 +1731,7 @@ export default function App() {
         <div className="flex items-center gap-2 flex-wrap">
 
           {/* Simulation Controls */}
-          <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+          <div className="flex items-center gap-1 glass-subpanel p-1 rounded-xl">
             <button
               onClick={() => {
                 const next = !isRunning;
@@ -1773,13 +1773,13 @@ export default function App() {
           </div>
 
           {/* Panel Layout Toggles (Make Canvas Larger or Smaller) */}
-          <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+          <div className="flex items-center gap-1 glass-subpanel p-1 rounded-xl">
             <button
               onClick={() => setLeftPanelCollapsed(!leftPanelCollapsed)}
               className={`px-2 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 transition ${
                 !leftPanelCollapsed
-                  ? 'bg-slate-800 text-indigo-300 border border-indigo-500/30'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/40'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
               }`}
               title={leftPanelCollapsed ? "Expand Component Palette (Make Canvas Smaller)" : "Collapse Component Palette (Make Canvas Bigger)"}
             >
@@ -1790,8 +1790,8 @@ export default function App() {
               onClick={() => setRightPanelCollapsed(!rightPanelCollapsed)}
               className={`px-2 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 transition ${
                 !rightPanelCollapsed
-                  ? 'bg-slate-800 text-indigo-300 border border-indigo-500/30'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/40'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
               }`}
               title={rightPanelCollapsed ? "Expand Mission & Inspector (Make Canvas Smaller)" : "Collapse Mission & Inspector (Make Canvas Bigger)"}
             >
@@ -1805,8 +1805,8 @@ export default function App() {
             onClick={toggleSound}
             className={`px-2.5 py-1 rounded-xl border text-xs flex items-center gap-1.5 transition active:scale-95 shadow-md ${
               isSoundMuted
-                ? 'bg-slate-900/90 border-slate-800 text-slate-500 hover:text-slate-300'
-                : 'bg-gradient-to-r from-indigo-950/80 to-purple-950/80 border-indigo-500/40 text-indigo-300 hover:text-white shadow-indigo-950/40'
+                ? 'bg-slate-900/60 backdrop-blur-md border-slate-800 text-slate-500 hover:text-slate-300'
+                : 'bg-gradient-to-r from-indigo-950/80 to-purple-950/80 backdrop-blur-md border-indigo-500/40 text-indigo-300 hover:text-white shadow-indigo-950/40'
             }`}
             title={isSoundMuted ? 'Game Audio is Muted — Click to Enable Sound' : 'Game Audio is Active — Click to Mute'}
           >
@@ -1825,8 +1825,8 @@ export default function App() {
             }}
             className={`px-2.5 py-1 rounded-xl border text-xs flex items-center gap-1.5 transition active:scale-95 shadow-md ${
               isAudioActive && !isSoundMuted
-                ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 shadow-amber-500/20'
-                : 'bg-slate-900/90 border-slate-800 text-slate-500 hover:text-slate-300'
+                ? 'bg-amber-500/20 backdrop-blur-md border-amber-500/50 text-amber-300 shadow-amber-500/20'
+                : 'bg-slate-900/60 backdrop-blur-md border-slate-800 text-slate-500 hover:text-slate-300'
             }`}
             title="Warrior Battle Music Soundtrack (Click to Toggle)"
           >
@@ -1837,7 +1837,7 @@ export default function App() {
           {/* Chaos Monkey Incident Trigger */}
           <button
             onClick={triggerManualChaos}
-            className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-rose-950/80 to-purple-950/80 border border-rose-500/50 hover:border-rose-400 text-xs text-rose-200 flex items-center gap-1.5 transition shadow-md shadow-rose-950/30 group active:scale-95"
+            className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-rose-950/80 to-purple-950/80 backdrop-blur-md border border-rose-500/50 hover:border-rose-400 text-xs text-rose-200 flex items-center gap-1.5 transition shadow-md shadow-rose-950/30 group active:scale-95"
             title="Summon Chaos Monkey to snip an instance and test system failover!"
           >
             <div className="relative">
@@ -1854,7 +1854,7 @@ export default function App() {
           {/* Ada AI Mentor Guide Trigger */}
           <button
             onClick={() => setShowWelcomeModal(true)}
-            className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-indigo-950/90 to-cyan-950/90 border border-cyan-500/40 hover:border-cyan-400 text-xs text-cyan-200 flex items-center gap-1.5 transition shadow-md shadow-cyan-950/30 group active:scale-95"
+            className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-indigo-950/90 to-cyan-950/90 backdrop-blur-md border border-cyan-500/40 hover:border-cyan-400 text-xs text-cyan-200 flex items-center gap-1.5 transition shadow-md shadow-cyan-950/30 group active:scale-95"
             title="Consult Ada (AI Cloud Architect Lead) for briefing & game tutorial"
           >
             <img
@@ -1869,7 +1869,7 @@ export default function App() {
 
       {/* Campaign Level Progress / Navigation Rail */}
       {gameMode === 'CAMPAIGN' && (
-        <div className="shrink-0 bg-slate-900 border-b border-slate-800 px-4 py-1.5 flex items-center justify-between text-xs overflow-x-auto gap-4">
+        <div className="shrink-0 glass-header px-4 py-1.5 flex items-center justify-between text-xs overflow-x-auto gap-4">
           <div className="flex items-center gap-2">
             {CAMPAIGN_LEVELS.map((lvl, idx) => {
               const isUnlocked = idx <= unlockedLevelIdx;
@@ -1886,9 +1886,9 @@ export default function App() {
                     isCurrent
                       ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-indigo-400/40'
                       : isPassed
-                      ? 'bg-emerald-950/60 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-900/50'
+                      ? 'bg-emerald-950/60 backdrop-blur text-emerald-300 border border-emerald-500/30 hover:bg-emerald-900/50'
                       : isUnlocked
-                      ? 'bg-slate-950/80 text-slate-300 hover:text-white border border-slate-800'
+                      ? 'glass-subpanel text-slate-300 hover:text-white'
                       : 'bg-slate-950/30 text-slate-600 border border-slate-900/40 cursor-not-allowed opacity-50'
                   }`}
                 >
@@ -1920,7 +1920,7 @@ export default function App() {
             {/* Wave Progress Bar */}
             <div className="flex items-center gap-2">
               <span className="text-[11px] text-slate-400">Wave Progress:</span>
-              <div className="w-32 h-2 bg-slate-800 rounded-full overflow-hidden">
+              <div className="w-32 h-2 bg-slate-800/80 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-indigo-500 to-emerald-400 transition-all duration-100"
                   style={{ width: `${waveProgress}%` }}
@@ -1934,7 +1934,7 @@ export default function App() {
               className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold flex items-center gap-1.5 transition ${
                 showBeginnerHints
                   ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40'
-                  : 'bg-slate-950 text-slate-400 border-slate-800'
+                  : 'glass-subpanel text-slate-400'
               }`}
             >
               <BookOpen className="w-3.5 h-3.5" />
@@ -1947,7 +1947,11 @@ export default function App() {
       {/* =================================================================== */}
       {/* 2. MAIN WORKSPACE: PALETTE + INTERACTIVE GRAPH CANVAS + INSPECTOR    */}
       {/* =================================================================== */}
-      <div className="flex-1 flex min-h-0 h-full overflow-hidden relative">
+      <div className="flex-1 flex min-h-0 h-full overflow-hidden relative bg-[#070a13]">
+        {/* Ambient Cosmic Diffused Glows for Glass Refraction */}
+        <div className="absolute top-0 left-10 w-96 h-96 bg-cyan-500/10 rounded-full blur-[140px] pointer-events-none z-0" />
+        <div className="absolute bottom-10 right-10 w-96 h-96 bg-purple-500/10 rounded-full blur-[140px] pointer-events-none z-0" />
+
         {/* Mobile Backdrop for Left Panel */}
         {!leftPanelCollapsed && (
           <div
@@ -1958,7 +1962,7 @@ export default function App() {
 
         {/* LEFT COLUMN: INFRASTRUCTURE COMPONENT PALETTE */}
         <aside
-          className={`h-full bg-slate-900 border-r border-slate-800 flex flex-col min-h-0 overflow-hidden transition-all duration-300 ease-in-out shrink-0 z-50 max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:w-80 max-lg:max-w-[85vw] max-lg:shadow-2xl ${
+          className={`h-full glass-panel border-r flex flex-col min-h-0 overflow-hidden transition-all duration-300 ease-in-out shrink-0 z-40 max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:w-80 max-lg:max-w-[85vw] max-lg:shadow-2xl ${
             leftPanelCollapsed
               ? 'w-0 p-0 border-r-0 opacity-0 pointer-events-none max-lg:-translate-x-full'
               : 'w-72 xl:w-80 2xl:w-88 p-3 opacity-100 max-lg:translate-x-0'
@@ -1968,19 +1972,19 @@ export default function App() {
           <div className="shrink-0 mb-2">
             <div className="flex items-center justify-between mb-1.5">
               <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-300">Cloud Components</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-300 font-display">Cloud Components</span>
                 <span className="text-[10px] text-indigo-400 font-medium hidden xl:inline">• Drag or Click</span>
               </div>
               <button
                 onClick={() => setLeftPanelCollapsed(true)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 transition"
                 title="Collapse Component Palette"
               >
                 <PanelLeftClose className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            <div className="grid grid-cols-5 gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-[10px] font-bold">
+            <div className="grid grid-cols-5 gap-1 glass-subpanel p-1 rounded-xl text-[10px] font-bold">
               {[
                 { id: 'ALL', label: 'All' },
                 { id: 'Edge', label: 'Edge' },
@@ -1992,7 +1996,7 @@ export default function App() {
                   key={t.id}
                   onClick={() => setActiveCatalogTab(t.id)}
                   className={`py-1 rounded-lg transition-all ${
-                    activeCatalogTab === t.id ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
+                    activeCatalogTab === t.id ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
                   {t.label}
@@ -2019,8 +2023,8 @@ export default function App() {
                   data-component-type={item.type}
                   className={`group relative w-full text-left p-2.5 rounded-xl border transition-all select-none ${
                     isAllowed
-                      ? 'bg-slate-950/90 hover:bg-slate-850 border-slate-800 hover:border-indigo-500/60 cursor-grab active:cursor-grabbing shadow-sm hover:shadow-indigo-500/10'
-                      : 'bg-slate-950/30 border-slate-900 opacity-40 cursor-not-allowed'
+                      ? 'glass-card cursor-grab active:cursor-grabbing shadow-sm hover:shadow-indigo-500/20'
+                      : 'bg-slate-950/30 border-slate-900/60 opacity-40 cursor-not-allowed'
                   }`}
                 >
                   {/* Hover Floating Guide Badge */}
@@ -2079,8 +2083,8 @@ export default function App() {
           </div>
 
           {/* Traffic Types Packet Legend (Pinned Footer) */}
-          <div className="shrink-0 pt-2.5 mt-2 border-t border-slate-800 space-y-1 text-[11px] text-slate-400">
-            <div className="font-semibold text-slate-300 text-xs mb-1">Traffic Flow Legend</div>
+          <div className="shrink-0 pt-2.5 mt-2 border-t border-indigo-500/20 space-y-1 text-[11px] text-slate-400">
+            <div className="font-semibold text-slate-300 text-xs mb-1 font-display">Traffic Flow Legend</div>
             <div className="grid grid-cols-2 gap-1.5 text-[10px]">
               {Object.values(TRAFFIC_TYPES).map((t) => (
                 <div key={t.id} className="flex items-center gap-1.5">
@@ -2302,39 +2306,39 @@ export default function App() {
           </div>
 
           {/* FLOATING CANVAS HUD CONTROLS (BOTTOM-RIGHT) */}
-          <div className="absolute bottom-16 lg:bottom-3 right-3 flex items-center gap-1 z-30 pointer-events-auto bg-slate-900/95 backdrop-blur-md border border-slate-800 p-1 rounded-xl shadow-2xl">
+          <div className="absolute bottom-16 lg:bottom-3 right-3 flex items-center gap-1 z-30 pointer-events-auto glass-panel p-1 rounded-xl shadow-2xl">
             <button
               onClick={() => setZoom((z) => Math.min(2.5, +(z + 0.15).toFixed(2)))}
-              className="w-7 h-7 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 flex items-center justify-center transition"
+              className="w-7 h-7 rounded-lg bg-slate-800/60 hover:bg-slate-700/70 text-slate-200 flex items-center justify-center transition"
               title="Zoom In (+)"
             >
               <ZoomIn className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={resetView}
-              className="px-2 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-[11px] font-mono text-slate-200 transition font-medium"
+              className="px-2 py-1 rounded-lg bg-slate-800/60 hover:bg-slate-700/70 text-[11px] font-mono text-slate-200 transition font-medium"
               title="Click to reset zoom to 100%"
             >
               {Math.round(zoom * 100)}%
             </button>
             <button
               onClick={() => setZoom((z) => Math.max(0.35, +(z - 0.15).toFixed(2)))}
-              className="w-7 h-7 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 flex items-center justify-center transition"
+              className="w-7 h-7 rounded-lg bg-slate-800/60 hover:bg-slate-700/70 text-slate-200 flex items-center justify-center transition"
               title="Zoom Out (-)"
             >
               <ZoomOut className="w-3.5 h-3.5" />
             </button>
-            <div className="w-px h-4 bg-slate-700 mx-0.5" />
+            <div className="w-px h-4 bg-indigo-500/20 mx-0.5" />
             <button
               onClick={fitView}
-              className="w-7 h-7 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 flex items-center justify-center transition"
+              className="w-7 h-7 rounded-lg bg-slate-800/60 hover:bg-slate-700/70 text-slate-200 flex items-center justify-center transition"
               title="Center & Fit Graph in View"
             >
               <Maximize2 className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={resetView}
-              className="w-7 h-7 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 flex items-center justify-center transition"
+              className="w-7 h-7 rounded-lg bg-slate-800/60 hover:bg-slate-700/70 text-slate-200 flex items-center justify-center transition"
               title="Reset View to Origin (0,0)"
             >
               <RotateCcw className="w-3.5 h-3.5" />
@@ -2343,10 +2347,10 @@ export default function App() {
 
           {/* FLOATING STATUS PILL (BOTTOM-LEFT) */}
           <div className="absolute bottom-16 lg:bottom-3 left-3 z-30 pointer-events-none flex items-center gap-2">
-            <div className="bg-slate-900/85 backdrop-blur border border-slate-800 px-2.5 py-1 rounded-lg text-[10px] text-slate-400 font-mono flex items-center gap-2 shadow-lg">
+            <div className="glass-pill px-2.5 py-1 rounded-lg text-[10px] text-slate-300 font-mono flex items-center gap-2 shadow-lg">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
               <span>({Math.round(pan.x)}, {Math.round(pan.y)})</span>
-              <span className="hidden sm:inline text-slate-500">• Pan anywhere</span>
+              <span className="hidden sm:inline text-slate-400">• Pan anywhere</span>
             </div>
           </div>
 
@@ -2560,7 +2564,7 @@ export default function App() {
                       handleSelectNode(node.id);
                     }}
                     title="Click to inspect and configure this component"
-                    className={`no-pan pointer-events-auto absolute z-20 bg-slate-900/95 backdrop-blur rounded-xl border ${statusColor} p-2.5 shadow-xl transition-all cursor-pointer group`}
+                    className={`no-pan pointer-events-auto absolute z-20 glass-subpanel rounded-xl border ${statusColor} p-2.5 shadow-2xl transition-all cursor-pointer group hover:border-indigo-400/60`}
                   >
                     {/* Hover "Click to Inspect" Floating Badge */}
                     <div className="absolute -top-7 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-40 whitespace-nowrap">
@@ -2809,16 +2813,16 @@ export default function App() {
 
         {/* RIGHT COLUMN: PROBLEM STATEMENT, INSPECTOR & LIVE MENTOR */}
         <aside
-          className={`h-full bg-slate-900 border-l border-slate-800 flex flex-col overflow-y-auto min-h-0 transition-all duration-300 ease-in-out shrink-0 z-50 max-lg:fixed max-lg:inset-y-0 max-lg:right-0 max-lg:w-88 max-lg:max-w-[90vw] max-lg:shadow-2xl ${
+          className={`h-full glass-panel border-l flex flex-col overflow-y-auto min-h-0 transition-all duration-300 ease-in-out shrink-0 z-40 max-lg:fixed max-lg:inset-y-0 max-lg:right-0 max-lg:w-88 max-lg:max-w-[90vw] max-lg:shadow-2xl ${
             rightPanelCollapsed
               ? 'w-0 p-0 border-l-0 opacity-0 pointer-events-none max-lg:translate-x-full'
               : 'w-80 xl:w-96 2xl:w-[420px] p-3.5 space-y-4 opacity-100 max-lg:translate-x-0'
           }`}
         >
           {/* Panel Header & Collapse Action */}
-          <div className="flex items-center justify-between pb-2 border-b border-slate-800/80 shrink-0">
+          <div className="flex items-center justify-between pb-2 border-b border-indigo-500/20 shrink-0">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-300 font-display">
                 Problem &amp; Diagnostics
               </span>
               {highlightMentor && (
@@ -2829,7 +2833,7 @@ export default function App() {
             </div>
             <button
               onClick={() => setRightPanelCollapsed(true)}
-              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 transition"
               title="Collapse Panel (Make Canvas Bigger)"
             >
               <PanelRightClose className="w-3.5 h-3.5" />
@@ -2839,7 +2843,7 @@ export default function App() {
           {/* 1. SCENARIO PROBLEM STATEMENT (TOP OF RIGHT PANEL)              */}
           {/* =============================================================== */}
           {gameMode === 'CAMPAIGN' ? (
-            <div className="bg-slate-950/90 border border-indigo-500/40 rounded-2xl p-4 space-y-3 shadow-lg shadow-indigo-950/20">
+            <div className="glass-subpanel rounded-2xl p-4 space-y-3 shadow-xl">
               {/* Header */}
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 flex items-center gap-1.5">
@@ -2862,13 +2866,13 @@ export default function App() {
               </div>
 
               {/* Problem Brief */}
-              <p className="text-xs text-slate-300 leading-relaxed bg-slate-900/80 p-3 rounded-xl border border-slate-800/80">
+              <p className="text-xs text-slate-300 leading-relaxed glass-card p-3 rounded-xl">
                 {currentLevel.brief}
               </p>
 
               {/* CURRENT STATUS vs. TARGET TO PASS LEVEL */}
-              <div className="bg-slate-900/90 rounded-2xl p-3.5 border border-slate-800 space-y-3 shadow-inner">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+              <div className="glass-card rounded-2xl p-3.5 space-y-3 shadow-inner">
+                <div className="flex items-center justify-between pb-2 border-b border-indigo-500/20">
                   <div className="flex items-center gap-1.5">
                     <Activity className="w-3.5 h-3.5 text-cyan-400" />
                     <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-200">
@@ -2889,7 +2893,7 @@ export default function App() {
                 {/* Side-by-Side Comparison Rows */}
                 <div className="space-y-2 text-xs">
                   {/* Metric 1: Traffic Load */}
-                  <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/80 flex items-center justify-between">
+                  <div className="glass-subpanel p-2.5 rounded-xl flex items-center justify-between">
                     <div>
                       <div className="text-[10px] text-slate-400 font-medium">1. Peak Traffic Load</div>
                       <div className="font-mono text-xs font-bold mt-0.5 flex items-center gap-1.5 flex-wrap">
@@ -2901,7 +2905,7 @@ export default function App() {
                       </div>
                     </div>
                     <div>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-800">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-900/80 text-slate-300 border border-slate-700/60">
                         {isRunning ? `Surge ${Math.round(waveProgress)}%` : 'Baseline'}
                       </span>
                     </div>
@@ -2909,10 +2913,10 @@ export default function App() {
 
                   {/* Metric 2: P99 Latency SLA */}
                   <div
-                    className={`p-2.5 rounded-xl border flex items-center justify-between transition-colors ${
+                    className={`p-2.5 rounded-xl border flex items-center justify-between transition-colors backdrop-blur-md ${
                       passedLatency
-                        ? 'bg-slate-950 border-emerald-500/30'
-                        : 'bg-rose-950/25 border-rose-500/40'
+                        ? 'bg-slate-950/60 border-emerald-500/30'
+                        : 'bg-rose-950/30 border-rose-500/40'
                     }`}
                   >
                     <div>
@@ -2942,10 +2946,10 @@ export default function App() {
 
                   {/* Metric 3: Uptime SLA */}
                   <div
-                    className={`p-2.5 rounded-xl border flex items-center justify-between transition-colors ${
+                    className={`p-2.5 rounded-xl border flex items-center justify-between transition-colors backdrop-blur-md ${
                       passedUptime
-                        ? 'bg-slate-950 border-emerald-500/30'
-                        : 'bg-rose-950/25 border-rose-500/40'
+                        ? 'bg-slate-950/60 border-emerald-500/30'
+                        : 'bg-rose-950/30 border-rose-500/40'
                     }`}
                   >
                     <div>
@@ -2975,10 +2979,10 @@ export default function App() {
 
                   {/* Metric 4: Cloud Budget */}
                   <div
-                    className={`p-2.5 rounded-xl border flex items-center justify-between transition-colors ${
+                    className={`p-2.5 rounded-xl border flex items-center justify-between transition-colors backdrop-blur-md ${
                       passedBudget
-                        ? 'bg-slate-950 border-emerald-500/30'
-                        : 'bg-rose-950/25 border-rose-500/40'
+                        ? 'bg-slate-950/60 border-emerald-500/30'
+                        : 'bg-rose-950/30 border-rose-500/40'
                     }`}
                   >
                     <div>
@@ -3009,7 +3013,7 @@ export default function App() {
 
                 {/* Instruction / Action Banner to Pass Level */}
                 <div
-                  className={`p-2.5 rounded-xl border text-[11px] flex items-center justify-between gap-2 ${
+                  className={`p-2.5 rounded-xl border text-[11px] flex items-center justify-between gap-2 backdrop-blur-md ${
                     isLevelPassing
                       ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-200'
                       : 'bg-amber-950/30 border-amber-500/40 text-amber-200'
@@ -3040,7 +3044,7 @@ export default function App() {
 
               {/* Real-Life Everyday Analogy */}
               {currentLevel.beginnerAnalogy && (
-                <div className="p-3 rounded-xl bg-amber-950/25 border border-amber-500/30 text-xs text-amber-200 leading-relaxed space-y-1">
+                <div className="p-3 rounded-xl bg-amber-950/25 border border-amber-500/30 text-xs text-amber-200 leading-relaxed space-y-1 backdrop-blur-md">
                   <div className="font-bold text-[10px] uppercase tracking-wider text-amber-400 flex items-center gap-1">
                     <span>💡 Everyday Analogy</span>
                   </div>
@@ -3050,7 +3054,7 @@ export default function App() {
 
               {/* Architecture Hints & Solution Clues */}
               {currentLevel.hints && currentLevel.hints.length > 0 && (
-                <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1.5">
+                <div className="p-3 rounded-xl glass-card space-y-1.5">
                   <div className="font-bold text-[10px] uppercase tracking-wider text-indigo-400 flex items-center gap-1">
                     <span>🔍 Architectural Strategy Tips</span>
                   </div>
@@ -3063,7 +3067,7 @@ export default function App() {
               )}
             </div>
           ) : gameMode === 'SURVIVAL' ? (
-            <div className="bg-slate-950/90 border border-amber-500/40 rounded-2xl p-4 space-y-2.5 shadow-lg shadow-amber-950/20">
+            <div className="glass-subpanel border-amber-500/40 rounded-2xl p-4 space-y-2.5 shadow-xl shadow-amber-950/20">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1.5">
                   <Flame className="w-3 h-3 text-amber-400" />
@@ -3076,12 +3080,12 @@ export default function App() {
               <h3 className="text-sm font-extrabold text-white">
                 Infinite Escalating Traffic Surge
               </h3>
-              <p className="text-xs text-slate-300 leading-relaxed bg-slate-900/80 p-2.5 rounded-xl border border-slate-800/80">
+              <p className="text-xs text-slate-300 leading-relaxed glass-card p-2.5 rounded-xl">
                 Survive as many waves as possible! Traffic surges by +2,500 RPS every wave with malicious bot swarms and random Chaos Monkey server outages. Maintain &ge;98% availability to advance!
               </p>
               {/* Live Status vs Survival Target */}
-              <div className="space-y-2 text-xs bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
-                <div className="flex items-center justify-between text-[10px] text-slate-400 font-bold uppercase tracking-wider pb-1 border-b border-slate-800">
+              <div className="space-y-2 text-xs glass-card p-2.5 rounded-xl">
+                <div className="flex items-center justify-between text-[10px] text-slate-400 font-bold uppercase tracking-wider pb-1 border-b border-indigo-500/20">
                   <span>System Status vs Target</span>
                   <span className={passedUptime && passedLatency ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
                     {passedUptime && passedLatency ? '✅ Passing' : '❌ Failing'}
@@ -3112,7 +3116,7 @@ export default function App() {
               </div>
             </div>
           ) : (
-            <div className="bg-slate-950/90 border border-emerald-500/40 rounded-2xl p-4 space-y-2.5 shadow-lg shadow-emerald-950/20">
+            <div className="glass-subpanel border-emerald-500/40 rounded-2xl p-4 space-y-2.5 shadow-xl shadow-emerald-950/20">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
                   🧪 Sandbox Lab
@@ -3124,7 +3128,7 @@ export default function App() {
               <h3 className="text-sm font-extrabold text-white">
                 Unrestricted Architectural Playground
               </h3>
-              <p className="text-xs text-slate-300 leading-relaxed bg-slate-900/80 p-2.5 rounded-xl border border-slate-800/80">
+              <p className="text-xs text-slate-300 leading-relaxed glass-card p-2.5 rounded-xl">
                 Zero budget caps and zero constraints. Drag and deploy any cloud component, dial the peak load slider up to 35,000+ RPS, and stress-test custom topologies.
               </p>
             </div>
@@ -3135,14 +3139,14 @@ export default function App() {
           {/* =============================================================== */}
           <div
             ref={inspectorSectionRef}
-            className={`bg-slate-950/80 border rounded-2xl p-3.5 space-y-3 transition-all duration-500 ${
+            className={`glass-subpanel rounded-2xl p-3.5 space-y-3 transition-all duration-500 ${
               highlightInspector
-                ? 'border-indigo-400 ring-2 ring-indigo-400/50 bg-indigo-950/30 shadow-2xl shadow-indigo-950/40 scale-[1.01]'
-                : 'border-slate-800'
+                ? 'border-indigo-400 ring-2 ring-indigo-400/50 bg-indigo-950/40 shadow-2xl scale-[1.01]'
+                : ''
             }`}
           >
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-indigo-400 flex items-center gap-1.5">
+              <span className="text-xs font-bold uppercase tracking-wider text-indigo-400 flex items-center gap-1.5 font-display">
                 <Settings className={`w-3.5 h-3.5 ${highlightInspector ? 'animate-spin text-indigo-300' : ''}`} />
                 <span>Component Inspector</span>
               </span>
@@ -3172,25 +3176,25 @@ export default function App() {
 
                 {/* Telemetry Stats */}
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="bg-slate-900 p-2 rounded-lg border border-slate-800">
+                  <div className="glass-card p-2 rounded-lg">
                     <div className="text-[10px] text-slate-400">Total Ingress</div>
                     <div className="font-mono font-bold text-white mt-0.5">
                       {Math.round(selectedMetrics.totalIn).toLocaleString()} RPS
                     </div>
                   </div>
-                  <div className="bg-slate-900 p-2 rounded-lg border border-slate-800">
+                  <div className="glass-card p-2 rounded-lg">
                     <div className="text-[10px] text-slate-400">Latency</div>
                     <div className="font-mono font-bold text-cyan-300 mt-0.5">
                       {selectedMetrics.effectiveLatency}ms
                     </div>
                   </div>
-                  <div className="bg-slate-900 p-2 rounded-lg border border-slate-800">
+                  <div className="glass-card p-2 rounded-lg">
                     <div className="text-[10px] text-slate-400">Saturation</div>
                     <div className="font-mono font-bold text-amber-300 mt-0.5">
                       {Math.round(selectedMetrics.utilization * 100)}%
                     </div>
                   </div>
-                  <div className="bg-slate-900 p-2 rounded-lg border border-slate-800">
+                  <div className="glass-card p-2 rounded-lg">
                     <div className="text-[10px] text-slate-400">Hourly Cost</div>
                     <div className="font-mono font-bold text-emerald-400 mt-0.5">
                       ${selectedMetrics.cost}/hr
@@ -3200,7 +3204,7 @@ export default function App() {
 
                 {/* Architectural Configuration Dropdowns */}
                 {selectedSpec.configOptions && (
-                  <div className="space-y-2 pt-2 border-t border-slate-800">
+                  <div className="space-y-2 pt-2 border-t border-indigo-500/20">
                     <span className="text-[11px] font-bold text-slate-300">Architectural Tuning:</span>
                     {Object.keys(selectedSpec.configOptions).map((configKey) => {
                       const opt = selectedSpec.configOptions[configKey];
@@ -3221,7 +3225,7 @@ export default function App() {
                                 )
                               );
                             }}
-                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 cursor-pointer"
+                            className="w-full glass-subpanel rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 cursor-pointer"
                           >
                             {opt.values.map((vName, idx) => (
                               <option key={vName} value={idx}>
@@ -3237,13 +3241,13 @@ export default function App() {
 
                 {/* Optional Beginner Tip */}
                 {showBeginnerHints && selectedSpec.beginnerTip && (
-                  <div className="p-2.5 rounded-xl bg-indigo-950/40 border border-indigo-500/30 text-[11px] text-indigo-200 leading-relaxed">
+                  <div className="p-2.5 rounded-xl bg-indigo-950/40 border border-indigo-500/30 text-[11px] text-indigo-200 leading-relaxed backdrop-blur-md">
                     <strong>💡 Simple Analogy:</strong> {selectedSpec.beginnerTip}
                   </div>
                 )}
               </div>
             ) : (
-              <div className="text-xs text-slate-500 py-4 text-center">
+              <div className="text-xs text-slate-400 py-4 text-center">
                 Click any component node on the canvas to inspect its live load and tune configurations.
               </div>
             )}
@@ -3254,14 +3258,14 @@ export default function App() {
           {/* =============================================================== */}
           <div
             ref={mentorSectionRef}
-            className={`bg-slate-950/90 border rounded-2xl p-3.5 space-y-3 transition-all duration-500 ${
+            className={`glass-subpanel rounded-2xl p-3.5 space-y-3 transition-all duration-500 ${
               highlightMentor
-                ? 'border-amber-400 ring-2 ring-amber-400/50 bg-amber-950/20 shadow-xl shadow-amber-950/40 scale-[1.01]'
-                : 'border-cyan-500/30 shadow-lg shadow-cyan-950/10'
+                ? 'border-amber-400 ring-2 ring-amber-400/50 bg-amber-950/20 shadow-2xl scale-[1.01]'
+                : 'border-cyan-500/30 shadow-xl'
             }`}
           >
             {/* Mentor Character Header */}
-            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+            <div className="flex items-center justify-between pb-2 border-b border-indigo-500/20">
               <div className="flex items-center gap-2.5">
                 <div className="relative">
                   <img
@@ -3292,7 +3296,7 @@ export default function App() {
             </div>
 
             {/* Ada's Reactive Speech Bubble */}
-            <div className="p-2.5 rounded-xl bg-cyan-950/30 border border-cyan-500/30 text-xs text-cyan-200 leading-relaxed">
+            <div className="p-2.5 rounded-xl bg-cyan-950/30 border border-cyan-500/30 text-xs text-cyan-200 leading-relaxed backdrop-blur-md">
               <p className="text-[11px] font-medium italic">
                 &ldquo;{adaCurrentTip.text}&rdquo;
               </p>
@@ -3309,7 +3313,7 @@ export default function App() {
                 return (
                   <div
                     key={i}
-                    className={`p-2 rounded-lg border text-[11px] leading-relaxed flex items-start gap-2 ${
+                    className={`p-2 rounded-lg border text-[11px] leading-relaxed flex items-start gap-2 backdrop-blur-md ${
                       isCrit
                         ? 'bg-rose-950/40 border-rose-500/40 text-rose-200'
                         : isWarn
@@ -3330,7 +3334,7 @@ export default function App() {
       {/* =================================================================== */}
       {/* MOBILE BOTTOM NAVIGATION BAR (< lg screens)                         */}
       {/* =================================================================== */}
-      <nav className="lg:hidden shrink-0 bg-slate-900/95 border-t border-slate-800 px-3 py-2 flex items-center justify-around z-30 shadow-2xl backdrop-blur-md safe-bottom">
+      <nav className="lg:hidden shrink-0 glass-header border-t px-3 py-2 flex items-center justify-around z-30 shadow-2xl safe-bottom">
         <button
           type="button"
           onClick={() => {
