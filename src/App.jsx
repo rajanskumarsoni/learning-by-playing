@@ -1973,6 +1973,18 @@ export default function App() {
   const [leaderboardTab, setLeaderboardTab] = useState('DAILY'); // 'DAILY' | 'SURVIVAL'
   const [isLeaderboardShareCopied, setIsLeaderboardShareCopied] = useState(false);
 
+  // 30-Second Fast Onboarding Tutorial State
+  const [tutorialStep, setTutorialStep] = useState(null); // 'DEPLOY_CACHE' | 'WIRE_CACHE' | 'RUN_SIM' | 'SIMULATING' | null
+  const [tutorialStartTime, setTutorialStartTime] = useState(null);
+  const [tutorialVictoryModal, setTutorialVictoryModal] = useState(null);
+  const isTutorialCompleted = useMemo(() => {
+    try {
+      return localStorage.getItem('systemsaviour_tutorial_completed') === 'true';
+    } catch {
+      return false;
+    }
+  }, []);
+
   // Unlocked Badges persistence in localStorage
   const [unlockedBadges, setUnlockedBadges] = useState(() => {
     try {
@@ -2893,6 +2905,18 @@ Can your architecture beat this? Test it in your browser:
                   } catch (e) {}
                   return updated;
                 });
+                if (tutorialStep !== null || currentLevelIdx === 0) {
+                  const elapsed = tutorialStartTime ? Math.max(12, Math.round((Date.now() - tutorialStartTime) / 1000)) : 24;
+                  setTutorialVictoryModal({
+                    elapsedSeconds: elapsed,
+                    p99: evaluation.p99Latency,
+                    uptime: evaluation.uptimePct
+                  });
+                  setTutorialStep(null);
+                  try {
+                    localStorage.setItem('systemsaviour_tutorial_completed', 'true');
+                  } catch {}
+                }
               } else if (gameMode === 'DAILY') {
                 recordDailyCompletion(evaluation.p99Latency);
               }
@@ -3388,6 +3412,87 @@ Can your architecture beat this? Test it in your browser:
     window.open(tweetUrl, '_blank', 'noopener,noreferrer');
   };
 
+  // 30-Second Fast Onboarding Tutorial Engine
+  const handleStartQuickOnboarding = useCallback(() => {
+    introAudioTour.stop();
+    setShowWelcomeModal(false);
+    sound.playSelect();
+    setGameMode('CAMPAIGN');
+    setCurrentLevelIdx(0);
+    // Load fresh Level 1 initial state
+    setNodes(JSON.parse(JSON.stringify(CAMPAIGN_LEVELS[0].initialNodes)));
+    setEdges(JSON.parse(JSON.stringify(CAMPAIGN_LEVELS[0].initialEdges)));
+    setLeftPanelCollapsed(false);
+    setIsRunning(false);
+    setWaveProgress(0);
+    setPostMortemModal(null);
+    setTutorialStep('DEPLOY_CACHE');
+    setTutorialStartTime(Date.now());
+    setTimeout(() => resetView(), 100);
+    setToastNotification({
+      type: 'success',
+      message: '⚡ 30s Tutorial Quest: Click "+ Deploy" on Redis Cache in the left palette!'
+    });
+    setTimeout(() => setToastNotification(null), 3500);
+  }, [resetView]);
+
+  const handleTutorialDeployCache = useCallback(() => {
+    sound.playPlaceNode();
+    handleAddService('CACHE', 490, 210);
+    setTutorialStep('WIRE_CACHE');
+  }, [handleAddService]);
+
+  const handleAutoWireCache = useCallback(() => {
+    sound.playUpgrade();
+    sound.playConnectWire();
+    const webNode = nodes.find((n) => n.type === 'WEB');
+    const cacheNode = nodes.find((n) => n.type === 'CACHE');
+    const sqlNode = nodes.find((n) => n.type === 'SQL');
+
+    if (!cacheNode || !webNode || !sqlNode) return;
+
+    setEdges((prev) => {
+      const filtered = prev.filter((e) => !(e.from === webNode.id && e.to === sqlNode.id));
+      const hasWebToCache = filtered.some((e) => e.from === webNode.id && e.to === cacheNode.id);
+      const hasCacheToSql = filtered.some((e) => e.from === cacheNode.id && e.to === sqlNode.id);
+      const nextEdges = [...filtered];
+      if (!hasWebToCache) nextEdges.push({ id: `e-${Date.now()}-1`, from: webNode.id, to: cacheNode.id });
+      if (!hasCacheToSql) nextEdges.push({ id: `e-${Date.now()}-2`, from: cacheNode.id, to: sqlNode.id });
+      return nextEdges;
+    });
+
+    setTutorialStep('RUN_SIM');
+    setToastNotification({
+      type: 'success',
+      message: '🔌 Redis Cache wired into pipeline! Now click Simulate Peak Wave!'
+    });
+    setTimeout(() => setToastNotification(null), 3000);
+  }, [nodes]);
+
+  // Auto-progress tutorial based on player actions
+  useEffect(() => {
+    if (tutorialStep === 'DEPLOY_CACHE') {
+      if (nodes.some((n) => n.type === 'CACHE')) {
+        sound.playUpgrade();
+        setTutorialStep('WIRE_CACHE');
+      }
+    } else if (tutorialStep === 'WIRE_CACHE') {
+      const cacheNode = nodes.find((n) => n.type === 'CACHE');
+      if (cacheNode) {
+        const hasIncoming = edges.some((e) => e.to === cacheNode.id);
+        const hasOutgoing = edges.some((e) => e.from === cacheNode.id);
+        if (hasIncoming && hasOutgoing) {
+          sound.playUpgrade();
+          setTutorialStep('RUN_SIM');
+        }
+      }
+    } else if (tutorialStep === 'RUN_SIM') {
+      if (isRunning) {
+        setTutorialStep('SIMULATING');
+      }
+    }
+  }, [tutorialStep, nodes, edges, isRunning]);
+
   const selectedNode = nodes.find((n) => n.id === selectedNodeId);
   const selectedSpec = selectedNode ? COMPONENT_CATALOG[selectedNode.type] : null;
   const selectedMetrics = selectedNode ? evaluation.nodeMetrics[selectedNode.id] : null;
@@ -3599,10 +3704,12 @@ Can your architecture beat this? Test it in your browser:
               className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition ${
                 isRunning
                   ? 'bg-amber-500 text-slate-950 hover:bg-amber-400'
+                  : tutorialStep === 'RUN_SIM'
+                  ? 'bg-emerald-400 text-slate-950 hover:bg-emerald-300 ring-4 ring-emerald-400 shadow-[0_0_25px_rgba(16,185,129,0.9)] animate-pulse scale-105'
                   : 'bg-emerald-500 text-slate-950 hover:bg-emerald-400'
               }`}
             >
-              {isRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+              {isRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-slate-950" />}
               {isRunning ? 'Pause Wave' : 'Simulate Peak Wave'}
             </button>
             <button
@@ -3748,6 +3855,16 @@ Can your architecture beat this? Test it in your browser:
           >
             <Award className="w-3.5 h-3.5 text-emerald-400 group-hover:scale-110 transition-transform" />
             <span className="font-bold text-emerald-300 hidden sm:inline">Badges ({unlockedBadges.length})</span>
+          </button>
+
+          {/* Instant 30s Quest Button */}
+          <button
+            onClick={handleStartQuickOnboarding}
+            className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-emerald-600/40 via-teal-600/40 to-cyan-600/40 backdrop-blur-md border border-emerald-400 hover:border-emerald-300 text-xs text-emerald-200 flex items-center gap-1.5 transition shadow-lg shadow-emerald-500/20 group active:scale-95 animate-pulse"
+            title="Instant 30-Second Guided Quest (Deploy Cache -> Auto-Wire -> 1st Victory)"
+          >
+            <Zap className="w-3.5 h-3.5 text-emerald-300 fill-emerald-300/40 group-hover:scale-110 transition-transform" />
+            <span className="font-extrabold text-emerald-200">30s Quest</span>
           </button>
 
           {/* Ada AI Mentor Guide Trigger */}
@@ -4013,6 +4130,7 @@ Can your architecture beat this? Test it in your browser:
             {availableCatalog.map((item) => {
               const Icon = item.icon;
               const isAllowed = gameMode !== 'CAMPAIGN' || currentLevel.allowedComponents.includes(item.type);
+              const isTutorialHighlight = tutorialStep === 'DEPLOY_CACHE' && item.type === 'CACHE';
               return (
                 <div
                   key={item.type}
@@ -4025,13 +4143,23 @@ Can your architecture beat this? Test it in your browser:
                   onClick={() => setDetailModalComponent(item.type)}
                   data-component-type={item.type}
                   className={`group relative w-full text-left p-2.5 rounded-xl border transition-all select-none ${
-                    isAllowed
+                    isTutorialHighlight
+                      ? 'bg-emerald-950/70 border-emerald-400 ring-2 ring-emerald-400 shadow-[0_0_25px_rgba(16,185,129,0.5)] cursor-pointer animate-pulse'
+                      : isAllowed
                       ? 'glass-card cursor-grab active:cursor-grabbing shadow-sm hover:shadow-indigo-500/20'
                       : 'bg-slate-950/30 border-slate-900/60 opacity-40 cursor-not-allowed'
                   }`}
                 >
+                  {/* Tutorial Step Callout Badge */}
+                  {isTutorialHighlight && (
+                    <div className="absolute -top-3 left-2 bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 text-[10px] font-black px-2.5 py-0.5 rounded-full shadow-lg border border-white pointer-events-none z-30 flex items-center gap-1 animate-bounce">
+                      <Zap className="w-3 h-3 fill-slate-950" />
+                      <span>⚡ STEP 1: DEPLOY REDIS CACHE</span>
+                    </div>
+                  )}
+
                   {/* Hover Floating Guide Badge */}
-                  {isAllowed && (
+                  {!isTutorialHighlight && isAllowed && (
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 absolute -top-2.5 right-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full shadow-lg border border-indigo-400/40 pointer-events-none z-30 flex items-center gap-1">
                       <span>💡 Click details • Deploy button to use</span>
                     </div>
@@ -4057,25 +4185,42 @@ Can your architecture beat this? Test it in your browser:
                         </div>
                         <div className="flex items-center gap-1.5">
                           {isAllowed && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleAddService(item.type);
-                                if (window.innerWidth < 1024) {
-                                  setLeftPanelCollapsed(true);
-                                }
-                              }}
-                              className="px-2 py-0.5 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[10px] shadow flex items-center gap-0.5 active:scale-95 transition"
-                              title="Deploy to canvas"
-                            >
-                              <Plus className="w-3 h-3" />
-                              <span>Deploy</span>
-                            </button>
+                            isTutorialHighlight ? (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleTutorialDeployCache();
+                                }}
+                                className="px-2.5 py-1 rounded-lg bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-black text-[11px] shadow-lg shadow-emerald-500/50 flex items-center gap-1 active:scale-95 transition ring-2 ring-white"
+                                title="Deploy Redis Cache to complete Step 1"
+                              >
+                                <Zap className="w-3 h-3 fill-slate-950" />
+                                <span>Deploy Cache!</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleAddService(item.type);
+                                  if (window.innerWidth < 1024) {
+                                    setLeftPanelCollapsed(true);
+                                  }
+                                }}
+                                className="px-2 py-0.5 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[10px] shadow flex items-center gap-0.5 active:scale-95 transition"
+                                title="Deploy to canvas"
+                              >
+                                <Plus className="w-3 h-3" />
+                                <span>Deploy</span>
+                              </button>
+                            )
                           )}
-                          <span className="text-[9px] text-indigo-400 font-semibold group-hover:text-indigo-300">
-                            Details &rarr;
-                          </span>
+                          {!isTutorialHighlight && (
+                            <span className="text-[9px] text-indigo-400 font-semibold group-hover:text-indigo-300">
+                              Details &rarr;
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -4334,6 +4479,84 @@ Can your architecture beat this? Test it in your browser:
               </div>
             )}
           </div>
+
+          {/* 30-SECOND ONBOARDING TUTORIAL FLOATING HUD */}
+          {tutorialStep && tutorialStep !== 'SIMULATING' && (
+            <div className="absolute top-14 left-1/2 -translate-x-1/2 z-40 max-w-xl w-[92%] sm:w-auto bg-slate-950/95 backdrop-blur-xl border-2 border-emerald-400 rounded-2xl p-3 sm:p-4 shadow-[0_0_35px_rgba(16,185,129,0.4)] flex flex-col sm:flex-row items-center gap-3 animate-fade-in pointer-events-auto">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-slate-950 shrink-0 shadow-lg shadow-emerald-500/30">
+                <Zap className="w-5 h-5 fill-current animate-bounce" />
+              </div>
+
+              <div className="flex-1 min-w-0 text-center sm:text-left">
+                <div className="flex items-center justify-center sm:justify-start gap-2">
+                  <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-mono">
+                    Step {tutorialStep === 'DEPLOY_CACHE' ? '1 of 3' : tutorialStep === 'WIRE_CACHE' ? '2 of 3' : '3 of 3'}
+                  </span>
+                  <span className="text-xs font-black text-white">
+                    {tutorialStep === 'DEPLOY_CACHE' && 'Deploy Redis Cache'}
+                    {tutorialStep === 'WIRE_CACHE' && 'Wire Cache Into Pipeline'}
+                    {tutorialStep === 'RUN_SIM' && 'Simulate Peak Wave'}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 mt-1 leading-snug">
+                  {tutorialStep === 'DEPLOY_CACHE' && (
+                    <span>Click <b>"Deploy Cache!"</b> on the left palette to drop Redis onto your canvas!</span>
+                  )}
+                  {tutorialStep === 'WIRE_CACHE' && (
+                    <span>Connect <b>API Gateway → Redis Cache → PostgreSQL</b>, or click <b>Auto-Wire</b>!</span>
+                  )}
+                  {tutorialStep === 'RUN_SIM' && (
+                    <span>Cache wired! Click the pulsing green <b>"Simulate Peak Wave"</b> button!</span>
+                  )}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                {tutorialStep === 'DEPLOY_CACHE' && (
+                  <button
+                    onClick={handleTutorialDeployCache}
+                    className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/30 flex items-center gap-1 active:scale-95 transition whitespace-nowrap"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>1-Click Deploy</span>
+                  </button>
+                )}
+
+                {tutorialStep === 'WIRE_CACHE' && (
+                  <button
+                    onClick={handleAutoWireCache}
+                    className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/30 flex items-center gap-1 active:scale-95 transition whitespace-nowrap"
+                  >
+                    <Share2 className="w-3.5 h-3.5" />
+                    <span>1-Click Auto-Wire</span>
+                  </button>
+                )}
+
+                {tutorialStep === 'RUN_SIM' && (
+                  <button
+                    onClick={() => {
+                      sound.playSimStart();
+                      sound.startAmbientDrone();
+                      setIsRunning(true);
+                      setTutorialStep('SIMULATING');
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/30 flex items-center gap-1 active:scale-95 transition whitespace-nowrap animate-pulse"
+                  >
+                    <Play className="w-3.5 h-3.5 fill-current" />
+                    <span>Launch Sim!</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={() => setTutorialStep(null)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                  title="Exit Tutorial"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* FLOATING CANVAS HUD CONTROLS (BOTTOM-RIGHT) */}
           <div className="absolute bottom-16 lg:bottom-3 right-3 flex items-center gap-1 z-30 pointer-events-auto glass-panel p-1 rounded-xl shadow-2xl">
@@ -5840,6 +6063,38 @@ Can your architecture beat this? Test it in your browser:
               </div>
             )}
 
+            {/* INSTANT PLAY: 30-SECOND TUTORIAL QUEST (ZERO FRICTION) */}
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-950/60 via-slate-900/80 to-teal-950/60 border-2 border-emerald-400 p-4 shadow-xl shadow-emerald-950/40 backdrop-blur-md group hover:border-emerald-300 transition-all">
+              <div className="absolute top-0 right-0 -mt-2 -mr-2 w-32 h-32 bg-emerald-500/15 rounded-full blur-2xl pointer-events-none" />
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-slate-950 font-black shadow-lg shadow-emerald-500/30 ring-2 ring-emerald-300 shrink-0">
+                    <Zap className="w-6 h-6 animate-bounce" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs sm:text-sm font-black text-white tracking-wide uppercase flex items-center gap-1.5">
+                        <span>⚡ Instant Play: 30-Second Victory Quest</span>
+                      </span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-400/20 text-emerald-300 border border-emerald-400/40 uppercase tracking-wider font-mono">
+                        Zero Friction • Guided
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 mt-0.5 max-w-xl">
+                      New to System Saviour? Jump straight into Level 1 with 1-click guided steps: deploy Redis Cache, auto-wire into the pipeline, and win your first victory scorecard in under 30 seconds!
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleStartQuickOnboarding}
+                  className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-emerald-500/30 flex items-center justify-center gap-2 active:scale-95 transition-all whitespace-nowrap ring-2 ring-emerald-200 shrink-0"
+                >
+                  <Zap className="w-4 h-4 fill-current" />
+                  <span>Start 30s Quest →</span>
+                </button>
+              </div>
+            </div>
+
             {/* 2. MODAL HEADER WITH ADA MENTOR BRIEFING */}
             <div
               id="intro-header-card"
@@ -7291,6 +7546,129 @@ Can your architecture beat this? Test it in your browser:
                   Done
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =================================================================== */}
+      {/* 11. 30-SECOND TUTORIAL FIRST VICTORY CELEBRATION MODAL              */}
+      {/* =================================================================== */}
+      {tutorialVictoryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-xl animate-fade-in">
+          <ConfettiOverlay />
+          <div className="relative w-full max-w-lg rounded-3xl bg-slate-900/95 border-2 border-emerald-400 p-6 sm:p-7 shadow-[0_0_60px_rgba(16,185,129,0.5)] text-slate-100 space-y-5 z-10 overflow-hidden">
+            {/* Ambient Glow */}
+            <div className="absolute top-0 right-0 -mr-16 -mt-16 w-48 h-48 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-48 h-48 bg-cyan-500/20 rounded-full blur-3xl pointer-events-none" />
+
+            <div className="flex items-start justify-between relative z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-400 to-teal-400 flex items-center justify-center text-3xl shadow-xl shadow-emerald-500/40 ring-2 ring-emerald-300 shrink-0 animate-bounce">
+                  ⚡
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-mono">
+                      Tutorial Quest Conquered
+                    </span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                      +500 XP
+                    </span>
+                  </div>
+                  <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight mt-0.5">
+                    First Victory Achieved!
+                  </h3>
+                </div>
+              </div>
+              <button
+                onClick={() => setTutorialVictoryModal(null)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                title="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Victory Badge / Speed Highlight */}
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/60 via-slate-900/80 to-teal-950/60 border border-emerald-500/40 space-y-3">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-300 font-medium">⚡ Speedrun Completion Time:</span>
+                <span className="text-base font-black font-mono text-emerald-300">
+                  {tutorialVictoryModal.elapsedSeconds}s to First Win!
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-2 pt-2 border-t border-emerald-500/20 text-center">
+                <div className="p-2 rounded-xl bg-slate-900/60 border border-slate-800">
+                  <div className="text-[10px] text-slate-400 font-mono">SLA UPTIME</div>
+                  <div className="text-sm font-bold text-emerald-400 font-mono mt-0.5">
+                    {tutorialVictoryModal.uptime ? tutorialVictoryModal.uptime.toFixed(1) : '100.0'}%
+                  </div>
+                </div>
+                <div className="p-2 rounded-xl bg-slate-900/60 border border-slate-800">
+                  <div className="text-[10px] text-slate-400 font-mono">P99 LATENCY</div>
+                  <div className="text-sm font-bold text-cyan-400 font-mono mt-0.5">
+                    {tutorialVictoryModal.p99 ? Math.round(tutorialVictoryModal.p99) : 34}ms
+                  </div>
+                </div>
+                <div className="p-2 rounded-xl bg-slate-900/60 border border-slate-800">
+                  <div className="text-[10px] text-slate-400 font-mono">FINOPS COST</div>
+                  <div className="text-sm font-bold text-amber-300 font-mono mt-0.5">
+                    ${evaluation.totalHourlyCost}/hr
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Ada Mentor Praise */}
+            <div className="flex items-start gap-3 p-3 rounded-2xl bg-slate-950/60 border border-indigo-500/30">
+              <img
+                src={mentorAdaImg}
+                alt="Ada Mentor"
+                className="w-10 h-10 rounded-xl object-cover ring-1 ring-cyan-400 shrink-0"
+              />
+              <div className="text-xs text-slate-300 leading-relaxed">
+                <span className="font-bold text-cyan-300">Ada (Lead Architect): </span>
+                "Outstanding execution! By caching high-frequency reads in Redis before hitting PostgreSQL, you slashed I/O bottlenecks and brought P99 latency well under SLA limits. You're ready for production scale!"
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row items-center gap-3 pt-1">
+              <button
+                onClick={() => {
+                  sound.playClick();
+                  const shareText = `⚡ System Saviour: 30s Speedrun Complete!\n⏱️ Time: ${tutorialVictoryModal.elapsedSeconds}s | P99: ${Math.round(tutorialVictoryModal.p99 || 34)}ms | SLA: ${(tutorialVictoryModal.uptime || 100).toFixed(1)}%\n🛡️ Architect: Staff Fellow\n👉 Test your system design skills: https://github.com/rajanskumarsoni/learning-by-playing`;
+                  navigator.clipboard.writeText(shareText);
+                  setToastNotification({
+                    type: 'success',
+                    message: '📋 30s Speedrun Scorecard copied to clipboard!'
+                  });
+                  setTimeout(() => setToastNotification(null), 3000);
+                }}
+                className="w-full sm:flex-1 py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs flex items-center justify-center gap-2 active:scale-95 transition"
+              >
+                <Share2 className="w-4 h-4 text-emerald-400" />
+                <span>Share Speedrun Card</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  sound.playSelect();
+                  setTutorialVictoryModal(null);
+                  setCurrentLevelIdx(1);
+                  setNodes(JSON.parse(JSON.stringify(CAMPAIGN_LEVELS[1].initialNodes)));
+                  setEdges(JSON.parse(JSON.stringify(CAMPAIGN_LEVELS[1].initialEdges)));
+                  setIsRunning(false);
+                  setWaveProgress(0);
+                  setPostMortemModal(null);
+                  setTimeout(() => resetView(), 100);
+                }}
+                className="w-full sm:flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-slate-950 font-black text-xs shadow-xl shadow-emerald-500/30 flex items-center justify-center gap-2 active:scale-95 transition ring-2 ring-emerald-200"
+              >
+                <span>Level 2: Viral Launch →</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
           </div>
         </div>
