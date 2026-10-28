@@ -624,6 +624,112 @@ export const ICONIC_PRESETS = [
 ];
 
 // ============================================================================
+// 3.6. ARCHITECT BADGES & STREAK REWARDS SYSTEM (TROPHIES & XP MULTIPLIERS)
+// ============================================================================
+export const STREAK_REWARDS = [
+  { day: 1, xpBonus: 50, title: 'Day 1: Incident Initiate', perk: '+50 XP Base Bonus', icon: '⚡' },
+  { day: 2, xpBonus: 75, title: 'Day 2: Steady Hand', perk: '+75 XP & Low Latency Crest', icon: '🛡️' },
+  { day: 3, xpBonus: 100, title: 'Day 3: Uptime Sentinel', perk: '🔥 1.25x XP Multiplier & Sentinel Badge', icon: '🔥' },
+  { day: 4, xpBonus: 125, title: 'Day 4: Cluster Veteran', perk: '+125 XP & Surge Tolerance', icon: '🌊' },
+  { day: 5, xpBonus: 150, title: 'Day 5: Chaos Shield', perk: '+150 XP & Auto-Heal Crest', icon: '🐒' },
+  { day: 6, xpBonus: 200, title: 'Day 6: Staff Architect', perk: '+200 XP & Telemetry Halo', icon: '⭐' },
+  { day: 7, xpBonus: 500, title: 'Day 7: Five-Nines Titan', perk: '👑 1.50x XP Multiplier & Titan Trophy', icon: '👑' }
+];
+
+export const ARCHITECT_BADGES = [
+  {
+    id: 'first_wire',
+    title: 'First Pipeline Wire',
+    icon: '🔌',
+    rarity: 'Common',
+    color: 'from-emerald-500/20 to-teal-500/20 border-emerald-500/40 text-emerald-300',
+    xpReward: 100,
+    description: 'Connect your first traffic flow wire between Internet Ingress and a compute node.'
+  },
+  {
+    id: 'cache_king',
+    title: 'Cache is King',
+    icon: '⚡',
+    rarity: 'Rare',
+    color: 'from-cyan-500/20 to-blue-500/20 border-cyan-500/40 text-cyan-300',
+    xpReward: 200,
+    description: 'Deploy a Redis Cache Cluster to absorb read queries and shield your relational database.'
+  },
+  {
+    id: 'ddos_bastion',
+    title: 'DDoS Bastion',
+    icon: '🛡️',
+    rarity: 'Rare',
+    color: 'from-indigo-500/20 to-purple-500/20 border-indigo-500/40 text-indigo-300',
+    xpReward: 250,
+    description: 'Deploy a WAF & Rate Limiter to inspect L7 traffic and filter rogue packet floods.'
+  },
+  {
+    id: 'chaos_tamer',
+    title: 'Chaos Monkey Tamer',
+    icon: '🐒',
+    rarity: 'Epic',
+    color: 'from-rose-500/20 to-red-500/20 border-rose-500/40 text-rose-300',
+    xpReward: 350,
+    description: 'Survive a live Chaos Monkey sabotage strike and successfully hotfix the severed node.'
+  },
+  {
+    id: 'streak_fire',
+    title: 'Uptime Sentinel',
+    icon: '🔥',
+    rarity: 'Epic',
+    color: 'from-amber-500/20 to-orange-500/20 border-amber-500/40 text-amber-300',
+    xpReward: 300,
+    description: 'Maintain a 3-day consecutive Daily Incident challenge streak.'
+  },
+  {
+    id: 'streak_titan',
+    title: 'Five-Nines Titan',
+    icon: '👑',
+    rarity: 'Legendary',
+    color: 'from-yellow-500/20 to-amber-500/20 border-yellow-500/50 text-yellow-300',
+    xpReward: 600,
+    description: 'Maintain a 7-day consecutive Daily Incident challenge streak.'
+  },
+  {
+    id: 'wave_conqueror',
+    title: 'Tsunami Breaker',
+    icon: '🌊',
+    rarity: 'Epic',
+    color: 'from-blue-500/20 to-cyan-500/20 border-blue-500/40 text-blue-300',
+    xpReward: 400,
+    description: 'Survive Wave 3 or higher in Endless Survival Wave mode.'
+  },
+  {
+    id: 'frugal_finops',
+    title: 'Frugal FinOps Master',
+    icon: '💰',
+    rarity: 'Rare',
+    color: 'from-emerald-500/20 to-green-500/20 border-emerald-500/40 text-emerald-300',
+    xpReward: 250,
+    description: 'Pass any production mission with total hourly compute cost under $200/hr.'
+  },
+  {
+    id: 'iconic_architect',
+    title: 'Iconic Architect',
+    icon: '🏛️',
+    rarity: 'Rare',
+    color: 'from-purple-500/20 to-pink-500/20 border-purple-500/40 text-purple-300',
+    xpReward: 200,
+    description: 'Explore and deploy any Iconic Architecture Preset (Netflix, Spotify, Uber, Cloudflare).'
+  },
+  {
+    id: 'staff_fellow',
+    title: 'Mythic Reliability Fellow',
+    icon: '⭐',
+    rarity: 'Legendary',
+    color: 'from-amber-400/25 to-yellow-300/25 border-yellow-400/70 text-yellow-200',
+    xpReward: 1000,
+    description: 'Conquer all 5 Campaign levels and achieve the highest title in distributed systems.'
+  }
+];
+
+// ============================================================================
 // 4. REAL-TIME SIMULATION & TELEMETRY ENGINE
 // ============================================================================
 function getNodeEffectiveStats(node) {
@@ -1386,6 +1492,19 @@ function getChallengeFromUrl() {
       };
     }
 
+    // Check for direct #badges or #achievements hash
+    if (window.location.hash === '#badges' || window.location.hash === '#achievements' || (window.location.search && window.location.search.includes('badges'))) {
+      return {
+        isBadgesDirect: true,
+        gameMode: 'CAMPAIGN',
+        author: 'Architect Showcase',
+        levelIdx: 0,
+        survivalWave: 1,
+        nodes: JSON.parse(JSON.stringify(CAMPAIGN_LEVELS[0].initialNodes)),
+        edges: JSON.parse(JSON.stringify(CAMPAIGN_LEVELS[0].initialEdges))
+      };
+    }
+
     let encoded = null;
     if (window.location.hash) {
       const hashStr = window.location.hash.replace(/^#/, '');
@@ -1848,8 +1967,38 @@ export default function App() {
   const [detailModalComponent, setDetailModalComponent] = useState(null);
   const [showLeaderboardModal, setShowLeaderboardModal] = useState(() => initialChallengeRef.current?.isLeaderboardDirect || false);
   const [showPresetsModal, setShowPresetsModal] = useState(() => initialChallengeRef.current?.isPresetsModalOpen || false);
+  const [showBadgesModal, setShowBadgesModal] = useState(() => initialChallengeRef.current?.isBadgesDirect || false);
+  const [isBadgesShareCopied, setIsBadgesShareCopied] = useState(false);
+  const [badgeToast, setBadgeToast] = useState(null); // { badge, timestamp }
   const [leaderboardTab, setLeaderboardTab] = useState('DAILY'); // 'DAILY' | 'SURVIVAL'
   const [isLeaderboardShareCopied, setIsLeaderboardShareCopied] = useState(false);
+
+  // Unlocked Badges persistence in localStorage
+  const [unlockedBadges, setUnlockedBadges] = useState(() => {
+    try {
+      const saved = localStorage.getItem('systemsaviour_unlocked_badges');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const unlockBadge = useCallback((badgeId) => {
+    setUnlockedBadges((prev) => {
+      if (prev.includes(badgeId)) return prev;
+      const next = [...prev, badgeId];
+      try {
+        localStorage.setItem('systemsaviour_unlocked_badges', JSON.stringify(next));
+      } catch {}
+      const b = ARCHITECT_BADGES.find((x) => x.id === badgeId);
+      if (b) {
+        sound.playUpgrade();
+        setBadgeToast(b);
+        setTimeout(() => setBadgeToast((curr) => (curr?.id === b.id ? null : curr)), 4500);
+      }
+      return next;
+    });
+  }, []);
 
   // Game Audio Synthesizer State
   const [isSoundMuted, setIsSoundMuted] = useState(() => sound.isMuted);
@@ -2068,7 +2217,7 @@ export default function App() {
   const touchStartZoomRef = useRef(1);
   const [chaosBanner, setChaosBanner] = useState(null);
 
-  // Player Architect Rank progression based on cleared levels & survival waves
+  // Player Architect Rank progression based on cleared levels, survival waves, badges & streak
   const playerRank = useMemo(() => {
     const ranks = [
       { level: 1, title: 'Cadet Architect', badge: '🔰' },
@@ -2078,12 +2227,48 @@ export default function App() {
       { level: 5, title: 'Legendary Cloud Saviour', badge: '👑' }
     ];
     const rankIdx = Math.min(unlockedLevelIdx, ranks.length - 1);
-    const xp = (unlockedLevelIdx + 1) * 350 + (survivalWave > 1 ? (survivalWave - 1) * 200 : 0);
+    const badgeBonusXp = unlockedBadges.reduce((sum, bId) => {
+      const b = ARCHITECT_BADGES.find((x) => x.id === bId);
+      return sum + (b?.xpReward || 0);
+    }, 0);
+    const streakBonusXp = Math.min(dailyStreak * 100, 1000);
+    const baseCampaignXp = (unlockedLevelIdx + 1) * 350;
+    const survivalXp = survivalWave > 1 ? (survivalWave - 1) * 200 : 0;
+    const totalXp = baseCampaignXp + survivalXp + badgeBonusXp + streakBonusXp;
     return {
       ...ranks[rankIdx],
-      xp
+      xp: totalXp,
+      badgeBonusXp,
+      streakBonusXp,
+      baseCampaignXp,
+      survivalXp
     };
-  }, [unlockedLevelIdx, survivalWave]);
+  }, [unlockedLevelIdx, survivalWave, unlockedBadges, dailyStreak]);
+
+  // Automatic Architect Badges check
+  useEffect(() => {
+    if (edges.length > 0 && !unlockedBadges.includes('first_wire')) {
+      unlockBadge('first_wire');
+    }
+    if (nodes.some((n) => n.type === 'CACHE') && !unlockedBadges.includes('cache_king')) {
+      unlockBadge('cache_king');
+    }
+    if (nodes.some((n) => n.type === 'WAF') && !unlockedBadges.includes('ddos_bastion')) {
+      unlockBadge('ddos_bastion');
+    }
+    if (dailyStreak >= 3 && !unlockedBadges.includes('streak_fire')) {
+      unlockBadge('streak_fire');
+    }
+    if (dailyStreak >= 7 && !unlockedBadges.includes('streak_titan')) {
+      unlockBadge('streak_titan');
+    }
+    if (bestSurvivalWave >= 3 && !unlockedBadges.includes('wave_conqueror')) {
+      unlockBadge('wave_conqueror');
+    }
+    if (unlockedLevelIdx >= 4 && !unlockedBadges.includes('staff_fellow')) {
+      unlockBadge('staff_fellow');
+    }
+  }, [edges, nodes, dailyStreak, bestSurvivalWave, unlockedLevelIdx, unlockedBadges, unlockBadge]);
 
   // Personal Best and Leaderboard Calculations
   const playerDailyBest = useMemo(() => {
@@ -2696,6 +2881,9 @@ Can your architecture beat this? Test it in your browser:
             const isWon = passedSLA && passedBudget;
             if (isWon) {
               sound.playVictory();
+              if (evaluation.totalHourlyCost <= 200) {
+                unlockBadge('frugal_finops');
+              }
               if (gameMode === 'CAMPAIGN') {
                 setUnlockedLevelIdx((prev) => {
                   const updated = Math.min(CAMPAIGN_LEVELS.length - 1, Math.max(prev, currentLevelIdx + 1));
@@ -3080,6 +3268,7 @@ Can your architecture beat this? Test it in your browser:
   const handleHotfixChaosNode = (nodeId) => {
     sound.playUpgrade();
     sound.playPlaceNode();
+    unlockBadge('chaos_tamer');
     setNodes((prev) => prev.map((n) => (n.id === nodeId ? { ...n, crashed: false } : n)));
     setChaosEncounter(null);
     setActiveOutageTicker(null);
@@ -3136,6 +3325,7 @@ Can your architecture beat this? Test it in your browser:
   const handleLoadIconicPreset = (preset) => {
     sound.playUpgrade();
     sound.playPlaceNode();
+    unlockBadge('iconic_architect');
     setGameMode('SANDBOX');
     setNodes(JSON.parse(JSON.stringify(preset.nodes)));
     setEdges(JSON.parse(JSON.stringify(preset.edges)));
@@ -3164,6 +3354,38 @@ Can your architecture beat this? Test it in your browser:
       message: `Link for ${preset.name} copied! Anyone can load this exact architecture 📋`
     });
     setTimeout(() => setToastNotification(null), 3500);
+  };
+
+  // Share Architect Badges & Trophy Showcase
+  const handleShareBadges = () => {
+    sound.playClick();
+    const unlockedTitles = unlockedBadges
+      .map((id) => ARCHITECT_BADGES.find((b) => b.id === id)?.title)
+      .filter(Boolean)
+      .slice(0, 4)
+      .join(', ');
+    const text = `🎖️ System Saviour Architect Credentials:\n👑 Rank: ${playerRank.title} (${playerRank.xp.toLocaleString()} XP)\n🔥 Daily Streak: ${dailyStreak} Day${dailyStreak === 1 ? '' : 's'}${dailyStreak >= 3 ? ' (1.25x Boost)' : ''}\n🏆 Badges: ${unlockedBadges.length}/${ARCHITECT_BADGES.length} Unlocked${unlockedTitles ? ` (${unlockedTitles}...)` : ''}\n\nCan your distributed architecture beat mine?\nTest your reliability in your browser 👉 ${window.location.origin + window.location.pathname}#badges`;
+
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+    }
+    setIsBadgesShareCopied(true);
+    setToastNotification({
+      type: 'success',
+      message: 'Architect trophy scorecard copied! Ready to paste & flex on Twitter or Slack 🏆'
+    });
+    setTimeout(() => {
+      setIsBadgesShareCopied(false);
+      setToastNotification(null);
+    }, 3500);
+  };
+
+  const handleTweetBadges = () => {
+    sound.playClick();
+    const text = `🎖️ System Saviour Architect Credentials:\n👑 Rank: ${playerRank.title} (${playerRank.xp.toLocaleString()} XP)\n🔥 Daily Streak: ${dailyStreak} Days\n🏆 Badges: ${unlockedBadges.length}/${ARCHITECT_BADGES.length} Unlocked\n\nCan your distributed architecture survive Chaos Monkey? Test it:`;
+    const shareUrl = `${window.location.origin + window.location.pathname}#badges`;
+    const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}`;
+    window.open(tweetUrl, '_blank', 'noopener,noreferrer');
   };
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId);
@@ -3202,13 +3424,30 @@ Can your architecture beat this? Test it in your browser:
               <h1 className="font-black text-xs sm:text-sm tracking-wide text-white truncate font-display">
                 System Saviour <span className="text-cyan-400">Simulator</span>
               </h1>
-              <span className="text-[9px] sm:text-[10px] font-bold uppercase px-1.5 sm:px-2 py-0.5 rounded-full bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-indigo-300 border border-indigo-500/40 shrink-0 flex items-center gap-1">
+              <button
+                onClick={() => {
+                  sound.playClick();
+                  setShowBadgesModal(true);
+                }}
+                className="cursor-pointer hover:border-indigo-400 hover:scale-105 transition text-[9px] sm:text-[10px] font-bold uppercase px-1.5 sm:px-2 py-0.5 rounded-full bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-indigo-300 border border-indigo-500/40 shrink-0 flex items-center gap-1 shadow-sm active:scale-95"
+                title="Click to view Architect Badges, Daily Streak Rewards & XP Showcase"
+              >
                 <span>{playerRank.badge}</span>
                 <span className="hidden xs:inline">{playerRank.title}</span>
-              </span>
+                <span className="text-amber-400 font-mono ml-0.5 font-black">🎖️{unlockedBadges.length}</span>
+              </button>
             </div>
             <div className="flex items-center gap-2 text-[10px] text-slate-400">
-              <span className="hidden sm:inline font-mono text-indigo-300">XP: {playerRank.xp}</span>
+              <span
+                onClick={() => {
+                  sound.playClick();
+                  setShowBadgesModal(true);
+                }}
+                className="hidden sm:inline font-mono text-indigo-300 hover:text-white cursor-pointer transition font-bold"
+                title="Total Architect XP (Click to view breakdown & badges)"
+              >
+                XP: {playerRank.xp.toLocaleString()}
+              </span>
               <span className="hidden sm:inline text-slate-600">•</span>
               <span className="flex items-center gap-1 text-cyan-400">
                 <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
@@ -3496,6 +3735,19 @@ Can your architecture beat this? Test it in your browser:
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-400 group-hover:rotate-12 transition-transform" />
             <span className="font-bold text-purple-300 hidden sm:inline">Presets</span>
+          </button>
+
+          {/* Architect Badges & Streak Rewards Button */}
+          <button
+            onClick={() => {
+              sound.playClick();
+              setShowBadgesModal(true);
+            }}
+            className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-emerald-950/80 to-teal-950/80 backdrop-blur-md border border-emerald-500/50 hover:border-emerald-400 text-xs text-emerald-200 flex items-center gap-1.5 transition shadow-md shadow-emerald-950/30 group active:scale-95"
+            title="View Architect Badges, Daily Streak Rewards & Trophy Showcase"
+          >
+            <Award className="w-3.5 h-3.5 text-emerald-400 group-hover:scale-110 transition-transform" />
+            <span className="font-bold text-emerald-300 hidden sm:inline">Badges ({unlockedBadges.length})</span>
           </button>
 
           {/* Ada AI Mentor Guide Trigger */}
@@ -6815,6 +7067,235 @@ Can your architecture beat this? Test it in your browser:
         </div>
       )}
 
+      {/* ========================================================================= */}
+      {/* ARCHITECT BADGES & DAILY STREAK REWARDS SHOWCASE MODAL                    */}
+      {/* ========================================================================= */}
+      {showBadgesModal && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setShowBadgesModal(false)}
+        >
+          <div
+            className="w-full max-w-4xl max-h-[92vh] flex flex-col rounded-3xl bg-slate-900/95 border border-amber-500/40 shadow-2xl shadow-amber-950/60 overflow-hidden text-slate-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="p-5 pb-4 border-b border-slate-800/80 bg-gradient-to-r from-slate-900 via-amber-950/50 to-slate-900 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 via-yellow-400 to-orange-500 flex items-center justify-center text-white shadow-lg shadow-amber-500/25">
+                  <Award className="w-6 h-6 text-slate-950" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xl font-black font-display tracking-tight text-white">
+                      Architect Badges &amp; Streak Rewards
+                    </h2>
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300">
+                      {unlockedBadges.length} / {ARCHITECT_BADGES.length} Unlocked
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    Earn permanent SRE trophies, stack consecutive daily streak XP multipliers, and flex your reliability credentials
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowBadgesModal(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Scrollable Body */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-6 min-h-0">
+              {/* Career Banner: Rank + XP Breakdown + Streak Multiplier */}
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-950 via-indigo-950/40 to-slate-950 border border-indigo-500/30 flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-14 h-14 rounded-2xl bg-slate-900 border border-indigo-400/40 flex items-center justify-center text-3xl shadow-inner shadow-indigo-500/20">
+                    {playerRank.badge}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-mono uppercase tracking-wider text-indigo-400 font-bold">
+                        Architect Rank (Level {playerRank.level}/5)
+                      </span>
+                    </div>
+                    <h3 className="text-lg font-black text-white">{playerRank.title}</h3>
+                    <div className="flex items-center gap-2 text-xs text-slate-400 font-mono mt-0.5">
+                      <span className="text-amber-300 font-bold">{playerRank.xp.toLocaleString()} XP</span>
+                      <span>•</span>
+                      <span>Campaign: +{playerRank.baseCampaignXp}</span>
+                      <span>•</span>
+                      <span>Badges: +{playerRank.badgeBonusXp}</span>
+                      <span>•</span>
+                      <span>Streak: +{playerRank.streakBonusXp}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Active Daily Streak Status */}
+                <div className="flex items-center gap-3 bg-amber-950/40 border border-amber-500/40 rounded-xl px-4 py-2.5">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center text-xl">
+                    🔥
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase font-bold text-amber-400 font-mono">Current Daily Streak</div>
+                    <div className="text-sm font-black text-white">
+                      {dailyStreak} Day{dailyStreak === 1 ? '' : 's'} Consecutive
+                    </div>
+                    <div className="text-[10px] text-amber-300/80 font-mono">
+                      {dailyStreak >= 7 ? '👑 1.50x XP Multiplier Active!' : dailyStreak >= 3 ? '🔥 1.25x XP Multiplier Active!' : 'Target: 3 Days for 1.25x Boost'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 7-Day Streak Rewards Track */}
+              <div>
+                <div className="flex items-center justify-between mb-2.5">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-amber-300 font-mono flex items-center gap-1.5">
+                    <span>🔥</span>
+                    <span>7-Day Daily Incident Streak Track</span>
+                  </h4>
+                  <span className="text-[11px] text-slate-400">Resets if a day is missed</span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
+                  {STREAK_REWARDS.map((tier) => {
+                    const isClaimed = dailyStreak >= tier.day;
+                    const isNext = dailyStreak + 1 === tier.day;
+                    return (
+                      <div
+                        key={tier.day}
+                        className={`p-3 rounded-xl border flex flex-col items-center text-center transition-all ${
+                          isClaimed
+                            ? 'bg-gradient-to-b from-amber-500/20 to-orange-500/10 border-amber-400/60 shadow-md shadow-amber-950/40'
+                            : isNext
+                            ? 'bg-slate-900/60 border-amber-400/40 ring-1 ring-amber-400/30 animate-pulse'
+                            : 'bg-slate-900/40 border-slate-800 opacity-60'
+                        }`}
+                      >
+                        <div className="text-xl mb-1">{tier.icon}</div>
+                        <div className="text-[11px] font-black text-white font-mono">Day {tier.day}</div>
+                        <div className="text-[9px] font-mono text-amber-300 font-bold mt-0.5">+{tier.xpBonus} XP</div>
+                        <div className="text-[8px] text-slate-400 mt-1 leading-tight line-clamp-2">{tier.perk}</div>
+                        <div className="mt-2 text-[9px] font-bold">
+                          {isClaimed ? (
+                            <span className="text-emerald-400 font-mono">✓ Claimed</span>
+                          ) : isNext ? (
+                            <span className="text-amber-400 font-mono">Next Target</span>
+                          ) : (
+                            <span className="text-slate-600 font-mono">Locked</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 10 Architect Badges Grid */}
+              <div>
+                <div className="flex items-center justify-between mb-2.5">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-300 font-mono flex items-center gap-1.5">
+                    <span>🎖️</span>
+                    <span>Engineering Milestone Badges</span>
+                  </h4>
+                  <span className="text-[11px] text-slate-400 font-mono">
+                    {unlockedBadges.length} of {ARCHITECT_BADGES.length} Unlocked
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {ARCHITECT_BADGES.map((badge) => {
+                    const isUnlocked = unlockedBadges.includes(badge.id);
+                    return (
+                      <div
+                        key={badge.id}
+                        className={`p-3.5 rounded-2xl border flex items-start gap-3.5 transition-all ${
+                          isUnlocked
+                            ? `bg-gradient-to-br ${badge.color} shadow-md`
+                            : 'bg-slate-900/40 border-slate-800/80 opacity-60 hover:opacity-80'
+                        }`}
+                      >
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0 ${
+                          isUnlocked ? 'bg-slate-900/80 border border-white/10 shadow-inner' : 'bg-slate-950/80 border border-slate-800 text-slate-600'
+                        }`}>
+                          {isUnlocked ? badge.icon : '🔒'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <h5 className={`text-sm font-bold truncate ${isUnlocked ? 'text-white' : 'text-slate-400'}`}>
+                              {badge.title}
+                            </h5>
+                            <span className={`text-[9px] font-mono px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                              badge.rarity === 'Legendary'
+                                ? 'bg-amber-400/20 text-yellow-300 border border-yellow-400/40'
+                                : badge.rarity === 'Epic'
+                                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                                : badge.rarity === 'Rare'
+                                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                                : 'bg-slate-700/40 text-slate-300 border border-slate-600/40'
+                            }`}>
+                              {badge.rarity}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-300/90 mt-1 leading-snug">
+                            {badge.description}
+                          </p>
+                          <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-slate-800/40 text-[10px] font-mono">
+                            <span className="text-amber-400 font-bold">+{badge.xpReward} XP Reward</span>
+                            <span className={isUnlocked ? 'text-emerald-400 font-bold flex items-center gap-1' : 'text-slate-500 flex items-center gap-1'}>
+                              {isUnlocked ? '✓ UNLOCKED' : 'LOCKED'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer (Share & Close) */}
+            <div className="p-4 border-t border-slate-800/80 bg-slate-950/80 flex flex-wrap items-center justify-between gap-3">
+              <div className="text-xs text-slate-400 flex items-center gap-2">
+                <span>Total XP Earned:</span>
+                <span className="text-amber-300 font-mono font-bold">{playerRank.xp.toLocaleString()} XP</span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleShareBadges}
+                  className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600/60 text-xs font-bold text-slate-200 flex items-center gap-1.5 transition active:scale-95 shadow-md"
+                  title="Copy formatted trophy stats to clipboard"
+                >
+                  {isBadgesShareCopied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-slate-400" />}
+                  <span>{isBadgesShareCopied ? 'Trophies Copied!' : 'Copy Showcase'}</span>
+                </button>
+
+                <button
+                  onClick={handleTweetBadges}
+                  className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white text-xs font-bold flex items-center gap-1.5 transition active:scale-95 shadow-lg shadow-sky-500/25"
+                  title="Share on Twitter / X"
+                >
+                  <Share2 className="w-4 h-4" />
+                  <span>Flex on X</span>
+                </button>
+
+                <button
+                  onClick={() => setShowBadgesModal(false)}
+                  className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition active:scale-95 shadow-md shadow-indigo-600/30"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Hidden File Input for Blueprint Import */}
       <input
         type="file"
@@ -6823,6 +7304,34 @@ Can your architecture beat this? Test it in your browser:
         accept=".json,application/json"
         className="hidden"
       />
+
+      {/* Newly Unlocked Trophy / Badge Toast Notification */}
+      {badgeToast && (
+        <div
+          onClick={() => {
+            sound.playClick();
+            setShowBadgesModal(true);
+          }}
+          className="fixed top-16 right-4 z-50 p-4 rounded-2xl bg-slate-900/95 border-2 border-amber-400 shadow-[0_0_35px_rgba(245,158,11,0.5)] backdrop-blur-xl flex items-center gap-3.5 cursor-pointer animate-in slide-in-from-top duration-300 group max-w-sm"
+        >
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-amber-500 to-yellow-400 flex items-center justify-center text-2xl shadow-lg shadow-amber-500/30 group-hover:scale-110 transition-transform">
+            {badgeToast.icon}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 font-mono">
+                🏆 Trophy Unlocked!
+              </span>
+              <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-amber-400/20 text-amber-300 font-bold">
+                +{badgeToast.xpReward} XP
+              </span>
+            </div>
+            <h4 className="text-sm font-bold text-white truncate">{badgeToast.title}</h4>
+            <p className="text-xs text-slate-300 line-clamp-1">{badgeToast.description}</p>
+          </div>
+          <ChevronRight className="w-4 h-4 text-amber-400 group-hover:translate-x-1 transition-transform" />
+        </div>
+      )}
 
       {/* Floating Glass Toast Notification Banner */}
       {toastNotification && (
