@@ -1607,6 +1607,95 @@ function ConfettiOverlay() {
 }
 
 // ============================================================================
+// 4.7. REAL-TIME AUDIO VISUALIZER & ADAPTIVE TRAFFIC BEAT COMPONENT
+// ============================================================================
+function AudioVisualizerWidget({ soundEngine, isMuted, isPlaying, className = '' }) {
+  const [bars, setBars] = useState([0.2, 0.4, 0.6, 0.3, 0.5]);
+  const [beatInfo, setBeatInfo] = useState({ bpm: 124, playbackRate: '1.00', intensity: 'NORMAL' });
+
+  useEffect(() => {
+    let animId;
+    let lastTime = 0;
+
+    const updateBars = (time) => {
+      if (time - lastTime > 40) { // ~25 fps update rate for smooth 60Hz response
+        lastTime = time;
+        if (soundEngine) {
+          const data = soundEngine.getVisualizerData();
+          setBars(data);
+          setBeatInfo(soundEngine.getBeatInfo());
+        }
+      }
+      animId = requestAnimationFrame(updateBars);
+    };
+
+    animId = requestAnimationFrame(updateBars);
+    return () => cancelAnimationFrame(animId);
+  }, [soundEngine]);
+
+  const getBarColor = (intensity) => {
+    if (intensity === 'CHAOS_P0') {
+      return 'bg-gradient-to-t from-rose-600 via-red-500 to-amber-300 shadow-[0_0_8px_rgba(239,68,68,0.7)]';
+    }
+    if (intensity === 'OVERLOAD') {
+      return 'bg-gradient-to-t from-amber-600 via-orange-500 to-yellow-300 shadow-[0_0_8px_rgba(245,158,11,0.6)]';
+    }
+    if (intensity === 'SURGE') {
+      return 'bg-gradient-to-t from-cyan-600 via-teal-400 to-emerald-300 shadow-[0_0_8px_rgba(20,184,166,0.5)]';
+    }
+    return 'bg-gradient-to-t from-indigo-500 via-cyan-400 to-emerald-300 shadow-[0_0_6px_rgba(56,189,248,0.4)]';
+  };
+
+  const isSilenced = isMuted || !isPlaying;
+
+  return (
+    <div
+      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl border border-slate-700/60 bg-slate-900/80 backdrop-blur-md shadow-md transition-all ${className}`}
+      title={`Live Audio Spectrum • Adaptive Beat: ${beatInfo.bpm} BPM (${beatInfo.intensity})`}
+    >
+      {/* 5 Equalizer Frequency Spectrum Bars */}
+      <div className="flex items-end gap-[3px] h-4 w-6 justify-center">
+        {bars.map((val, idx) => {
+          const heightPx = isSilenced ? 3 : Math.max(3, Math.round(val * 16));
+          return (
+            <div
+              key={idx}
+              className={`w-[3px] rounded-full transition-all duration-75 ${
+                isSilenced ? 'bg-slate-700' : getBarColor(beatInfo.intensity)
+              }`}
+              style={{ height: `${heightPx}px` }}
+            />
+          );
+        })}
+      </div>
+
+      {/* Dynamic Beat Rate / Intensity Indicator */}
+      <div className="flex items-center gap-1 font-mono">
+        <span
+          className={`text-[11px] font-bold tracking-tight leading-none ${
+            isSilenced
+              ? 'text-slate-500'
+              : beatInfo.intensity === 'CHAOS_P0'
+              ? 'text-rose-400 font-extrabold animate-pulse'
+              : beatInfo.intensity === 'OVERLOAD'
+              ? 'text-amber-400 font-bold'
+              : beatInfo.intensity === 'SURGE'
+              ? 'text-cyan-300 font-bold'
+              : 'text-indigo-300'
+          }`}
+        >
+          {beatInfo.bpm}
+          <span className="text-[8px] text-slate-400 ml-0.5">BPM</span>
+        </span>
+        {!isSilenced && beatInfo.intensity === 'CHAOS_P0' && (
+          <span className="text-[10px] text-rose-400 animate-bounce leading-none" title="P0 High-Alert Tempo Surge!">🔥</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
 // 5. MAIN REACT APPLICATION COMPONENT
 // ============================================================================
 export default function App() {
@@ -2440,6 +2529,14 @@ Can your architecture beat this? Test it in your browser:
   const passedUptime = evaluation.uptimePct >= targetMinUptime;
   const passedBudget = !currentMaxBudget || evaluation.totalHourlyCost <= currentMaxBudget;
   const isLevelPassing = passedLatency && passedUptime && passedBudget;
+
+  // Drive Adaptive Traffic Beat Engine
+  useEffect(() => {
+    const loadRatio = Math.min(1.2, currentLiveRps / Math.max(1, targetPeakRps));
+    const hasCrashedNodes = nodes.some((n) => n.crashed);
+    const isIncident = chaosEncounter !== null || isRedAlertActive || hasCrashedNodes || evaluation.uptimePct < 98;
+    sound.setAdaptiveTrafficBeat(loadRatio, isIncident, isRunning);
+  }, [currentLiveRps, targetPeakRps, chaosEncounter, isRedAlertActive, nodes, evaluation.uptimePct, isRunning]);
 
   // Ada's Reactive Tactical Comms Advice
   const adaCurrentTip = useMemo(() => {
@@ -3316,6 +3413,14 @@ Can your architecture beat this? Test it in your browser:
             </button>
           </div>
 
+          {/* Real-Time Audio Visualizer & Adaptive Traffic Beat Engine */}
+          <AudioVisualizerWidget
+            soundEngine={sound}
+            isMuted={isSoundMuted}
+            isPlaying={isAudioActive}
+            className="hidden sm:flex"
+          />
+
           {/* Audio Synthesizer Mute / Unmute Button */}
           <button
             onClick={toggleSound}
@@ -3327,7 +3432,7 @@ Can your architecture beat this? Test it in your browser:
             title={isSoundMuted ? 'Game Audio is Muted — Click to Enable Sound' : 'Game Audio is Active — Click to Mute'}
           >
             {isSoundMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4 animate-pulse text-indigo-400" />}
-            <span className="font-bold hidden sm:inline">{isSoundMuted ? 'Muted' : 'Sound ON'}</span>
+            <span className="font-bold hidden md:inline">{isSoundMuted ? 'Muted' : 'Sound ON'}</span>
           </button>
 
           {/* Warrior Battle Music Track Toggle */}
@@ -3347,7 +3452,7 @@ Can your architecture beat this? Test it in your browser:
             title="Warrior Battle Music Soundtrack (Click to Toggle)"
           >
             <Music className={`w-3.5 h-3.5 ${isAudioActive && !isSoundMuted ? 'animate-bounce text-amber-400' : ''}`} />
-            <span className="font-bold hidden md:inline">Warrior Theme: {isAudioActive && !isSoundMuted ? 'ON (75%)' : 'OFF'}</span>
+            <span className="font-bold hidden lg:inline">Theme: {isAudioActive && !isSoundMuted ? 'ON (75%)' : 'OFF'}</span>
           </button>
 
           {/* Chaos Monkey Incident Trigger */}
@@ -5416,6 +5521,14 @@ Can your architecture beat this? Test it in your browser:
                   </button>
                 </div>
 
+                {/* Real-time Spectrum Visualizer */}
+                <AudioVisualizerWidget
+                  soundEngine={sound}
+                  isMuted={isSoundMuted}
+                  isPlaying={isAudioActive}
+                  className="bg-amber-950/30 border-amber-500/30"
+                />
+
                 {/* Warrior Battle Soundtrack Toggle */}
                 <button
                   onClick={() => {
@@ -5434,13 +5547,6 @@ Can your architecture beat this? Test it in your browser:
                 >
                   <Music className={`w-3.5 h-3.5 ${isAudioActive ? 'animate-bounce text-amber-400' : ''}`} />
                   <span>Warrior Theme: {isAudioActive ? 'ON (75%)' : 'OFF'}</span>
-                  {isAudioActive && (
-                    <div className="flex items-center gap-0.5 h-2.5">
-                      <span className="w-0.5 h-2 bg-amber-400 animate-pulse" />
-                      <span className="w-0.5 h-3 bg-red-400 animate-ping" />
-                      <span className="w-0.5 h-1.5 bg-amber-400 animate-pulse" />
-                    </div>
-                  )}
                 </button>
               </div>
             </div>

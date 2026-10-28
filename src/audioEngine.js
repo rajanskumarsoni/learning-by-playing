@@ -20,6 +20,9 @@ class SoundEngine {
     this.isSaviourMusicPlaying = true; // Default music is ON!
     this.warriorAudio = null;
     this.warriorSourceNode = null;
+    this.analyser = null;
+    this.analyserDataArray = null;
+    this.currentPlaybackRate = 1.0;
     this.musicTargetGain = 0.75; // High, audible, energetic warrior theme volume
     this.duckedGain = 0.30;      // Background volume during Ada speech (keeps music clearly audible!)
     this.isDucked = false;
@@ -41,7 +44,15 @@ class SoundEngine {
         this.ctx = new AudioCtx();
         this.masterGain = this.ctx.createGain();
         this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : 0.95, this.ctx.currentTime);
-        this.masterGain.connect(this.ctx.destination);
+        
+        // Real-time audio analyser for dynamic visualizer
+        this.analyser = this.ctx.createAnalyser();
+        this.analyser.fftSize = 64;
+        this.analyser.smoothingTimeConstant = 0.8;
+        this.analyserDataArray = new Uint8Array(this.analyser.frequencyBinCount);
+
+        this.masterGain.connect(this.analyser);
+        this.analyser.connect(this.ctx.destination);
       }
     }
     if (this.ctx && this.ctx.state === 'suspended') {
@@ -499,6 +510,16 @@ class SoundEngine {
         this.warriorAudio.loop = true;
         this.warriorAudio.preload = 'auto';
         this.warriorAudio.volume = this.isMuted ? 0 : (this.isDucked ? this.duckedGain : this.musicTargetGain);
+        this.warriorAudio.playbackRate = this.currentPlaybackRate || 1.0;
+
+        if (this.ctx && !this.warriorSourceNode) {
+          try {
+            this.warriorSourceNode = this.ctx.createMediaElementSource(this.warriorAudio);
+            this.warriorSourceNode.connect(this.masterGain);
+          } catch (e) {
+            // Handled gracefully if browser policy forbids re-routing
+          }
+        }
 
         this.warriorAudio.onerror = (e) => {
           console.warn('Primary warrior audio load failed, falling back to public path:', e);
@@ -633,6 +654,98 @@ class SoundEngine {
     // Audibly ducked to 0.30 when Ada IS speaking so player still clearly hears the warrior beat!
     const target = isDucked ? this.duckedGain : this.musicTargetGain;
     this.fadeWarriorVolume(target, 280);
+  }
+
+  // ============================================================================
+  // 16. ADAPTIVE TRAFFIC BEAT ENGINE & REAL-TIME AUDIO VISUALIZER
+  // ============================================================================
+  setAdaptiveTrafficBeat(loadRatio = 0.5, isIncident = false, isRunning = false) {
+    let targetRate = 1.0;
+    if (isIncident) {
+      targetRate = 1.18; // Urgent adrenaline rush during Chaos Monkey / Red Alert!
+    } else if (isRunning) {
+      if (loadRatio > 0.85) {
+        targetRate = 1.12; // High-traffic surge
+      } else if (loadRatio > 0.50) {
+        targetRate = 1.06; // Active scaling
+      } else {
+        targetRate = 1.0;
+      }
+    } else {
+      targetRate = 1.0; // Normal idle
+    }
+
+    // Smoothly interpolate current playback rate towards target
+    const current = this.currentPlaybackRate || 1.0;
+    const next = current + (targetRate - current) * 0.18;
+    this.currentPlaybackRate = next;
+
+    if (this.warriorAudio) {
+      try {
+        this.warriorAudio.playbackRate = Math.max(0.95, Math.min(1.22, next));
+      } catch (e) {}
+    }
+
+    // Modulate ambient drone pitch if running
+    if (this.ambientOsc1 && this.ctx) {
+      const dronePitch = isIncident ? 65 : 55 + (loadRatio * 15);
+      this.ambientOsc1.frequency.setTargetAtTime(dronePitch, this.ctx.currentTime, 0.2);
+    }
+  }
+
+  getBeatInfo() {
+    const rate = this.currentPlaybackRate || 1.0;
+    const bpm = Math.round(124 * rate);
+    let intensity = 'NORMAL';
+    if (rate >= 1.15) intensity = 'CHAOS_P0';
+    else if (rate >= 1.10) intensity = 'OVERLOAD';
+    else if (rate >= 1.04) intensity = 'SURGE';
+
+    return {
+      bpm,
+      playbackRate: rate.toFixed(2),
+      intensity
+    };
+  }
+
+  getVisualizerData() {
+    // If Web Audio analyser node is hooked up and receiving frequency spectrum data
+    if (this.analyser && this.analyserDataArray) {
+      this.analyser.getByteFrequencyData(this.analyserDataArray);
+      let sum = 0;
+      for (let i = 0; i < this.analyserDataArray.length; i++) {
+        sum += this.analyserDataArray[i];
+      }
+      if (sum > 12) {
+        // Sample 5 frequency bands: [sub-bass, bass, mid, high-mid, treble]
+        const step = Math.floor(this.analyserDataArray.length / 5);
+        const bands = [];
+        for (let b = 0; b < 5; b++) {
+          let bandSum = 0;
+          for (let k = 0; k < step; k++) {
+            bandSum += this.analyserDataArray[b * step + k] || 0;
+          }
+          const avg = bandSum / step / 255;
+          bands.push(Math.max(0.12, Math.min(1.0, avg * 1.6)));
+        }
+        return bands;
+      }
+    }
+
+    // Dynamic rhythm fallback: pulse in sync with the current playback tempo and traffic beat
+    const now = performance.now() * 0.005;
+    const rate = this.currentPlaybackRate || 1.0;
+    const isAudible = (this.isMusicActive() || this.isAmbientPlaying) && !this.isMuted;
+    const baseFloor = isAudible ? 0.32 : 0.08;
+    const amplitude = isAudible ? 0.65 : 0.08;
+
+    return [
+      baseFloor + amplitude * Math.abs(Math.sin(now * 1.8 * rate)),
+      baseFloor + amplitude * Math.abs(Math.sin(now * 2.5 * rate + 0.9)),
+      baseFloor + amplitude * Math.abs(Math.cos(now * 3.2 * rate + 1.8)),
+      baseFloor + amplitude * Math.abs(Math.sin(now * 2.8 * rate + 2.7)),
+      baseFloor + amplitude * Math.abs(Math.cos(now * 4.1 * rate + 3.6))
+    ].map(v => Math.max(0.1, Math.min(1.0, v)));
   }
 }
 
