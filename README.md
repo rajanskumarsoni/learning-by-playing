@@ -1,6 +1,14 @@
 # System Saviour: Interactive System Design Simulator
 
+[![Play Online](https://img.shields.io/badge/🎮_Play_Online-GitHub_Pages-6366f1?style=for-the-badge)](https://rajanskumarsoni.github.io/learning-by-playing/)
+
+> **Play Live Online:** [https://rajanskumarsoni.github.io/learning-by-playing/](https://rajanskumarsoni.github.io/learning-by-playing/)
+
 Learn distributed systems and cloud architecture by playing an interactive wave-defense simulation game!
+
+## 🌐 Live Game
+Play directly in your browser:  
+👉 **[https://rajanskumarsoni.github.io/learning-by-playing/](https://rajanskumarsoni.github.io/learning-by-playing/)**
 
 ## Features
 - **5 Progressive Campaign Levels + Unlimited Sandbox Mode**:
