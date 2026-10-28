@@ -1212,6 +1212,19 @@ function getChallengeFromUrl() {
       };
     }
 
+    // Check for direct #chaos hash
+    if (window.location.hash === '#chaos' || (window.location.search && window.location.search.includes('mode=chaos'))) {
+      return {
+        isChaosDirect: true,
+        gameMode: 'CAMPAIGN',
+        author: 'Chaos Monkey',
+        levelIdx: 4,
+        survivalWave: 1,
+        nodes: JSON.parse(JSON.stringify(CAMPAIGN_LEVELS[4].initialNodes)),
+        edges: JSON.parse(JSON.stringify(CAMPAIGN_LEVELS[4].initialEdges))
+      };
+    }
+
     let encoded = null;
     if (window.location.hash) {
       const hashStr = window.location.hash.replace(/^#/, '');
@@ -1645,7 +1658,7 @@ export default function App() {
 
   // Handle shared challenge deep linking & live hash navigation
   useEffect(() => {
-    if (initialChallengeRef.current && !initialChallengeRef.current.isLeaderboardDirect) {
+    if (initialChallengeRef.current && !initialChallengeRef.current.isLeaderboardDirect && !initialChallengeRef.current.isChaosDirect) {
       sound.playUpgrade();
       setToastNotification({
         type: 'success',
@@ -1654,9 +1667,17 @@ export default function App() {
       setTimeout(() => setToastNotification(null), 5000);
     }
 
+    if (initialChallengeRef.current?.isChaosDirect) {
+      setTimeout(() => triggerManualChaos(), 600);
+    }
+
     const handleHashChange = () => {
       if (window.location.hash === '#leaderboard') {
         setShowLeaderboardModal(true);
+        return;
+      }
+      if (window.location.hash === '#chaos') {
+        triggerManualChaos();
         return;
       }
       const challenge = getChallengeFromUrl();
@@ -1664,6 +1685,9 @@ export default function App() {
         if (challenge.isLeaderboardDirect) {
           setShowLeaderboardModal(true);
           return;
+        }
+        if (challenge.isChaosDirect) {
+          setTimeout(() => triggerManualChaos(), 300);
         }
         setGameMode(challenge.gameMode);
         setCurrentLevelIdx(challenge.levelIdx);
@@ -1736,6 +1760,11 @@ export default function App() {
   // Game Juice & Screen Shake State
   const [isScreenShaking, setIsScreenShaking] = useState(false);
   const [isRedAlertActive, setIsRedAlertActive] = useState(false);
+
+  // Interactive Chaos Monkey Encounter & Live Outage Ticker State
+  const [chaosEncounter, setChaosEncounter] = useState(null); // { type, nodeId, nodeName, x, y, dialogue, toolIcon, startedAt }
+  const [activeOutageTicker, setActiveOutageTicker] = useState(null); // { id, level, title, summary, tweetQuote, victimId, nodeName }
+  const [isWarStoryCopied, setIsWarStoryCopied] = useState(false);
 
   const triggerScreenShake = useCallback((withRedAlert = true) => {
     setIsScreenShaking(true);
@@ -2362,8 +2391,13 @@ Can your architecture beat this? Test it in your browser:
       setWaveProgress((prev) => {
         const next = prev + 0.8 * simSpeed;
 
-        // Mid-wave Chaos Monkey trigger (at ~50% progress in Level 5 or Chaos active)
-        if (chaosActive && Math.floor(prev) < 50 && Math.floor(next) >= 50) {
+        // Mid-wave Chaos Monkey trigger (at ~50% progress in Level 5, Survival Wave 2+, or Chaos active)
+        const shouldAutoChaos =
+          (gameMode === 'SURVIVAL' && survivalWave >= 2) ||
+          (gameMode === 'CAMPAIGN' && currentLevelIdx === 4) ||
+          chaosActive;
+
+        if (shouldAutoChaos && Math.floor(prev) < 50 && Math.floor(next) >= 50) {
           triggerManualChaos();
         }
 
@@ -2681,30 +2715,135 @@ Can your architecture beat this? Test it in your browser:
     setZoom(1);
   }, []);
 
-  const triggerManualChaos = () => {
+  const triggerManualChaos = (preferredType = null) => {
     const candidates = nodes.filter((n) => n.type !== 'SOURCE' && !n.crashed);
     if (candidates.length === 0) {
       sound.playUpgrade();
       setNodes((prev) => prev.map((n) => ({ ...n, crashed: false })));
-      setChaosBanner({
-        message: 'All damaged nodes rebooted and restored to nominal service.',
-        isRestore: true
+      setChaosEncounter(null);
+      setActiveOutageTicker(null);
+      setToastNotification({
+        type: 'success',
+        message: 'All damaged nodes rebooted and restored to nominal service.'
       });
-      setTimeout(() => setChaosBanner(null), 3500);
+      setTimeout(() => setToastNotification(null), 3500);
       return;
     }
+
     sound.playChaosStrike();
     sound.playCrash();
     triggerScreenShake(true);
+
+    // Pick victim node
     const victim = candidates[Math.floor(Math.random() * candidates.length)];
     const victimName = COMPONENT_CATALOG[victim.type]?.name || victim.type;
+
+    // Multi-Vector Sabotage Attack Scenarios
+    const attackVariants = [
+      {
+        type: 'POWER_CUT',
+        name: 'Power Cable Severance',
+        toolIcon: '✂️',
+        dialogue: `Snip snip! Severed electrical feed to ${victimName}! Can your cluster fail over?`,
+        tweetQuote: `Alert: Hardware power feed severed to ${victimName}! Failover in progress...`
+      },
+      {
+        type: 'CACHE_FLUSH',
+        name: 'Cache Eviction Storm',
+        toolIcon: '🌪️',
+        dialogue: `Whoosh! Evicted all cache keys! Stampede hitting database!`,
+        tweetQuote: `Incident: 100% cache miss storm on ${victimName}! Read queue spiking...`
+      },
+      {
+        type: 'DDOS_SWARM',
+        name: 'Volumetric DDoS Attack',
+        toolIcon: '👾',
+        dialogue: `Injected 15,000 rogue bot requests directly into ${victimName}!`,
+        tweetQuote: `SecOps: Malicious bot swarm detected targeting ${victimName}...`
+      },
+      {
+        type: 'LATENCY_SPIKE',
+        name: 'Fiber Packet Degradation',
+        toolIcon: '🐢',
+        dialogue: `Chewed the fiber route! Injected +250ms packet drop latency!`,
+        tweetQuote: `Network telemetry: Major packet drop detected on ${victimName}...`
+      }
+    ];
+
+    const attack = preferredType
+      ? attackVariants.find((a) => a.type === preferredType) || attackVariants[0]
+      : attackVariants[Math.floor(Math.random() * attackVariants.length)];
+
+    // Crash the targeted victim node
     setNodes((prev) => prev.map((n) => (n.id === victim.id ? { ...n, crashed: true } : n)));
-    setChaosBanner({
-      message: `Chaos Monkey snipped power to ${victimName}! Instance crashed!`,
-      victimName,
-      isRestore: false
+
+    // Set interactive canvas sprite encounter right above victim node
+    setChaosEncounter({
+      type: attack.type,
+      nodeId: victim.id,
+      nodeName: victimName,
+      x: victim.x,
+      y: victim.y,
+      dialogue: attack.dialogue,
+      toolIcon: attack.toolIcon,
+      startedAt: Date.now()
     });
-    setTimeout(() => setChaosBanner(null), 4500);
+
+    // Set Live Breaking Outage Ticker
+    setActiveOutageTicker({
+      id: Date.now(),
+      level: 'P0',
+      title: `${attack.name} on ${victimName}`,
+      summary: `Active Outage: ${victimName} knocked offline! P99 latency spiking!`,
+      tweetQuote: attack.tweetQuote,
+      victimId: victim.id,
+      nodeName: victimName
+    });
+  };
+
+  // Hotfix / Banish Chaos Monkey action
+  const handleHotfixChaosNode = (nodeId) => {
+    sound.playUpgrade();
+    sound.playPlaceNode();
+    setNodes((prev) => prev.map((n) => (n.id === nodeId ? { ...n, crashed: false } : n)));
+    setChaosEncounter(null);
+    setActiveOutageTicker(null);
+    setToastNotification({
+      type: 'success',
+      message: '⚡ SRE Self-Healing Triumph! Node rebooted & Chaos Monkey repelled! (+150 XP)'
+    });
+    setTimeout(() => setToastNotification(null), 3500);
+  };
+
+  // Share SRE War Story
+  const handleShareWarStory = () => {
+    sound.playClick();
+    const story = activeOutageTicker
+      ? `🚨 OUTAGE REPORT: Chaos Monkey executed a ${activeOutageTicker.title}!\n${activeOutageTicker.summary}\n\nOur architecture sustained ${evaluation.uptimePct}% uptime at ${evaluation.p99Latency}ms P99 latency!\n\nCan your distributed system survive Chaos Monkey?\nTest your resilience here 👉 ${window.location.origin + window.location.pathname}#chaos`
+      : `🚨 SRE WAR STORY: Survived a surprise Chaos Monkey outage in System Saviour!\nCan your distributed architecture take a server crash?\nTest it here 👉 ${window.location.origin + window.location.pathname}#chaos`;
+
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(story);
+    }
+    setIsWarStoryCopied(true);
+    setToastNotification({
+      type: 'success',
+      message: 'War story copied to clipboard! Share on Twitter or Slack 📋'
+    });
+    setTimeout(() => {
+      setIsWarStoryCopied(false);
+      setToastNotification(null);
+    }, 3500);
+  };
+
+  const handleTweetWarStory = () => {
+    sound.playClick();
+    const story = activeOutageTicker
+      ? `🚨 OUTAGE REPORT: Chaos Monkey executed a ${activeOutageTicker.title}!\n${activeOutageTicker.summary}\n\nCan your distributed architecture survive? Test it:`
+      : `🚨 SRE WAR STORY: Survived a surprise Chaos Monkey outage in System Saviour!\nCan your distributed architecture take a server crash? Test it:`;
+    const shareUrl = `${window.location.origin + window.location.pathname}#chaos`;
+    const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(story)}&url=${encodeURIComponent(shareUrl)}`;
+    window.open(tweetUrl, '_blank', 'noopener,noreferrer');
   };
 
   const resetWave = () => {
@@ -2713,6 +2852,8 @@ Can your architecture beat this? Test it in your browser:
     setIsRunning(false);
     setWaveProgress(0);
     setPostMortemModal(null);
+    setChaosEncounter(null);
+    setActiveOutageTicker(null);
     setNodes((prev) => prev.map((n) => ({ ...n, crashed: false })));
   };
 
@@ -3161,6 +3302,70 @@ Can your architecture beat this? Test it in your browser:
       )}
 
       {/* =================================================================== */}
+      {/* LIVE P0 OUTAGE & INCIDENT TICKER (SRE COMMAND CENTER)               */}
+      {/* =================================================================== */}
+      {activeOutageTicker && (
+        <div className="shrink-0 bg-gradient-to-r from-rose-950 via-slate-900 to-rose-950 border-y border-rose-500/60 px-4 py-2 flex items-center justify-between text-xs text-white shadow-xl shadow-rose-950/50 z-30 animate-in slide-in-from-top duration-200">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-600 text-white font-black text-[10px] tracking-wider uppercase animate-pulse shadow-md shadow-rose-600/50 shrink-0">
+              <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+              <span>LIVE P0 INCIDENT</span>
+            </div>
+            <div className="min-w-0 flex items-center gap-2">
+              <span className="font-bold text-rose-300 truncate">
+                {activeOutageTicker.title}
+              </span>
+              <span className="text-slate-400 hidden md:inline">•</span>
+              <span className="text-slate-300 text-[11px] truncate hidden md:inline">
+                {activeOutageTicker.tweetQuote}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="hidden sm:flex items-center gap-2 px-2 py-0.5 rounded-lg bg-black/40 border border-rose-500/30 text-[10px] font-mono">
+              <span>P99: <strong className="text-rose-400">{evaluation.p99Latency}ms</strong></span>
+              <span>SLA: <strong className={evaluation.uptimePct >= 98 ? 'text-emerald-400' : 'text-rose-400'}>{evaluation.uptimePct}%</strong></span>
+            </div>
+
+            {activeOutageTicker.victimId && (
+              <button
+                onClick={() => handleHotfixChaosNode(activeOutageTicker.victimId)}
+                className="px-2.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition active:scale-95 shadow flex items-center gap-1"
+                title="Immediately restore and reboot the crashed service"
+              >
+                <span>🔧 Reboot</span>
+              </button>
+            )}
+
+            <button
+              onClick={handleShareWarStory}
+              className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-400 border border-sky-500/30 font-bold text-xs transition active:scale-95 flex items-center gap-1"
+              title="Copy SRE Outage War Story to clipboard"
+            >
+              <Share2 className="w-3 h-3" />
+              <span className="hidden sm:inline">{isWarStoryCopied ? 'Copied!' : 'War Story'}</span>
+            </button>
+
+            <button
+              onClick={handleTweetWarStory}
+              className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-400 border border-sky-500/30 font-bold text-xs transition active:scale-95 flex items-center gap-1"
+              title="Post outage war story directly to Twitter / X"
+            >
+              <span>Post</span>
+            </button>
+
+            <button
+              onClick={() => setActiveOutageTicker(null)}
+              className="p-1 text-slate-400 hover:text-white rounded-lg transition"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* =================================================================== */}
       {/* 2. MAIN WORKSPACE: PALETTE + INTERACTIVE GRAPH CANVAS + INSPECTOR    */}
       {/* =================================================================== */}
       <div className="flex-1 flex min-h-0 h-full overflow-hidden relative bg-[#070a13]">
@@ -3386,32 +3591,6 @@ Can your architecture beat this? Test it in your browser:
               <div className="px-3.5 py-1 rounded-full bg-rose-950/90 border border-rose-500/60 text-rose-300 text-[11px] font-bold flex items-center gap-2 shadow-2xl backdrop-blur-md">
                 <span className="w-2 h-2 rounded-full bg-rose-400 animate-ping" />
                 <span>⚡ LIVE PEAK WAVE: SIMULATING MAXIMUM SURGE LOAD</span>
-              </div>
-            </div>
-          )}
-
-          {/* Chaos Monkey Incident Alert Banner */}
-          {chaosBanner && (
-            <div className="absolute top-14 left-1/2 -translate-x-1/2 z-40 pointer-events-auto transition-all animate-bounce">
-              <div className="px-4 py-2 rounded-2xl bg-slate-900/95 border-2 border-rose-500 text-white text-xs font-bold flex items-center gap-3 shadow-2xl shadow-rose-950/80 backdrop-blur-md">
-                <img
-                  src={chaosMonkeyImg}
-                  alt="Chaos Monkey"
-                  className="w-8 h-8 rounded-full object-cover ring-2 ring-rose-400 shrink-0"
-                />
-                <div>
-                  <div className="text-[10px] uppercase tracking-wider text-rose-400 font-black flex items-center gap-1">
-                    <Flame className="w-3 h-3 text-amber-400" />
-                    <span>Chaos Monkey Incident Alert</span>
-                  </div>
-                  <div className="text-slate-200 text-xs">{chaosBanner.message}</div>
-                </div>
-                <button
-                  onClick={() => setChaosBanner(null)}
-                  className="text-slate-400 hover:text-white p-1 rounded-lg ml-2"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
               </div>
             </div>
           )}
@@ -3985,6 +4164,54 @@ Can your architecture beat this? Test it in your browser:
                   </div>
                 );
               })}
+
+              {/* Interactive Chaos Monkey Hover Sprite on Victim Node */}
+              {chaosEncounter && (
+                <div
+                  style={{
+                    left: chaosEncounter.x + 88,
+                    top: chaosEncounter.y - 82,
+                    touchAction: 'none'
+                  }}
+                  className="absolute pointer-events-auto z-40 -translate-x-1/2 transition-all duration-300 animate-in fade-in zoom-in-75"
+                >
+                  <div className="flex items-center gap-2.5 p-2 rounded-2xl bg-slate-900/95 border-2 border-rose-500 shadow-2xl shadow-rose-950/90 backdrop-blur-md">
+                    <div className="relative shrink-0">
+                      <img
+                        src={chaosMonkeyImg}
+                        alt="Chaos Monkey"
+                        className="w-10 h-10 rounded-full object-cover ring-2 ring-rose-400 animate-bounce"
+                      />
+                      <span className="absolute -bottom-1 -right-1 text-xs select-none">
+                        {chaosEncounter.toolIcon || '✂️'}
+                      </span>
+                    </div>
+
+                    <div className="space-y-0.5 pr-1">
+                      <div className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-rose-400">
+                        <Flame className="w-3 h-3 text-amber-400" />
+                        <span>Chaos Sabotage!</span>
+                      </div>
+                      <div className="text-[11px] font-bold text-white max-w-[210px] leading-tight">
+                        &ldquo;{chaosEncounter.dialogue}&rdquo;
+                      </div>
+                      <div className="pt-1 flex items-center gap-1.5">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleHotfixChaosNode(chaosEncounter.nodeId);
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-[10px] shadow active:scale-95 transition flex items-center gap-1"
+                          title="Instantly reboot the damaged node and banish Chaos Monkey"
+                        >
+                          <span>🔧 Hotfix &amp; Banish</span>
+                          <span className="text-[9px] text-emerald-950 font-extrabold bg-emerald-300 px-1 rounded-full">+150 XP</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
