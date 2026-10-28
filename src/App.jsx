@@ -487,6 +487,143 @@ const CAMPAIGN_LEVELS = [
 ];
 
 // ============================================================================
+// 3.5. ICONIC REAL-WORLD ARCHITECTURE PRESETS (NETFLIX, SPOTIFY, UBER, CLOUDFLARE)
+// ============================================================================
+export const ICONIC_PRESETS = [
+  {
+    id: 'netflix',
+    name: 'Netflix Open Connect & Microservices',
+    company: 'Netflix',
+    badge: '250M+ Subscribers',
+    emoji: '🎬',
+    color: 'from-red-600/30 to-rose-900/40',
+    borderColor: 'border-red-500/50',
+    tagline: 'Edge CDN caches 95% of video chunks while microservices handle millions of stream sessions via EVCache & Kafka telemetry.',
+    targetRps: 32000,
+    keyFeatures: ['Edge CDN Cache', 'Dual Web Services', 'EVCache (Redis)', 'Kafka Event Queue', 'Transcoder Workers'],
+    nodes: [
+      { id: 'src', type: 'SOURCE', x: 60, y: 220, config: {} },
+      { id: 'cdn-1', type: 'CDN', x: 260, y: 120, config: { hitRatio: 1 } },
+      { id: 'waf-1', type: 'WAF', x: 260, y: 320, config: { mode: 1 } },
+      { id: 'lb-1', type: 'LB', x: 470, y: 220, config: { algorithm: 1 } },
+      { id: 'web-1', type: 'WEB', x: 680, y: 120, config: { tier: 1 } },
+      { id: 'web-2', type: 'WEB', x: 680, y: 320, config: { tier: 1 } },
+      { id: 'cache-1', type: 'CACHE', x: 900, y: 120, config: { eviction: 1 } },
+      { id: 'kafka-1', type: 'QUEUE', x: 900, y: 320, config: { partitions: 1 } },
+      { id: 'sql-1', type: 'SQL', x: 1120, y: 120, config: { scaling: 1 } },
+      { id: 'worker-1', type: 'WORKER', x: 1120, y: 320, config: { tier: 1 } }
+    ],
+    edges: [
+      { id: 'e1', from: 'src', to: 'cdn-1' },
+      { id: 'e2', from: 'src', to: 'waf-1' },
+      { id: 'e3', from: 'cdn-1', to: 'lb-1' },
+      { id: 'e4', from: 'waf-1', to: 'lb-1' },
+      { id: 'e5', from: 'lb-1', to: 'web-1' },
+      { id: 'e6', from: 'lb-1', to: 'web-2' },
+      { id: 'e7', from: 'web-1', to: 'cache-1' },
+      { id: 'e8', from: 'web-2', to: 'cache-1' },
+      { id: 'e9', from: 'cache-1', to: 'sql-1' },
+      { id: 'e10', from: 'web-1', to: 'kafka-1' },
+      { id: 'e11', from: 'web-2', to: 'kafka-1' },
+      { id: 'e12', from: 'kafka-1', to: 'worker-1' }
+    ]
+  },
+  {
+    id: 'spotify',
+    name: 'Spotify AI Audio & Discover Weekly',
+    company: 'Spotify',
+    badge: '100M+ Songs & AI RAG',
+    emoji: '🎵',
+    color: 'from-emerald-600/30 to-green-900/40',
+    borderColor: 'border-emerald-500/50',
+    tagline: 'High-speed audio CDN with real-time Vector DB + GPU LLM recommendations and persistent song metadata store.',
+    targetRps: 28000,
+    keyFeatures: ['Audio CDN Chunks', 'Vector Embeddings', 'GPU Inference Cluster', 'Redis Cache', 'Postgres Metadata'],
+    nodes: [
+      { id: 'src', type: 'SOURCE', x: 60, y: 220, config: {} },
+      { id: 'cdn-1', type: 'CDN', x: 260, y: 120, config: { hitRatio: 1 } },
+      { id: 'lb-1', type: 'LB', x: 260, y: 320, config: { algorithm: 1 } },
+      { id: 'web-1', type: 'WEB', x: 480, y: 220, config: { tier: 1 } },
+      { id: 'cache-1', type: 'CACHE', x: 700, y: 120, config: { eviction: 1 } },
+      { id: 'sql-1', type: 'SQL', x: 920, y: 120, config: { scaling: 1 } },
+      { id: 'vector-1', type: 'VECTOR', x: 700, y: 320, config: { indexing: 1 } },
+      { id: 'gpu-1', type: 'GPU', x: 920, y: 320, config: { modelSize: 1 } }
+    ],
+    edges: [
+      { id: 'e1', from: 'src', to: 'cdn-1' },
+      { id: 'e2', from: 'src', to: 'lb-1' },
+      { id: 'e3', from: 'lb-1', to: 'web-1' },
+      { id: 'e4', from: 'web-1', to: 'cache-1' },
+      { id: 'e5', from: 'cache-1', to: 'sql-1' },
+      { id: 'e6', from: 'web-1', to: 'vector-1' },
+      { id: 'e7', from: 'vector-1', to: 'gpu-1' }
+    ]
+  },
+  {
+    id: 'uber',
+    name: 'Uber Real-Time Geospatial Dispatch',
+    company: 'Uber',
+    badge: '25M+ Daily Rides',
+    emoji: '🚗',
+    color: 'from-slate-600/30 to-zinc-900/40',
+    borderColor: 'border-slate-400/50',
+    tagline: 'Millisecond spatial driver-rider matching powered by Kafka H3 geospatial telemetry, parallel workers, and in-memory caches.',
+    targetRps: 35000,
+    keyFeatures: ['WAF Edge Security', 'Kafka Ingestion Stream', 'Dual Matching Workers', 'Redis Geo-Telemetry', 'ACID Trip Ledger'],
+    nodes: [
+      { id: 'src', type: 'SOURCE', x: 60, y: 220, config: {} },
+      { id: 'waf-1', type: 'WAF', x: 250, y: 220, config: { mode: 1 } },
+      { id: 'lb-1', type: 'LB', x: 440, y: 220, config: { algorithm: 1 } },
+      { id: 'web-1', type: 'WEB', x: 640, y: 220, config: { tier: 1 } },
+      { id: 'cache-1', type: 'CACHE', x: 840, y: 110, config: { eviction: 1 } },
+      { id: 'kafka-1', type: 'QUEUE', x: 840, y: 260, config: { partitions: 1 } },
+      { id: 'worker-1', type: 'WORKER', x: 1040, y: 180, config: { tier: 1 } },
+      { id: 'worker-2', type: 'WORKER', x: 1040, y: 340, config: { tier: 1 } },
+      { id: 'sql-1', type: 'SQL', x: 1250, y: 260, config: { scaling: 1 } }
+    ],
+    edges: [
+      { id: 'e1', from: 'src', to: 'waf-1' },
+      { id: 'e2', from: 'waf-1', to: 'lb-1' },
+      { id: 'e3', from: 'lb-1', to: 'web-1' },
+      { id: 'e4', from: 'web-1', to: 'cache-1' },
+      { id: 'e5', from: 'web-1', to: 'kafka-1' },
+      { id: 'e6', from: 'kafka-1', to: 'worker-1' },
+      { id: 'e7', from: 'kafka-1', to: 'worker-2' },
+      { id: 'e8', from: 'worker-1', to: 'sql-1' },
+      { id: 'e9', from: 'worker-2', to: 'sql-1' }
+    ]
+  },
+  {
+    id: 'cloudflare',
+    name: 'Cloudflare Sub-10ms Edge Defense',
+    company: 'Cloudflare',
+    badge: '20% of Global Web',
+    emoji: '⚡',
+    color: 'from-amber-600/30 to-orange-900/40',
+    borderColor: 'border-orange-500/50',
+    tagline: 'Hyper-optimized edge network absorbing volumetric DDoS attacks and serving cached content in single-digit milliseconds.',
+    targetRps: 40000,
+    keyFeatures: ['DDoS Mitigation WAF', 'Global Edge CDN', 'Edge KV Cache', 'Protected Origin DB'],
+    nodes: [
+      { id: 'src', type: 'SOURCE', x: 60, y: 220, config: {} },
+      { id: 'waf-1', type: 'WAF', x: 260, y: 130, config: { mode: 1 } },
+      { id: 'cdn-1', type: 'CDN', x: 260, y: 310, config: { hitRatio: 1 } },
+      { id: 'cache-1', type: 'CACHE', x: 480, y: 220, config: { eviction: 1 } },
+      { id: 'web-1', type: 'WEB', x: 700, y: 220, config: { tier: 1 } },
+      { id: 'sql-1', type: 'SQL', x: 930, y: 220, config: { scaling: 1 } }
+    ],
+    edges: [
+      { id: 'e1', from: 'src', to: 'waf-1' },
+      { id: 'e2', from: 'src', to: 'cdn-1' },
+      { id: 'e3', from: 'waf-1', to: 'cache-1' },
+      { id: 'e4', from: 'cdn-1', to: 'cache-1' },
+      { id: 'e5', from: 'cache-1', to: 'web-1' },
+      { id: 'e6', from: 'web-1', to: 'sql-1' }
+    ]
+  }
+];
+
+// ============================================================================
 // 4. REAL-TIME SIMULATION & TELEMETRY ENGINE
 // ============================================================================
 function getNodeEffectiveStats(node) {
@@ -1225,6 +1362,30 @@ function getChallengeFromUrl() {
       };
     }
 
+    // Check for direct #preset= or #presets hash
+    if (window.location.hash === '#presets' || window.location.hash.startsWith('#preset=') || (window.location.search && window.location.search.includes('preset'))) {
+      let presetId = 'netflix';
+      if (window.location.hash.startsWith('#preset=')) {
+        presetId = window.location.hash.replace('#preset=', '').toLowerCase();
+      } else if (window.location.search) {
+        const sp = new URLSearchParams(window.location.search);
+        presetId = (sp.get('preset') || 'netflix').toLowerCase();
+      }
+      const matched = ICONIC_PRESETS.find((p) => p.id === presetId) || ICONIC_PRESETS[0];
+      return {
+        isPresetDirect: true,
+        isPresetsModalOpen: window.location.hash === '#presets',
+        gameMode: 'SANDBOX',
+        author: matched.company,
+        levelIdx: 0,
+        survivalWave: 1,
+        targetRps: matched.targetRps,
+        presetName: matched.name,
+        nodes: JSON.parse(JSON.stringify(matched.nodes)),
+        edges: JSON.parse(JSON.stringify(matched.edges))
+      };
+    }
+
     let encoded = null;
     if (window.location.hash) {
       const hashStr = window.location.hash.replace(/^#/, '');
@@ -1597,6 +1758,7 @@ export default function App() {
   const [levelBriefingModal, setLevelBriefingModal] = useState(null); // { mode: 'CAMPAIGN' | 'SURVIVAL' | 'SANDBOX', levelIdx?: number }
   const [detailModalComponent, setDetailModalComponent] = useState(null);
   const [showLeaderboardModal, setShowLeaderboardModal] = useState(() => initialChallengeRef.current?.isLeaderboardDirect || false);
+  const [showPresetsModal, setShowPresetsModal] = useState(() => initialChallengeRef.current?.isPresetsModalOpen || false);
   const [leaderboardTab, setLeaderboardTab] = useState('DAILY'); // 'DAILY' | 'SURVIVAL'
   const [isLeaderboardShareCopied, setIsLeaderboardShareCopied] = useState(false);
 
@@ -1658,13 +1820,22 @@ export default function App() {
 
   // Handle shared challenge deep linking & live hash navigation
   useEffect(() => {
-    if (initialChallengeRef.current && !initialChallengeRef.current.isLeaderboardDirect && !initialChallengeRef.current.isChaosDirect) {
+    if (initialChallengeRef.current && !initialChallengeRef.current.isLeaderboardDirect && !initialChallengeRef.current.isChaosDirect && !initialChallengeRef.current.isPresetDirect) {
       sound.playUpgrade();
       setToastNotification({
         type: 'success',
         message: `🏆 Challenge Blueprint from ${initialChallengeRef.current.author} Loaded! Click "Start Traffic" to test resilience.`
       });
       setTimeout(() => setToastNotification(null), 5000);
+    }
+
+    if (initialChallengeRef.current?.isPresetDirect) {
+      sound.playUpgrade();
+      setToastNotification({
+        type: 'success',
+        message: `🎬 ${initialChallengeRef.current.presetName} Architecture Loaded! Ready for stress testing.`
+      });
+      setTimeout(() => setToastNotification(null), 4500);
     }
 
     if (initialChallengeRef.current?.isChaosDirect) {
@@ -1674,6 +1845,10 @@ export default function App() {
     const handleHashChange = () => {
       if (window.location.hash === '#leaderboard') {
         setShowLeaderboardModal(true);
+        return;
+      }
+      if (window.location.hash === '#presets') {
+        setShowPresetsModal(true);
         return;
       }
       if (window.location.hash === '#chaos') {
@@ -1688,6 +1863,9 @@ export default function App() {
         }
         if (challenge.isChaosDirect) {
           setTimeout(() => triggerManualChaos(), 300);
+        }
+        if (challenge.isPresetDirect) {
+          setSandboxRps(challenge.targetRps || 30000);
         }
         setGameMode(challenge.gameMode);
         setCurrentLevelIdx(challenge.levelIdx);
@@ -2857,6 +3035,40 @@ Can your architecture beat this? Test it in your browser:
     setNodes((prev) => prev.map((n) => ({ ...n, crashed: false })));
   };
 
+  // Deploy and share iconic architecture presets
+  const handleLoadIconicPreset = (preset) => {
+    sound.playUpgrade();
+    sound.playPlaceNode();
+    setGameMode('SANDBOX');
+    setNodes(JSON.parse(JSON.stringify(preset.nodes)));
+    setEdges(JSON.parse(JSON.stringify(preset.edges)));
+    setSandboxRps(preset.targetRps);
+    setIsRunning(false);
+    setWaveProgress(0);
+    setChaosEncounter(null);
+    setActiveOutageTicker(null);
+    setShowPresetsModal(false);
+    setTimeout(() => resetView(), 80);
+    setToastNotification({
+      type: 'success',
+      message: `🚀 Deployed ${preset.name}! Ready to stress-test in Sandbox Lab.`
+    });
+    setTimeout(() => setToastNotification(null), 4000);
+  };
+
+  const handleSharePreset = (preset) => {
+    sound.playClick();
+    const shareUrl = `${window.location.origin + window.location.pathname}#preset=${preset.id}`;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(shareUrl);
+    }
+    setToastNotification({
+      type: 'success',
+      message: `Link for ${preset.name} copied! Anyone can load this exact architecture 📋`
+    });
+    setTimeout(() => setToastNotification(null), 3500);
+  };
+
   const selectedNode = nodes.find((n) => n.id === selectedNodeId);
   const selectedSpec = selectedNode ? COMPONENT_CATALOG[selectedNode.type] : null;
   const selectedMetrics = selectedNode ? evaluation.nodeMetrics[selectedNode.id] : null;
@@ -3166,6 +3378,19 @@ Can your architecture beat this? Test it in your browser:
           >
             <Trophy className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
             <span className="font-bold text-amber-300 hidden sm:inline">Leaderboard</span>
+          </button>
+
+          {/* Iconic Presets Button */}
+          <button
+            onClick={() => {
+              sound.playClick();
+              setShowPresetsModal(true);
+            }}
+            className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-purple-950/80 to-indigo-950/80 backdrop-blur-md border border-purple-500/50 hover:border-purple-400 text-xs text-purple-200 flex items-center gap-1.5 transition shadow-md shadow-purple-950/30 group active:scale-95"
+            title="Explore and deploy battle-tested architectures from Netflix, Spotify, Uber & Cloudflare"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-400 group-hover:rotate-12 transition-transform" />
+            <span className="font-bold text-purple-300 hidden sm:inline">Presets</span>
           </button>
 
           {/* Ada AI Mentor Guide Trigger */}
@@ -3723,18 +3948,32 @@ Can your architecture beat this? Test it in your browser:
             </div>
 
             {gameMode === 'SANDBOX' && (
-              <div className="bg-slate-900/90 backdrop-blur border border-slate-800 px-3 py-1.5 rounded-xl text-xs text-slate-300 flex items-center gap-2 pointer-events-auto shadow-lg">
-                <span>Peak Load:</span>
-                <input
-                  type="range"
-                  min={1000}
-                  max={35000}
-                  step={1000}
-                  value={sandboxRps}
-                  onChange={(e) => setSandboxRps(Number(e.target.value))}
-                  className="w-24 accent-indigo-500"
-                />
-                <span className="font-mono font-bold text-indigo-400">{sandboxRps.toLocaleString()}</span>
+              <div className="flex items-center gap-2 pointer-events-auto">
+                <div className="bg-slate-900/90 backdrop-blur border border-slate-800 px-3 py-1.5 rounded-xl text-xs text-slate-300 flex items-center gap-2 shadow-lg">
+                  <span>Peak Load:</span>
+                  <input
+                    type="range"
+                    min={1000}
+                    max={40000}
+                    step={1000}
+                    value={sandboxRps}
+                    onChange={(e) => setSandboxRps(Number(e.target.value))}
+                    className="w-24 accent-indigo-500"
+                  />
+                  <span className="font-mono font-bold text-indigo-400">{sandboxRps.toLocaleString()} RPS</span>
+                </div>
+
+                <button
+                  onClick={() => setShowPresetsModal(true)}
+                  className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 via-indigo-500/20 to-purple-500/20 hover:from-amber-500/30 hover:to-purple-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold transition flex items-center gap-1.5 shadow-md active:scale-95"
+                  title="Load iconic real-world architectures (Netflix, Spotify, Uber, Cloudflare)"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Iconic Presets</span>
+                  <span className="text-[10px] bg-amber-400/20 text-amber-200 px-1.5 py-0.2 rounded-full border border-amber-400/30">
+                    4 Architectures
+                  </span>
+                </button>
               </div>
             )}
           </div>
@@ -6341,6 +6580,130 @@ Can your architecture beat this? Test it in your browser:
                   Close
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* ICONIC PRODUCTION ARCHITECTURES SHOWCASE MODAL (NETFLIX, SPOTIFY, UBER)    */}
+      {/* ========================================================================= */}
+      {showPresetsModal && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setShowPresetsModal(false)}
+        >
+          <div
+            className="w-full max-w-4xl max-h-[92vh] flex flex-col rounded-3xl bg-slate-900/95 border border-indigo-500/40 shadow-2xl shadow-indigo-950/60 overflow-hidden text-slate-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="p-5 pb-4 border-b border-slate-800/80 bg-gradient-to-r from-slate-900 via-indigo-950/60 to-slate-900 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/25">
+                  <Sparkles className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xl font-black font-display tracking-tight text-white">
+                      Iconic Production Architectures
+                    </h2>
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 border border-indigo-500/40 text-indigo-300">
+                      1-Click Deploy
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    Deploy, inspect, and stress-test real-world hyperscale architectures from top tech companies
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowPresetsModal(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Presets Grid */}
+            <div className="flex-1 overflow-y-auto p-5 grid grid-cols-1 md:grid-cols-2 gap-4 min-h-0">
+              {ICONIC_PRESETS.map((preset) => (
+                <div
+                  key={preset.id}
+                  className={`p-4 rounded-2xl bg-gradient-to-br ${preset.color} border ${preset.borderColor} flex flex-col justify-between gap-3 shadow-lg relative group transition-all duration-200 hover:scale-[1.01]`}
+                >
+                  <div className="space-y-2">
+                    {/* Header: Emoji, Title & Badge */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-3xl select-none">{preset.emoji}</span>
+                        <div>
+                          <h3 className="text-base font-black text-white font-display leading-snug">
+                            {preset.name}
+                          </h3>
+                          <div className="text-[11px] font-bold text-slate-400">
+                            {preset.company} Engineering
+                          </div>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-white/10 text-white border border-white/20 whitespace-nowrap">
+                        {preset.badge}
+                      </span>
+                    </div>
+
+                    {/* Tagline / Architectural Summary */}
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      {preset.tagline}
+                    </p>
+
+                    {/* Component Stack Pills */}
+                    <div className="flex flex-wrap gap-1 pt-1">
+                      {preset.keyFeatures.map((feat, fIdx) => (
+                        <span
+                          key={fIdx}
+                          className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-black/40 text-slate-200 border border-white/10 font-medium"
+                        >
+                          {feat}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Actions: Deploy to Canvas & Share Link */}
+                  <div className="pt-2 border-t border-white/10 flex items-center justify-between gap-2">
+                    <button
+                      onClick={() => handleSharePreset(preset)}
+                      className="py-1.5 px-3 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-sky-400 border border-sky-500/30 text-xs font-bold transition flex items-center gap-1.5 active:scale-95 shadow"
+                      title="Copy 1-click playable link to this preset"
+                    >
+                      <LinkIcon className="w-3.5 h-3.5" />
+                      <span>Share Link</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleLoadIconicPreset(preset)}
+                      className="py-1.5 px-4 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 text-white font-black text-xs transition shadow-md shadow-indigo-500/30 flex items-center gap-1.5 active:scale-95"
+                    >
+                      <Play className="w-3.5 h-3.5 fill-white" />
+                      <span>Deploy to Canvas</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-3.5 border-t border-slate-800 bg-slate-950/80 flex items-center justify-between text-xs text-slate-400">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>All presets are 100% interactive — scale peak RPS or unleash Chaos Monkey after deploying!</span>
+              </div>
+              <button
+                onClick={() => setShowPresetsModal(false)}
+                className="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
