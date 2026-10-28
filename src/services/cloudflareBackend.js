@@ -10,7 +10,7 @@ const CF_CONFIG = {
   r2SecretKey: import.meta.env.VITE_CLOUDFLARE_R2_SECRET_ACCESS_KEY || '66f971f04f49c2de60f44a376c52892610b22395d5f09c4779ab9aea0ee837bc',
   r2Endpoint: import.meta.env.VITE_CLOUDFLARE_R2_ENDPOINT || 'https://d6a573fb6c8125d26bf1e3bea89353c9.r2.cloudflarestorage.com',
   bucket: import.meta.env.VITE_CLOUDFLARE_R2_BUCKET || 'systemsaviour-data',
-  workerUrl: import.meta.env.VITE_CLOUDFLARE_WORKER_URL || ''
+  workerUrl: import.meta.env.VITE_CLOUDFLARE_WORKER_URL || 'https://systemsaviour-backend.systemsaviour-backend.workers.dev'
 };
 
 const LOCAL_STORAGE_KEYS = {
