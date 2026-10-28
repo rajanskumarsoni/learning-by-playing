@@ -1,0 +1,26 @@
+[
+  {
+    "dayIndex": 665,
+    "title": "Black Friday Flash Mob",
+    "threat": "Massive flash crowd spike with 88% burst reads",
+    "targetRps": 18000,
+    "allowedBudget": 600,
+    "maxLatencyMs": 80
+  },
+  {
+    "dayIndex": 666,
+    "title": "Botnet SYN Flood Attack",
+    "threat": "Volumetric Layer 7 assault with spoofed query storms",
+    "targetRps": 28000,
+    "allowedBudget": 850,
+    "maxLatencyMs": 65
+  },
+  {
+    "dayIndex": 667,
+    "title": "Thundering Herd Cache Wipe",
+    "threat": "Simultaneous cold-cache eviction forcing direct DB lockups",
+    "targetRps": 14000,
+    "allowedBudget": 500,
+    "maxLatencyMs": 90
+  }
+]

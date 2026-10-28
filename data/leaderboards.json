@@ -1,0 +1,91 @@
+{
+  "daily": [
+    {
+      "rank": 1,
+      "name": "Jeff Dean",
+      "score": 9940,
+      "p99": "18ms",
+      "sla": "99.99%",
+      "role": "Fellow Architect",
+      "date": "2026-10-28T22:14:29.204Z"
+    },
+    {
+      "rank": 2,
+      "name": "Werner Vogels",
+      "score": 9810,
+      "p99": "24ms",
+      "sla": "99.98%",
+      "role": "Principal SRE",
+      "date": "2026-10-28T22:14:29.205Z"
+    },
+    {
+      "rank": 3,
+      "name": "Brendan Burns",
+      "score": 9750,
+      "p99": "31ms",
+      "sla": "99.95%",
+      "role": "K8s Guardian",
+      "date": "2026-10-28T22:14:29.205Z"
+    },
+    {
+      "rank": 4,
+      "name": "Kelsey Hightower",
+      "score": 9680,
+      "p99": "35ms",
+      "sla": "99.92%",
+      "role": "NoCode Sage",
+      "date": "2026-10-28T22:14:29.205Z"
+    },
+    {
+      "rank": 5,
+      "name": "Ada (Staff Mentor)",
+      "score": 9550,
+      "p99": "42ms",
+      "sla": "99.90%",
+      "role": "Architect Mentor",
+      "date": "2026-10-28T22:14:29.205Z"
+    }
+  ],
+  "survival": [
+    {
+      "rank": 1,
+      "name": "Jeff Dean",
+      "wave": 18,
+      "nodes": 42,
+      "score": 34200,
+      "role": "Fellow Architect"
+    },
+    {
+      "rank": 2,
+      "name": "Werner Vogels",
+      "wave": 15,
+      "nodes": 36,
+      "score": 28500,
+      "role": "Principal SRE"
+    },
+    {
+      "rank": 3,
+      "name": "Brendan Burns",
+      "wave": 12,
+      "nodes": 29,
+      "score": 22100,
+      "role": "K8s Guardian"
+    },
+    {
+      "rank": 4,
+      "name": "Kelsey Hightower",
+      "wave": 11,
+      "nodes": 25,
+      "score": 19800,
+      "role": "NoCode Sage"
+    },
+    {
+      "rank": 5,
+      "name": "Ada (Staff Mentor)",
+      "wave": 10,
+      "nodes": 22,
+      "score": 17400,
+      "role": "Architect Mentor"
+    }
+  ]
+}

@@ -1,0 +1,215 @@
+{
+  "netflix": {
+    "id": "bp-netflix-zuul",
+    "title": "Netflix Video Streaming Pipeline",
+    "author": "Netflix Open Source",
+    "description": "High-throughput Zuul edge proxy routing through multi-tiered caching into stateless microservices.",
+    "nodes": [
+      {
+        "id": "n1",
+        "type": "SOURCE",
+        "x": 80,
+        "y": 220
+      },
+      {
+        "id": "n2",
+        "type": "WAF",
+        "x": 260,
+        "y": 220
+      },
+      {
+        "id": "n3",
+        "type": "LB",
+        "x": 440,
+        "y": 220
+      },
+      {
+        "id": "n4",
+        "type": "WEB",
+        "x": 620,
+        "y": 220,
+        "count": 6
+      },
+      {
+        "id": "n5",
+        "type": "CACHE",
+        "x": 800,
+        "y": 140,
+        "count": 3
+      },
+      {
+        "id": "n6",
+        "type": "SQL",
+        "x": 980,
+        "y": 220,
+        "count": 2
+      }
+    ],
+    "edges": [
+      {
+        "id": "e1",
+        "from": "n1",
+        "to": "n2"
+      },
+      {
+        "id": "e2",
+        "from": "n2",
+        "to": "n3"
+      },
+      {
+        "id": "e3",
+        "from": "n3",
+        "to": "n4"
+      },
+      {
+        "id": "e4",
+        "from": "n4",
+        "to": "n5"
+      },
+      {
+        "id": "e5",
+        "from": "n5",
+        "to": "n6"
+      }
+    ]
+  },
+  "spotify": {
+    "id": "bp-spotify-audio",
+    "title": "Spotify Real-time Audio Distribution",
+    "author": "Spotify Engineering",
+    "description": "Edge CDN termination delivering sub-10ms audio metadata directly from distributed Cassandra/Redis stores.",
+    "nodes": [
+      {
+        "id": "s1",
+        "type": "SOURCE",
+        "x": 80,
+        "y": 220
+      },
+      {
+        "id": "s2",
+        "type": "CDN",
+        "x": 260,
+        "y": 220
+      },
+      {
+        "id": "s3",
+        "type": "WEB",
+        "x": 440,
+        "y": 220,
+        "count": 4
+      },
+      {
+        "id": "s4",
+        "type": "CACHE",
+        "x": 620,
+        "y": 140,
+        "count": 4
+      },
+      {
+        "id": "s5",
+        "type": "QUEUE",
+        "x": 620,
+        "y": 300,
+        "count": 2
+      },
+      {
+        "id": "s6",
+        "type": "SQL",
+        "x": 800,
+        "y": 300,
+        "count": 2
+      }
+    ],
+    "edges": [
+      {
+        "id": "se1",
+        "from": "s1",
+        "to": "s2"
+      },
+      {
+        "id": "se2",
+        "from": "s2",
+        "to": "s3"
+      },
+      {
+        "id": "se3",
+        "from": "s3",
+        "to": "s4"
+      },
+      {
+        "id": "se4",
+        "from": "s3",
+        "to": "s5"
+      },
+      {
+        "id": "se5",
+        "from": "s5",
+        "to": "s6"
+      }
+    ]
+  },
+  "cloudflare": {
+    "id": "bp-cloudflare-workers",
+    "title": "Cloudflare Edge WAF & Serverless Mesh",
+    "author": "Cloudflare Edge Network",
+    "description": "Layer 7 DDoS filtering, edge worker computation, and globally replicated KV caching.",
+    "nodes": [
+      {
+        "id": "c1",
+        "type": "SOURCE",
+        "x": 80,
+        "y": 220
+      },
+      {
+        "id": "c2",
+        "type": "WAF",
+        "x": 260,
+        "y": 220,
+        "count": 4
+      },
+      {
+        "id": "c3",
+        "type": "CDN",
+        "x": 440,
+        "y": 220,
+        "count": 3
+      },
+      {
+        "id": "c4",
+        "type": "CACHE",
+        "x": 620,
+        "y": 150,
+        "count": 4
+      },
+      {
+        "id": "c5",
+        "type": "WEB",
+        "x": 620,
+        "y": 290,
+        "count": 4
+      }
+    ],
+    "edges": [
+      {
+        "id": "ce1",
+        "from": "c1",
+        "to": "c2"
+      },
+      {
+        "id": "ce2",
+        "from": "c2",
+        "to": "c3"
+      },
+      {
+        "id": "ce3",
+        "from": "c3",
+        "to": "c4"
+      },
+      {
+        "id": "ce4",
+        "from": "c3",
+        "to": "c5"
+      }
+    ]
+  }
+}

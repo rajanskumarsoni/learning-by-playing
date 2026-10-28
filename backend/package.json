@@ -1,0 +1,15 @@
+{
+  "name": "systemsaviour-backend",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker & R2 Backend for System Saviour",
+  "main": "worker.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "start": "wrangler dev"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "wrangler": "^4.155.0"
+  }
+}
