@@ -141,6 +141,41 @@ We want this to be the most engaging, interactive way on the internet to master 
 
 ---
 
+## 📣 How to Mention & Attribute System Saviour
+
+If you feature **System Saviour** in your YouTube video, blog post, university course, technical workshop, system design interview prep curriculum, or derivative project, we’d love to see it! Here’s how you can cite or mention the project:
+
+### 1. In Your Project README (Badge)
+Add this badge to your markdown:
+
+```markdown
+[![Powered by System Saviour](https://img.shields.io/badge/Powered%20By-System%20Saviour-6366f1?style=flat-square&logo=gamepad)](https://rajanskumarsoni.github.io/learning-by-playing/)
+```
+
+### 2. In Articles, Videos, and Course Slides
+Please include a brief credit with a link:
+
+> *"Interactive architecture simulations powered by [System Saviour](https://github.com/rajanskumarsoni/learning-by-playing) by Rajan Kumar Soni ([Live Demo](https://rajanskumarsoni.github.io/learning-by-playing/))."*
+
+### 3. Academic & Technical Citation (BibTeX)
+If referencing in papers, research, or thesis work:
+
+```bibtex
+@software{system_saviour_2026,
+  author = {Soni, Rajan Kumar},
+  title = {System Saviour: Interactive Distributed Systems & Cloud Architecture Simulator},
+  year = {2026},
+  publisher = {GitHub},
+  journal = {GitHub repository},
+  url = {https://github.com/rajanskumarsoni/learning-by-playing}
+}
+```
+
+### 4. Tag Us on Social Media
+Sharing your score, custom topology, or tutorial? Mention **[Rajan Kumar Soni](https://github.com/rajanskumarsoni)** on GitHub and tag `#SystemSaviour` so we can repost and feature your work!
+
+---
+
 ## 📄 License
 
 Distributed under the [MIT License](LICENSE). Feel free to use, modify, learn from, and share!

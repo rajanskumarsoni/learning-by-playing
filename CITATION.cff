@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use System Saviour in your research, educational courses, tutorials, or projects, please cite it as below."
+authors:
+  - family-names: "Soni"
+    given-names: "Rajan Kumar"
+title: "System Saviour: Interactive Distributed Systems & Cloud Architecture Simulator"
+version: 1.0.0
+date-released: 2026-10-28
+url: "https://github.com/rajanskumarsoni/learning-by-playing"
+repository-code: "https://github.com/rajanskumarsoni/learning-by-playing"
+keywords:
+  - "distributed-systems"
+  - "system-design"
+  - "cloud-architecture"
+  - "educational-game"
+  - "simulator"
+  - "gamification"
+license: MIT
