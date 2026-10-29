@@ -7,7 +7,8 @@ import {
   ArrowRight, Sparkles, Info, X, RefreshCw, ZoomIn, ZoomOut, Maximize2, Move,
   BookOpen, Search, Bot, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
   ChevronLeft, ChevronDown, Star, Trophy, Radio, Target, Volume2, VolumeX, Music, Headphones, Mic,
-  Link as LinkIcon, Calendar, Crown, Medal, Cloud, ShieldAlert, CheckCircle
+  Link as LinkIcon, Calendar, Crown, Medal, Cloud, ShieldAlert, CheckCircle,
+  User, UserPlus, LogIn, LogOut, Mail, Key, EyeOff
 } from 'lucide-react';
 import mentorAdaImg from './assets/mentor_ada.jpg';
 import chaosMonkeyImg from './assets/chaos_monkey.jpg';
@@ -2894,6 +2895,732 @@ function ManagerPromotionModal({ promotion, onAccept, onReplay, onClose }) {
 }
 
 // ============================================================================
+// 4.10. AUTHENTICATION & ARCHITECT IDENTITY PANE (SIGN IN & SIGN UP)
+// Built with the First Page Pane Technique with Hero (Left) and Devil (Right) background
+// ============================================================================
+function AuthModal({
+  isOpen,
+  initialTab = 'SIGNIN',
+  onClose,
+  currentUser,
+  onLogin,
+  onLogout
+}) {
+  if (!isOpen) return null;
+
+  const [tab, setTab] = useState(initialTab); // 'SIGNIN' | 'SIGNUP'
+
+  // Sign In State
+  const [signInEmail, setSignInEmail] = useState('');
+  const [signInPassword, setSignInPassword] = useState('');
+  const [showSignInPassword, setShowSignInPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
+  const [signInError, setSignInError] = useState(null);
+
+  // Sign Up State
+  const [signUpHandle, setSignUpHandle] = useState('');
+  const [signUpEmail, setSignUpEmail] = useState('');
+  const [signUpPassword, setSignUpPassword] = useState('');
+  const [signUpConfirmPassword, setSignUpConfirmPassword] = useState('');
+  const [showSignUpPassword, setShowSignUpPassword] = useState(false);
+  const [specialization, setSpecialization] = useState('HIGH_AVAILABILITY');
+  const [agreedToTerms, setAgreedToTerms] = useState(true);
+  const [signUpError, setSignUpError] = useState(null);
+
+  // Interaction State
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [authSuccessMsg, setAuthSuccessMsg] = useState(null);
+  const [forgotPasswordNotice, setForgotPasswordNotice] = useState(false);
+
+  // Real-time password strength
+  const passwordStrength = useMemo(() => {
+    if (!signUpPassword) return { score: 0, label: 'Enter Password', color: 'bg-slate-700' };
+    let score = 0;
+    if (signUpPassword.length >= 8) score += 1;
+    if (/[A-Z]/.test(signUpPassword) && /[a-z]/.test(signUpPassword)) score += 1;
+    if (/[0-9]/.test(signUpPassword)) score += 1;
+    if (/[^A-Za-z0-9]/.test(signUpPassword)) score += 1;
+
+    switch (score) {
+      case 1:
+        return { score: 1, label: 'Weak', color: 'bg-rose-500' };
+      case 2:
+        return { score: 2, label: 'Moderate', color: 'bg-amber-500' };
+      case 3:
+        return { score: 3, label: 'Strong', color: 'bg-emerald-500' };
+      case 4:
+        return { score: 4, label: 'Production Ready 🛡️', color: 'bg-cyan-400' };
+      default:
+        return { score: 0, label: 'Too Short', color: 'bg-rose-600' };
+    }
+  }, [signUpPassword]);
+
+  const passwordsMatch = signUpPassword && signUpConfirmPassword && signUpPassword === signUpConfirmPassword;
+
+  const handleSignInSubmit = (e) => {
+    if (e) e.preventDefault();
+    setSignInError(null);
+
+    const emailTrimmed = signInEmail.trim();
+    if (!emailTrimmed) {
+      setSignInError('Please enter your Architect Email or Handle');
+      return;
+    }
+    if (!signInPassword || signInPassword.length < 4) {
+      setSignInError('Password must be at least 4 characters');
+      return;
+    }
+
+    setIsSubmitting(true);
+    sound.playClick();
+
+    setTimeout(() => {
+      setIsSubmitting(false);
+      const name = emailTrimmed.includes('@') ? emailTrimmed.split('@')[0] : emailTrimmed;
+      const user = {
+        id: `arch_${Math.random().toString(16).substring(2, 10)}`,
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        email: emailTrimmed.includes('@') ? emailTrimmed : `${emailTrimmed}@systemsaviour.dev`,
+        role: 'Distributed Systems Architect',
+        specialization: 'HIGH_AVAILABILITY',
+        salary: '$145,000 / yr',
+        rank: 'Senior Architect',
+        joinedAt: new Date().toLocaleDateString(),
+        authProvider: 'email',
+        token: `cf_tok_${Math.random().toString(36).substring(2, 15)}`
+      };
+      setAuthSuccessMsg(`Terminal Authenticated! Welcome, ${user.name}.`);
+      sound.playVictory();
+      setTimeout(() => {
+        onLogin(user);
+        onClose();
+      }, 700);
+    }, 450);
+  };
+
+  const handleSignUpSubmit = (e) => {
+    if (e) e.preventDefault();
+    setSignUpError(null);
+
+    const handleTrimmed = signUpHandle.trim();
+    const emailTrimmed = signUpEmail.trim();
+
+    if (!handleTrimmed || handleTrimmed.length < 3) {
+      setSignUpError('Architect Handle must be at least 3 characters');
+      return;
+    }
+    if (!emailTrimmed || !emailTrimmed.includes('@')) {
+      setSignUpError('Please provide a valid engineering email');
+      return;
+    }
+    if (!signUpPassword || signUpPassword.length < 6) {
+      setSignUpError('Password must be at least 6 characters');
+      return;
+    }
+    if (signUpPassword !== signUpConfirmPassword) {
+      setSignUpError('Passwords do not match');
+      return;
+    }
+    if (!agreedToTerms) {
+      setSignUpError('Please accept the System Architecture Code of Conduct');
+      return;
+    }
+
+    setIsSubmitting(true);
+    sound.playClick();
+
+    setTimeout(() => {
+      setIsSubmitting(false);
+      const user = {
+        id: `arch_${Math.random().toString(16).substring(2, 10)}`,
+        name: handleTrimmed,
+        email: emailTrimmed,
+        role: specialization === 'HIGH_AVAILABILITY'
+          ? 'High Availability & SRE Lead'
+          : specialization === 'THROUGHPUT'
+          ? 'Throughput & Microservices Guru'
+          : specialization === 'SECURITY'
+          ? 'Zero-Trust Cyber Sec Specialist'
+          : 'Cloud FinOps Engineer',
+        specialization,
+        salary: '$95,000 / yr',
+        rank: 'Junior Architect',
+        joinedAt: new Date().toLocaleDateString(),
+        authProvider: 'email',
+        token: `cf_tok_${Math.random().toString(36).substring(2, 15)}`
+      };
+      setAuthSuccessMsg(`Account Created! Architect ID deployed.`);
+      sound.playVictory();
+      setTimeout(() => {
+        onLogin(user);
+        onClose();
+      }, 700);
+    }, 550);
+  };
+
+  const handleGuestLogin = () => {
+    sound.playClick();
+    setIsSubmitting(true);
+    setTimeout(() => {
+      setIsSubmitting(false);
+      const randNum = Math.floor(100 + Math.random() * 900);
+      const guestUser = {
+        id: `guest_${randNum}`,
+        name: `GuestArchitect#${randNum}`,
+        email: `guest${randNum}@systemsaviour.dev`,
+        role: 'Staff Fellow (Guest Terminal)',
+        specialization: 'HIGH_AVAILABILITY',
+        salary: '$120,000 / yr',
+        rank: 'Guest Fellow',
+        joinedAt: 'Guest Session',
+        authProvider: 'guest',
+        token: `guest_tok_${Math.random().toString(36).substring(2, 10)}`
+      };
+      setAuthSuccessMsg(`Logged in as ${guestUser.name}!`);
+      sound.playVictory();
+      setTimeout(() => {
+        onLogin(guestUser);
+        onClose();
+      }, 600);
+    }, 300);
+  };
+
+  const handleSocialLogin = (provider) => {
+    sound.playClick();
+    setIsSubmitting(true);
+    setTimeout(() => {
+      setIsSubmitting(false);
+      const randId = Math.random().toString(36).substring(2, 8);
+      const user = {
+        id: `${provider.toLowerCase()}_${randId}`,
+        name: `${provider === 'GITHUB' ? 'OctoArchitect' : 'GoogleArchitect'}_${randId}`,
+        email: `architect@${provider.toLowerCase()}.user`,
+        role: 'Verified Cloud Architect',
+        specialization: 'THROUGHPUT',
+        salary: '$165,000 / yr',
+        rank: 'Senior Architect',
+        joinedAt: new Date().toLocaleDateString(),
+        authProvider: provider.toLowerCase(),
+        token: `oauth_${provider.toLowerCase()}_${Math.random().toString(36).substring(2, 15)}`
+      };
+      setAuthSuccessMsg(`Authenticated via ${provider}!`);
+      sound.playVictory();
+      setTimeout(() => {
+        onLogin(user);
+        onClose();
+      }, 600);
+    }, 400);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-[#070a13] flex items-center justify-center p-4 z-50 overflow-y-auto overflow-x-hidden animate-fade-in select-none">
+      {/* Subtle Ambient Arena Lighting (Solid backdrop, zero pass-through to game) */}
+      <div className="absolute inset-0 bg-gradient-to-r from-cyan-950/25 via-slate-950 to-red-950/25 pointer-events-none" />
+
+      {/* ================================================================= */}
+      {/* BIG BACKGROUND HERO (LEFT) & DEVIL (RIGHT) (First Page Technique)  */}
+      {/* ================================================================= */}
+      {/* BIG HERO IN BACKGROUND (LEFT) */}
+      <div className="fixed -left-8 sm:-left-4 lg:left-0 2xl:left-6 top-1/2 -translate-y-1/2 z-20 pointer-events-none select-none flex flex-col items-start">
+        <div className="relative">
+          <div className="absolute -inset-14 bg-cyan-500/30 rounded-full blur-3xl animate-pulse pointer-events-none" />
+          <img
+            src={heroImg}
+            alt="System Saviour Hero"
+            className="w-72 sm:w-88 md:w-[440px] lg:w-[500px] xl:w-[580px] 2xl:w-[680px] max-h-[94vh] object-contain animate-hero-zoom drop-shadow-[0_0_60px_rgba(56,189,248,0.8)]"
+          />
+        </div>
+      </div>
+
+      {/* ARCHITECT HERO NAME BADGE - MOVED FAR LEFT */}
+      <div className="fixed left-3 sm:left-6 md:left-8 xl:left-12 bottom-5 sm:bottom-7 z-40 pointer-events-auto select-none flex flex-col items-start">
+        <div className="px-3 sm:px-4 py-1.5 rounded-full bg-slate-950/90 border border-cyan-400 text-cyan-300 font-black text-xs sm:text-sm uppercase tracking-wider backdrop-blur-md shadow-[0_0_30px_rgba(34,211,238,0.5)] flex items-center gap-2 ring-2 ring-cyan-500/50 whitespace-nowrap">
+          <Shield className="w-4 h-4 text-cyan-400" />
+          <span>Architect Hero</span>
+        </div>
+        <span className="text-[10px] sm:text-xs font-mono text-cyan-300/90 mt-1 font-bold pl-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap">
+          High Availability Guardian
+        </span>
+      </div>
+
+      {/* BIG DEVIL IN BACKGROUND (RIGHT) */}
+      <div className="fixed -right-8 sm:-right-4 lg:right-0 2xl:right-6 top-1/2 -translate-y-1/2 z-20 pointer-events-none select-none flex flex-col items-end">
+        <div className="relative">
+          <div className="absolute -inset-14 bg-red-500/30 rounded-full blur-3xl animate-pulse pointer-events-none" />
+          <img
+            src={devilImg}
+            alt="Chaos Outage Devil"
+            className="w-72 sm:w-88 md:w-[440px] lg:w-[500px] xl:w-[580px] 2xl:w-[680px] max-h-[94vh] object-contain animate-devil-zoom drop-shadow-[0_0_60px_rgba(239,68,68,0.8)]"
+          />
+        </div>
+      </div>
+
+      {/* CHAOS DEVIL NAME BADGE - MOVED FAR RIGHT */}
+      <div className="fixed right-3 sm:right-6 md:right-8 xl:right-12 bottom-5 sm:bottom-7 z-40 pointer-events-auto select-none flex flex-col items-end">
+        <div className="px-3 sm:px-4 py-1.5 rounded-full bg-slate-950/90 border border-red-500 text-red-300 font-black text-xs sm:text-sm uppercase tracking-wider backdrop-blur-md shadow-[0_0_30px_rgba(239,68,68,0.5)] flex items-center gap-2 ring-2 ring-red-500/50 whitespace-nowrap">
+          <Flame className="w-4 h-4 text-red-400" />
+          <span>Chaos Devil</span>
+        </div>
+        <span className="text-[10px] sm:text-xs font-mono text-red-300/90 mt-1 font-bold pr-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap">
+          Outages &amp; Chaos Demon
+        </span>
+      </div>
+
+      {/* ================================================================= */}
+      {/* CENTER AUTHENTICATION GLASS PANE                                  */}
+      {/* ================================================================= */}
+      <div className="relative max-w-lg xl:max-w-xl w-full bg-slate-950/80 border border-indigo-400/35 rounded-3xl p-6 sm:p-7 shadow-[0_0_60px_rgba(0,0,0,0.7)] my-auto text-slate-100 max-h-[92vh] overflow-y-auto z-30 backdrop-blur-xl space-y-4">
+        {/* Sticky Floating Close Button */}
+        <div className="sticky top-0 z-50 flex justify-end -mt-1 -mr-1 pointer-events-none">
+          <button
+            onClick={() => {
+              sound.playClick();
+              onClose();
+            }}
+            className="pointer-events-auto p-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 text-slate-400 hover:text-white transition shadow-xl backdrop-blur-md active:scale-95"
+            title="Close Auth Terminal"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Brand Lockup & Terminal Subtitle */}
+        <div className="text-center space-y-1 relative">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 text-[10px] font-black uppercase tracking-wider font-mono">
+            <Terminal className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Cloudflare Edge Terminal Authentication</span>
+          </div>
+          <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center justify-center gap-2 font-display">
+            <span>System Saviour</span>
+            <span className="text-cyan-400 font-mono">Identity</span>
+          </h2>
+          <p className="text-xs text-slate-300 max-w-sm mx-auto">
+            Sync architectures with Cloudflare KV, claim your architect leaderboard rank, and save campaign progress.
+          </p>
+        </div>
+
+        {/* Success Overlay Notification */}
+        {authSuccessMsg && (
+          <div className="p-3.5 rounded-2xl bg-emerald-950/80 border border-emerald-500/60 text-emerald-300 text-xs font-bold flex items-center gap-2.5 animate-in fade-in zoom-in-95">
+            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+            <span>{authSuccessMsg}</span>
+          </div>
+        )}
+
+        {/* If user is ALREADY LOGGED IN: Show Active Architect Card */}
+        {currentUser ? (
+          <div className="space-y-4 p-4 rounded-2xl bg-slate-900/90 border border-indigo-500/40">
+            <div className="flex items-center gap-3.5">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-500 to-indigo-600 flex items-center justify-center text-white text-xl font-black shadow-lg shadow-cyan-500/30 ring-2 ring-cyan-400 shrink-0">
+                {currentUser.name.charAt(0).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-black text-base text-white truncate">{currentUser.name}</h3>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold">
+                    Active
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 truncate">{currentUser.email}</p>
+                <div className="text-[11px] font-medium text-cyan-300 mt-0.5">
+                  💼 {currentUser.role}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
+                <div className="text-[10px] text-slate-400 font-mono uppercase">Compensation</div>
+                <div className="font-bold text-amber-300 text-xs mt-0.5">{currentUser.salary || '$145,000 / yr'}</div>
+              </div>
+              <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
+                <div className="text-[10px] text-slate-400 font-mono uppercase">Edge Sync Status</div>
+                <div className="font-bold text-emerald-400 text-xs mt-0.5 flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>Cloud Connected</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2.5 pt-2">
+              <button
+                onClick={() => {
+                  sound.playClick();
+                  onLogout();
+                }}
+                className="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-rose-950/80 hover:text-rose-300 border border-slate-700 hover:border-rose-500/50 text-slate-300 font-bold text-xs transition flex items-center justify-center gap-1.5 active:scale-95"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Sign Out</span>
+              </button>
+              <button
+                onClick={() => {
+                  sound.playSelect();
+                  onClose();
+                }}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-1.5 active:scale-95 transition"
+              >
+                <span>Enter Architecture Arena →</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Segmented Tab Switcher (Sign In vs Sign Up) */}
+            <div className="flex rounded-2xl bg-slate-900/90 p-1 border border-indigo-500/30">
+              <button
+                onClick={() => {
+                  sound.playClick();
+                  setTab('SIGNIN');
+                  setSignInError(null);
+                  setSignUpError(null);
+                }}
+                className={`flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 ${
+                  tab === 'SIGNIN'
+                    ? 'bg-gradient-to-r from-cyan-500 to-indigo-600 text-slate-950 font-black shadow-lg shadow-cyan-500/20'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Sign In</span>
+              </button>
+              <button
+                onClick={() => {
+                  sound.playClick();
+                  setTab('SIGNUP');
+                  setSignInError(null);
+                  setSignUpError(null);
+                }}
+                className={`flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 ${
+                  tab === 'SIGNUP'
+                    ? 'bg-gradient-to-r from-cyan-500 to-indigo-600 text-slate-950 font-black shadow-lg shadow-cyan-500/20'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>Create Account</span>
+              </button>
+            </div>
+
+            {/* ============================================================= */}
+            {/* TAB 1: SIGN IN FORM                                           */}
+            {/* ============================================================= */}
+            {tab === 'SIGNIN' ? (
+              <form onSubmit={handleSignInSubmit} className="space-y-3.5 pt-1">
+                {signInError && (
+                  <div className="p-2.5 rounded-xl bg-rose-950/80 border border-rose-500/50 text-rose-300 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
+                    <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                    <span>{signInError}</span>
+                  </div>
+                )}
+
+                {forgotPasswordNotice && (
+                  <div className="p-2.5 rounded-xl bg-cyan-950/80 border border-cyan-500/50 text-cyan-300 text-xs font-semibold flex items-center gap-2">
+                    <Info className="w-4 h-4 text-cyan-400 shrink-0" />
+                    <span>Password reset instructions dispatched to email terminal.</span>
+                  </div>
+                )}
+
+                {/* Email / Handle Input */}
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                    <Mail className="w-3 h-3 text-cyan-400" />
+                    <span>Architect Email or Handle</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={signInEmail}
+                    onChange={(e) => setSignInEmail(e.target.value)}
+                    placeholder="neo@systemsaviour.dev"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-slate-700/80 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 text-slate-100 text-xs placeholder:text-slate-500 outline-none transition"
+                  />
+                </div>
+
+                {/* Password Input with Reveal Toggle */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-slate-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                      <Lock className="w-3 h-3 text-cyan-400" />
+                      <span>Terminal Password</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setForgotPasswordNotice(true)}
+                      className="text-[10px] text-cyan-400 hover:text-cyan-300 font-semibold transition"
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type={showSignInPassword ? 'text' : 'password'}
+                      value={signInPassword}
+                      onChange={(e) => setSignInPassword(e.target.value)}
+                      placeholder="••••••••••••"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-slate-700/80 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 text-slate-100 text-xs placeholder:text-slate-500 outline-none transition pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSignInPassword(!showSignInPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition"
+                    >
+                      {showSignInPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Remember Me Checkbox */}
+                <div className="flex items-center justify-between text-xs text-slate-400">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="rounded border-slate-700 bg-slate-900 text-cyan-500 focus:ring-0 cursor-pointer"
+                    />
+                    <span className="text-[11px]">Remember terminal authentication session</span>
+                  </label>
+                </div>
+
+                {/* Primary Sign In Button */}
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-400 via-teal-400 to-indigo-500 hover:from-cyan-300 hover:to-indigo-400 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-cyan-500/25 flex items-center justify-center gap-2 active:scale-95 transition disabled:opacity-50 ring-2 ring-cyan-200"
+                >
+                  {isSubmitting ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <LogIn className="w-4 h-4" />
+                      <span>Authenticate Terminal &rarr;</span>
+                    </>
+                  )}
+                </button>
+
+                {/* Divider */}
+                <div className="relative my-3">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-slate-800" />
+                  </div>
+                  <div className="relative flex justify-center text-[10px] uppercase font-mono tracking-wider">
+                    <span className="bg-slate-950 px-2.5 text-slate-500">Or Quick Authenticate</span>
+                  </div>
+                </div>
+
+                {/* Quick OAuth & Guest Login Buttons */}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleSocialLogin('GITHUB')}
+                    className="py-2.5 px-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold flex items-center justify-center gap-2 transition active:scale-95"
+                  >
+                    <Github className="w-3.5 h-3.5" />
+                    <span>GitHub</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSocialLogin('GOOGLE')}
+                    className="py-2.5 px-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold flex items-center justify-center gap-2 transition active:scale-95"
+                  >
+                    <Globe className="w-3.5 h-3.5 text-rose-400" />
+                    <span>Google</span>
+                  </button>
+                </div>
+
+                {/* 1-Click Guest Terminal Demo */}
+                <button
+                  type="button"
+                  onClick={handleGuestLogin}
+                  className="w-full py-2.5 px-3 rounded-xl bg-indigo-950/40 hover:bg-indigo-900/50 border border-indigo-500/40 text-indigo-300 text-xs font-bold flex items-center justify-center gap-2 transition active:scale-95"
+                >
+                  <Zap className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Instant Guest Architect Access (Zero Password)</span>
+                </button>
+              </form>
+            ) : (
+              /* ============================================================= */
+              /* TAB 2: SIGN UP / CREATE ACCOUNT FORM                          */
+              /* ============================================================= */
+              <form onSubmit={handleSignUpSubmit} className="space-y-3 pt-1">
+                {signUpError && (
+                  <div className="p-2.5 rounded-xl bg-rose-950/80 border border-rose-500/50 text-rose-300 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
+                    <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                    <span>{signUpError}</span>
+                  </div>
+                )}
+
+                {/* Architect Handle & Email Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-slate-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                      <User className="w-3 h-3 text-cyan-400" />
+                      <span>Architect Handle</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={signUpHandle}
+                      onChange={(e) => setSignUpHandle(e.target.value)}
+                      placeholder="e.g. CyberArchitect"
+                      className="w-full px-3 py-2 rounded-xl bg-slate-900/90 border border-slate-700/80 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 text-slate-100 text-xs placeholder:text-slate-500 outline-none transition"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-slate-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                      <Mail className="w-3 h-3 text-cyan-400" />
+                      <span>Engineering Email</span>
+                    </label>
+                    <input
+                      type="email"
+                      value={signUpEmail}
+                      onChange={(e) => setSignUpEmail(e.target.value)}
+                      placeholder="architect@domain.com"
+                      className="w-full px-3 py-2 rounded-xl bg-slate-900/90 border border-slate-700/80 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 text-slate-100 text-xs placeholder:text-slate-500 outline-none transition"
+                    />
+                  </div>
+                </div>
+
+                {/* Specialization Selection */}
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-300 uppercase tracking-wider font-mono flex items-center justify-between">
+                    <span>Engineering Specialization</span>
+                    <span className="text-[10px] text-cyan-400 font-normal">Choose starting discipline</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {[
+                      { id: 'HIGH_AVAILABILITY', emoji: '🛡️', name: 'High Availability & SRE' },
+                      { id: 'THROUGHPUT', emoji: '⚡', name: 'Throughput & Scaling' },
+                      { id: 'SECURITY', emoji: '🔒', name: 'Zero Trust Security' },
+                      { id: 'FINOPS', emoji: '💰', name: 'Cloud FinOps Economy' }
+                    ].map((spec) => (
+                      <button
+                        type="button"
+                        key={spec.id}
+                        onClick={() => {
+                          sound.playClick();
+                          setSpecialization(spec.id);
+                        }}
+                        className={`p-2 rounded-xl border text-left text-[11px] font-bold transition flex items-center gap-2 ${
+                          specialization === spec.id
+                            ? 'bg-cyan-500/20 border-cyan-400 text-white ring-1 ring-cyan-400'
+                            : 'bg-slate-900/70 border-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <span className="text-sm shrink-0">{spec.emoji}</span>
+                        <span className="truncate">{spec.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Password & Confirm Password */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-slate-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                      <Lock className="w-3 h-3 text-cyan-400" />
+                      <span>Password</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showSignUpPassword ? 'text' : 'password'}
+                        value={signUpPassword}
+                        onChange={(e) => setSignUpPassword(e.target.value)}
+                        placeholder="••••••••••••"
+                        className="w-full px-3 py-2 rounded-xl bg-slate-900/90 border border-slate-700/80 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 text-slate-100 text-xs placeholder:text-slate-500 outline-none transition pr-8"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowSignUpPassword(!showSignUpPassword)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition"
+                      >
+                        {showSignUpPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-slate-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                        <Key className="w-3 h-3 text-cyan-400" />
+                        <span>Confirm Password</span>
+                      </label>
+                      {signUpConfirmPassword && (
+                        <span className={`text-[10px] font-bold ${passwordsMatch ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {passwordsMatch ? '✓ Match' : '✗ Mismatch'}
+                        </span>
+                      )}
+                    </div>
+                    <input
+                      type="password"
+                      value={signUpConfirmPassword}
+                      onChange={(e) => setSignUpConfirmPassword(e.target.value)}
+                      placeholder="••••••••••••"
+                      className={`w-full px-3 py-2 rounded-xl bg-slate-900/90 border text-slate-100 text-xs outline-none transition ${
+                        signUpConfirmPassword && !passwordsMatch
+                          ? 'border-rose-500 focus:ring-rose-500'
+                          : 'border-slate-700/80 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400'
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                {/* Password Strength Meter */}
+                {signUpPassword && (
+                  <div className="space-y-1 p-2 rounded-xl bg-slate-900/60 border border-slate-800">
+                    <div className="flex items-center justify-between text-[10px] font-mono">
+                      <span className="text-slate-400">Security Strength:</span>
+                      <span className="font-bold text-slate-200">{passwordStrength.label}</span>
+                    </div>
+                    <div className="grid grid-cols-4 gap-1 h-1.5">
+                      {[1, 2, 3, 4].map((step) => (
+                        <div
+                          key={step}
+                          className={`rounded-full transition-all duration-300 ${
+                            step <= passwordStrength.score ? passwordStrength.color : 'bg-slate-800'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Terms Agreement Checkbox */}
+                <label className="flex items-center gap-2 cursor-pointer select-none text-[11px] text-slate-400 pt-1">
+                  <input
+                    type="checkbox"
+                    checked={agreedToTerms}
+                    onChange={(e) => setAgreedToTerms(e.target.checked)}
+                    className="rounded border-slate-700 bg-slate-900 text-cyan-500 focus:ring-0 cursor-pointer"
+                  />
+                  <span>I agree to the System Architecture Code of Conduct and Cloudflare telemetry</span>
+                </label>
+
+                {/* Create Account Primary Button */}
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-emerald-500/25 flex items-center justify-center gap-2 active:scale-95 transition disabled:opacity-50 ring-2 ring-emerald-200 mt-2"
+                >
+                  {isSubmitting ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <UserPlus className="w-4 h-4" />
+                      <span>Deploy Architect Identity &rarr;</span>
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
 // 5. MAIN REACT APPLICATION COMPONENT
 // ============================================================================
 export default function App() {
@@ -3041,14 +3768,37 @@ export default function App() {
     }
   });
 
-  // Welcome Screen, Level Targets Briefing & Component Details Modal States (Skip welcome if loading deep link challenge)
-  const [showWelcomeModal, setShowWelcomeModal] = useState(() => !initialChallengeRef.current);
+  // Welcome Screen, Level Targets Briefing & Component Details Modal States (Skip welcome if loading deep link challenge or auth)
+  const [showWelcomeModal, setShowWelcomeModal] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const h = window.location.hash;
+      if (h === '#signin' || h === '#signup' || h === '#auth' || h === '#register') return false;
+    }
+    return !initialChallengeRef.current;
+  });
   const [levelBriefingModal, setLevelBriefingModal] = useState(null); // { mode: 'CAMPAIGN' | 'SURVIVAL' | 'SANDBOX', levelIdx?: number }
   const [detailModalComponent, setDetailModalComponent] = useState(null);
   const [showLeaderboardModal, setShowLeaderboardModal] = useState(() => initialChallengeRef.current?.isLeaderboardDirect || false);
   const [showPresetsModal, setShowPresetsModal] = useState(() => initialChallengeRef.current?.isPresetsModalOpen || false);
   const [showBadgesModal, setShowBadgesModal] = useState(() => initialChallengeRef.current?.isBadgesDirect || false);
   const [promotionModal, setPromotionModal] = useState(null); // { manager, nextManager, levelIdx, stars, p99Latency, uptimePct }
+
+  // Architect Authentication & Cloud Identity State (Persisted in localStorage)
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('systemsaviour_auth_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [authModal, setAuthModal] = useState(() => {
+    if (typeof window !== 'undefined') {
+      if (window.location.hash === '#signin' || window.location.hash === '#auth') return { isOpen: true, initialTab: 'SIGNIN' };
+      if (window.location.hash === '#signup' || window.location.hash === '#register') return { isOpen: true, initialTab: 'SIGNUP' };
+    }
+    return null;
+  }); // { isOpen: boolean, initialTab: 'SIGNIN' | 'SIGNUP' } | null
   const [isBadgesShareCopied, setIsBadgesShareCopied] = useState(false);
   const [badgeToast, setBadgeToast] = useState(null); // { badge, timestamp }
   const [leaderboardTab, setLeaderboardTab] = useState('DAILY'); // 'DAILY' | 'SURVIVAL'
@@ -3195,6 +3945,16 @@ export default function App() {
     }
 
     const handleHashChange = () => {
+      if (window.location.hash === '#signin' || window.location.hash === '#auth') {
+        setShowWelcomeModal(false);
+        setAuthModal({ isOpen: true, initialTab: 'SIGNIN' });
+        return;
+      }
+      if (window.location.hash === '#signup' || window.location.hash === '#register') {
+        setShowWelcomeModal(false);
+        setAuthModal({ isOpen: true, initialTab: 'SIGNUP' });
+        return;
+      }
       if (window.location.hash === '#leaderboard') {
         setShowLeaderboardModal(true);
         return;
@@ -5104,6 +5864,35 @@ Can your architecture beat this? Test it in your browser:
             </button>
           </div>
 
+          {/* Architect Authentication Terminal Button */}
+          <button
+            onClick={() => {
+              sound.playClick();
+              setAuthModal({ isOpen: true, initialTab: currentUser ? 'SIGNIN' : 'SIGNIN' });
+            }}
+            className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 shadow-md active:scale-95 transition shrink-0 ${
+              currentUser
+                ? 'bg-slate-900/90 border-cyan-500/40 text-cyan-300 hover:border-cyan-400'
+                : 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 border-indigo-500/40 text-white'
+            }`}
+            title={currentUser ? `Signed in as ${currentUser.name} (${currentUser.role})` : 'Sign In or Register Architect Profile'}
+          >
+            {currentUser ? (
+              <>
+                <div className="w-4 h-4 rounded-full bg-cyan-500/30 text-cyan-300 flex items-center justify-center text-[10px] font-black ring-1 ring-cyan-400">
+                  {currentUser.name.charAt(0).toUpperCase()}
+                </div>
+                <span className="hidden sm:inline max-w-[90px] truncate font-mono">{currentUser.name}</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              </>
+            ) : (
+              <>
+                <LogIn className="w-3.5 h-3.5 text-cyan-400" />
+                <span className="hidden xs:inline">Sign In</span>
+              </>
+            )}
+          </button>
+
           {/* Continuous Bouncy Spring Utilities Capsule */}
           <div
             className="relative flex items-center justify-end"
@@ -5119,11 +5908,11 @@ Can your architecture beat this? Test it in your browser:
                   : 'rounded-full p-0.5 bg-slate-900/90 border-indigo-500/40 hover:border-cyan-400 hover:scale-110 active:scale-95 shadow-indigo-500/10 cursor-pointer'
               }`}
             >
-              {/* Collapsible Utility Items (Chaos, Leaderboard, Presets, Badges, Cloudflare) */}
+              {/* Collapsible Utility Items (Chaos, Leaderboard, Presets, Badges, Cloudflare, Auth) */}
               <div
                 className={`flex items-center gap-1 transition-all duration-500 ease-spring overflow-hidden ${
                   isUtilitiesExpanded
-                    ? 'max-w-[420px] opacity-100 scale-100 translate-x-0'
+                    ? 'max-w-[490px] opacity-100 scale-100 translate-x-0'
                     : 'max-w-0 opacity-0 scale-75 -translate-x-4 pointer-events-none'
                 }`}
               >
@@ -5194,6 +5983,20 @@ Can your architecture beat this? Test it in your browser:
                 >
                   <Cloud className="w-3.5 h-3.5 text-orange-400" />
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                </button>
+
+                {/* 6. Identity / Auth */}
+                <button
+                  onClick={() => {
+                    sound.playClick();
+                    setAuthModal({ isOpen: true, initialTab: currentUser ? 'SIGNIN' : 'SIGNIN' });
+                    setIsUtilitiesExpanded(false);
+                  }}
+                  className="px-2 py-1 rounded-lg text-xs text-cyan-300 hover:text-cyan-200 hover:bg-cyan-950/60 hover:scale-110 active:scale-90 transition-all duration-200 flex items-center gap-1 font-bold whitespace-nowrap"
+                  title="Architect Terminal Identity & Authentication"
+                >
+                  <User className="w-3.5 h-3.5 text-cyan-400" />
+                  <span className="text-[11px]">{currentUser ? currentUser.name : 'Sign In'}</span>
                 </button>
               </div>
 
@@ -7684,6 +8487,29 @@ Can your architecture beat this? Test it in your browser:
                   <Music className={`w-3.5 h-3.5 ${isAudioActive ? 'animate-bounce text-amber-400' : ''}`} />
                   <span>Warrior Theme: {isAudioActive ? 'ON (75%)' : 'OFF'}</span>
                 </button>
+
+                {/* Sign In / Architect Identity Button */}
+                <button
+                  onClick={() => {
+                    sound.playClick();
+                    setShowWelcomeModal(false);
+                    setAuthModal({ isOpen: true, initialTab: currentUser ? 'SIGNIN' : 'SIGNIN' });
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-500/30 to-purple-500/30 hover:from-indigo-500/40 hover:to-purple-500/40 border border-indigo-400/50 text-white font-bold text-xs flex items-center gap-1.5 transition shadow active:scale-95"
+                  title="Sign In or Register an Architect Identity"
+                >
+                  {currentUser ? (
+                    <>
+                      <User className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>{currentUser.name}</span>
+                    </>
+                  ) : (
+                    <>
+                      <LogIn className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Sign In / Sign Up</span>
+                    </>
+                  )}
+                </button>
               </div>
             </div>
 
@@ -9352,6 +10178,38 @@ Can your architecture beat this? Test it in your browser:
           resetWave();
         }}
         onClose={() => setPromotionModal(null)}
+      />
+
+      {/* =================================================================== */}
+      {/* 11.6. AUTHENTICATION & ARCHITECT IDENTITY PANE (SIGN IN / SIGN UP)   */}
+      {/* =================================================================== */}
+      <AuthModal
+        isOpen={Boolean(authModal?.isOpen)}
+        initialTab={authModal?.initialTab || 'SIGNIN'}
+        onClose={() => setAuthModal(null)}
+        currentUser={currentUser}
+        onLogin={(user) => {
+          setCurrentUser(user);
+          try {
+            localStorage.setItem('systemsaviour_auth_user', JSON.stringify(user));
+          } catch (e) {}
+          setToastNotification({
+            type: 'success',
+            message: `🔑 Terminal Authenticated! Welcome, ${user.name}.`
+          });
+          setTimeout(() => setToastNotification(null), 3500);
+        }}
+        onLogout={() => {
+          setCurrentUser(null);
+          try {
+            localStorage.removeItem('systemsaviour_auth_user');
+          } catch (e) {}
+          setToastNotification({
+            type: 'info',
+            message: 'Terminal session ended. You are now in Guest Mode.'
+          });
+          setTimeout(() => setToastNotification(null), 3000);
+        }}
       />
 
       {/* =================================================================== */}
