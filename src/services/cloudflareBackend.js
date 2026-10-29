@@ -510,12 +510,12 @@ class CloudflareBackendService {
   }
 
   /**
-   * Authoritative Social OAuth Connect
+   * Authoritative Social OAuth Connect (Google / GitHub)
    */
-  async socialLogin(provider, email = null, name = null) {
+  async socialLogin(provider, email = null, name = null, extra = {}) {
     const res = await this._fetchApi('/api/auth/social', {
       method: 'POST',
-      body: JSON.stringify({ provider, email, name })
+      body: JSON.stringify({ provider, email, name, ...extra })
     });
 
     if (res && res.success && res.user) {
@@ -527,21 +527,43 @@ class CloudflareBackendService {
     }
 
     const randId = Math.random().toString(36).substring(2, 7);
+    const cleanProvider = (provider || 'github').toLowerCase();
     const fallbackSocial = {
-      id: `${provider}_${randId}`,
-      name: `${provider === 'github' ? 'OctoArchitect' : 'GoogleArchitect'}_${randId}`,
-      email: `architect@${provider}.user`,
-      role: 'Verified Cloud Architect',
-      specialization: 'THROUGHPUT',
-      salary: '$165,000 / yr',
+      id: `${cleanProvider}_${randId}`,
+      name: name || `${cleanProvider === 'github' ? 'OctoArchitect' : 'GoogleArchitect'}_${randId}`,
+      email: email || `architect@${cleanProvider}.user`,
+      avatar: extra.avatar || null,
+      handle: extra.handle || (name ? name.replace(/\s+/g, '_').toLowerCase() : `${cleanProvider}_${randId}`),
+      role: cleanProvider === 'github' ? 'GitHub Senior Architect' : 'Google Cloud Fellow',
+      specialization: cleanProvider === 'github' ? 'THROUGHPUT' : 'AVAILABILITY',
+      salary: cleanProvider === 'github' ? '$165,000 / yr' : '$175,000 / yr',
       rank: 'Senior Architect',
-      authProvider: provider,
+      authProvider: cleanProvider,
       token: `oauth_tok_${Date.now()}`
     };
     try {
       localStorage.setItem(LOCAL_STORAGE_KEYS.AUTH_USER, JSON.stringify(fallbackSocial));
     } catch {}
     return { success: true, user: fallbackSocial };
+  }
+
+  /**
+   * Authoritative Google ID Token Verification
+   */
+  async verifyGoogleToken(credentialPayload) {
+    const res = await this._fetchApi('/api/auth/oauth/google', {
+      method: 'POST',
+      body: JSON.stringify(credentialPayload)
+    });
+
+    if (res && res.success && res.user) {
+      try {
+        localStorage.setItem(LOCAL_STORAGE_KEYS.AUTH_USER, JSON.stringify(res.user));
+        if (res.token) localStorage.setItem(LOCAL_STORAGE_KEYS.AUTH_TOKEN, res.token);
+      } catch {}
+      return res;
+    }
+    return res;
   }
 
   /**

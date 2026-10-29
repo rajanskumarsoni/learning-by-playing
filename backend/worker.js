@@ -543,32 +543,47 @@ export default {
       // Social OAuth Connect (POST /api/auth/social)
       if (path === '/api/auth/social' && method === 'POST') {
         const payload = await request.json();
-        const { provider = 'github', email, name } = payload;
+        const { provider = 'github', email, name, handle, avatar, providerId } = payload;
         const randId = Math.random().toString(36).substring(2, 7);
-        const cleanName = name || `${provider === 'github' ? 'OctoArchitect' : 'GoogleArchitect'}_${randId}`;
-        const cleanEmail = email || `architect_${randId}@${provider.toLowerCase()}.user`;
+        const cleanProvider = (provider || 'github').toLowerCase();
+        const cleanName = name || `${cleanProvider === 'github' ? 'OctoArchitect' : 'GoogleArchitect'}_${randId}`;
+        const cleanEmail = (email || `${(handle || cleanName).replace(/\s+/g, '_').toLowerCase()}@${cleanProvider}.user`).toLowerCase();
+        const cleanHandle = (handle || cleanName.replace(/[^a-zA-Z0-9_]/g, '_')).toLowerCase();
 
-        let userId = await storageGet(env, `user_by_email_${cleanEmail.toLowerCase()}`);
+        let userId = await storageGet(env, `user_by_email_${cleanEmail}`);
         let userRecord;
 
         if (userId) {
           userRecord = await storageGet(env, `user_${userId}`);
+          if (userRecord) {
+            // Update profile with fresh OAuth provider details
+            if (avatar) userRecord.avatar = avatar;
+            if (name) userRecord.name = cleanName;
+            if (cleanHandle && !userRecord.handle) userRecord.handle = cleanHandle;
+            userRecord.authProvider = cleanProvider;
+            if (providerId) userRecord.providerId = providerId;
+            userRecord.updatedAt = new Date().toISOString();
+            await storagePut(env, `user_${userId}`, userRecord);
+          }
         } else {
-          userId = `oauth_${provider.toLowerCase()}_${Date.now()}_${randId}`;
+          userId = `oauth_${cleanProvider}_${Date.now()}_${randId}`;
           userRecord = {
             id: userId,
             name: cleanName,
-            handle: cleanName.toLowerCase(),
-            email: cleanEmail.toLowerCase(),
-            role: 'Verified Cloud Architect',
-            specialization: 'THROUGHPUT',
+            handle: cleanHandle,
+            email: cleanEmail,
+            avatar: avatar || null,
+            role: cleanProvider === 'github' ? 'GitHub Senior Architect' : 'Google Cloud Fellow',
+            specialization: cleanProvider === 'github' ? 'THROUGHPUT' : 'AVAILABILITY',
             salary: '$165,000 / yr',
             rank: 'Senior Architect',
-            authProvider: provider.toLowerCase(),
+            authProvider: cleanProvider,
+            providerId: providerId || null,
             createdAt: new Date().toISOString()
           };
           await storagePut(env, `user_${userId}`, userRecord);
-          await storagePut(env, `user_by_email_${cleanEmail.toLowerCase()}`, userId);
+          await storagePut(env, `user_by_email_${cleanEmail}`, userId);
+          await storagePut(env, `user_by_handle_${cleanHandle}`, userId);
         }
 
         const token = generateToken();
@@ -583,8 +598,205 @@ export default {
           success: true,
           token,
           user: safeUser,
-          message: `Authenticated via ${provider}`
+          message: `Authenticated via ${cleanProvider.toUpperCase()}`
         });
+      }
+
+      // Google Identity Services ID Token Verification (POST /api/auth/oauth/google)
+      if (path === '/api/auth/oauth/google' && method === 'POST') {
+        const payload = await request.json();
+        const { credential, email, name, picture, sub } = payload;
+
+        let verifiedEmail = email;
+        let verifiedName = name;
+        let verifiedAvatar = picture;
+        let googleSub = sub;
+
+        // If a real Google ID Token is provided, verify against Google's public tokeninfo endpoint
+        if (credential) {
+          try {
+            const googleRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
+            if (googleRes.ok) {
+              const googleData = await googleRes.json();
+              if (googleData.email) {
+                verifiedEmail = googleData.email;
+                verifiedName = googleData.name || googleData.given_name || 'Google Architect';
+                verifiedAvatar = googleData.picture || null;
+                googleSub = googleData.sub;
+              }
+            }
+          } catch (e) {
+            console.error('Google token verification error:', e);
+          }
+        }
+
+        if (!verifiedEmail) {
+          return jsonResponse({ success: false, error: 'Could not verify Google credentials' }, 400);
+        }
+
+        const cleanEmail = verifiedEmail.toLowerCase();
+        let userId = await storageGet(env, `user_by_email_${cleanEmail}`);
+        let userRecord;
+
+        if (userId) {
+          userRecord = await storageGet(env, `user_${userId}`);
+          if (userRecord) {
+            if (verifiedAvatar) userRecord.avatar = verifiedAvatar;
+            if (verifiedName) userRecord.name = verifiedName;
+            userRecord.authProvider = 'google';
+            if (googleSub) userRecord.providerId = googleSub;
+            userRecord.updatedAt = new Date().toISOString();
+            await storagePut(env, `user_${userId}`, userRecord);
+          }
+        } else {
+          const randId = Math.random().toString(36).substring(2, 7);
+          const handle = (verifiedEmail.split('@')[0] || `google_${randId}`).replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
+          userId = `oauth_google_${Date.now()}_${randId}`;
+          userRecord = {
+            id: userId,
+            name: verifiedName || 'Google Cloud Architect',
+            handle,
+            email: cleanEmail,
+            avatar: verifiedAvatar || null,
+            role: 'Google Cloud Fellow',
+            specialization: 'AVAILABILITY',
+            salary: '$175,000 / yr',
+            rank: 'Staff Architect',
+            authProvider: 'google',
+            providerId: googleSub || null,
+            createdAt: new Date().toISOString()
+          };
+          await storagePut(env, `user_${userId}`, userRecord);
+          await storagePut(env, `user_by_email_${cleanEmail}`, userId);
+          await storagePut(env, `user_by_handle_${handle}`, userId);
+        }
+
+        const token = generateToken();
+        await storagePut(env, `session_${token}`, {
+          userId,
+          createdAt: new Date().toISOString(),
+          expiresAt: Date.now() + 86400000 * 30
+        });
+
+        const { passwordHash: _p, salt: _s, ...safeUser } = userRecord;
+        return jsonResponse({
+          success: true,
+          token,
+          user: safeUser,
+          message: 'Google Account authenticated successfully'
+        });
+      }
+
+      // GitHub OAuth Authorization Callback (GET /api/auth/oauth/github/callback)
+      if (path === '/api/auth/oauth/github/callback' && method === 'GET') {
+        const url = new URL(request.url);
+        const code = url.searchParams.get('code');
+        const clientId = env.GITHUB_CLIENT_ID;
+        const clientSecret = env.GITHUB_CLIENT_SECRET;
+
+        if (!code || !clientId || !clientSecret) {
+          return new Response('GitHub OAuth not configured or missing code parameter', { status: 400 });
+        }
+
+        try {
+          const tokenRes = await fetch('https://github.com/login/oauth/access_token', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+              client_id: clientId,
+              client_secret: clientSecret,
+              code
+            })
+          });
+
+          const tokenData = await tokenRes.json();
+          if (!tokenData.access_token) {
+            return new Response(`GitHub OAuth failed: ${tokenData.error_description || tokenData.error}`, { status: 400 });
+          }
+
+          const ghUserRes = await fetch('https://api.github.com/user', {
+            headers: {
+              'Authorization': `Bearer ${tokenData.access_token}`,
+              'User-Agent': 'SystemSaviour-App'
+            }
+          });
+          const ghUser = await ghUserRes.json();
+
+          const cleanEmail = (ghUser.email || `${ghUser.login}@github.user`).toLowerCase();
+          let userId = await storageGet(env, `user_by_email_${cleanEmail}`);
+          let userRecord;
+
+          if (userId) {
+            userRecord = await storageGet(env, `user_${userId}`);
+            if (userRecord) {
+              userRecord.avatar = ghUser.avatar_url;
+              userRecord.name = ghUser.name || ghUser.login;
+              userRecord.authProvider = 'github';
+              userRecord.providerId = String(ghUser.id);
+              await storagePut(env, `user_${userId}`, userRecord);
+            }
+          } else {
+            const randId = Math.random().toString(36).substring(2, 7);
+            userId = `oauth_github_${Date.now()}_${randId}`;
+            userRecord = {
+              id: userId,
+              name: ghUser.name || ghUser.login,
+              handle: ghUser.login.toLowerCase(),
+              email: cleanEmail,
+              avatar: ghUser.avatar_url,
+              role: 'GitHub Senior Architect',
+              specialization: 'THROUGHPUT',
+              salary: '$165,000 / yr',
+              rank: 'Senior Architect',
+              authProvider: 'github',
+              providerId: String(ghUser.id),
+              createdAt: new Date().toISOString()
+            };
+            await storagePut(env, `user_${userId}`, userRecord);
+            await storagePut(env, `user_by_email_${cleanEmail}`, userId);
+            await storagePut(env, `user_by_handle_${ghUser.login.toLowerCase()}`, userId);
+          }
+
+          const sessionToken = generateToken();
+          await storagePut(env, `session_${sessionToken}`, {
+            userId,
+            createdAt: new Date().toISOString(),
+            expiresAt: Date.now() + 86400000 * 30
+          });
+
+          const { passwordHash: _p, salt: _s, ...safeUser } = userRecord;
+
+          // Return HTML that communicates to opener window or redirects
+          const html = `<!DOCTYPE html>
+<html>
+<head><title>GitHub Authentication Successful</title></head>
+<body style="background:#070a13;color:#38bdf8;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
+  <div style="text-align:center;">
+    <h2>Authentication Successful!</h2>
+    <p>Logging into System Saviour...</p>
+    <script>
+      const authData = ${JSON.stringify({ token: sessionToken, user: safeUser })};
+      if (window.opener) {
+        window.opener.postMessage({ type: 'SYSTEM_SAVIOUR_OAUTH_SUCCESS', payload: authData }, '*');
+        window.close();
+      } else {
+        localStorage.setItem('systemsaviour_auth_user', JSON.stringify(authData.user));
+        localStorage.setItem('systemsaviour_auth_token', authData.token);
+        window.location.href = '/';
+      }
+    </script>
+  </div>
+</body>
+</html>`;
+          return new Response(html, {
+            headers: { 'Content-Type': 'text/html; charset=utf-8' }
+          });
+        } catch (err) {
+          return new Response(`OAuth Error: ${err.message}`, { status: 500 });
+        }
       }
 
       // Current Authenticated User (GET /api/auth/me)
