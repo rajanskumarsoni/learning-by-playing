@@ -2921,9 +2921,7 @@ export default function App() {
     sound.playClick();
     setSelectedNodeId(nodeId);
     setRightPanelTab('INSPECTOR');
-    if (rightPanelCollapsed) {
-      setRightPanelCollapsed(false);
-    }
+    setRightPanelCollapsed(false);
     setTimeout(() => {
       if (inspectorSectionRef.current) {
         inspectorSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -2931,7 +2929,7 @@ export default function App() {
     }, 60);
     setHighlightInspector(true);
     setTimeout(() => setHighlightInspector(false), 2200);
-  }, [rightPanelCollapsed]);
+  }, []);
 
   // Auto-Save Architecture State to localStorage whenever nodes or edges change
   useEffect(() => {
@@ -5628,12 +5626,22 @@ Can your architecture beat this? Test it in your browser:
                     title="Click to inspect and configure this component"
                     className={`no-pan pointer-events-auto absolute z-20 glass-subpanel rounded-xl border ${statusColor} p-2.5 shadow-2xl transition-all cursor-pointer group hover:border-indigo-400/60`}
                   >
-                    {/* Hover "Click to Inspect" Floating Badge */}
-                    <div className="absolute -top-7 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-40 whitespace-nowrap">
-                      <div className="px-2.5 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-bold shadow-2xl flex items-center gap-1 border border-indigo-400/50 animate-bounce">
-                        <Sliders className="w-2.5 h-2.5 text-indigo-200" />
-                        <span>Click to inspect</span>
-                      </div>
+                    {/* Hover "Inspect Element" Popup Button */}
+                    <div className="absolute -top-9 left-1/2 -translate-x-1/2 opacity-0 scale-90 translate-y-1 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0 pointer-events-none group-hover:pointer-events-auto transition-all duration-200 ease-out z-40 whitespace-nowrap pb-2.5">
+                      <button
+                        type="button"
+                        data-inspect-btn={node.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelectNode(node.id);
+                        }}
+                        className="px-3 py-1 rounded-full bg-gradient-to-r from-indigo-600 via-indigo-500 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 text-white text-[11px] font-black tracking-wide shadow-2xl shadow-indigo-600/60 flex items-center gap-1.5 border border-indigo-300/40 ring-2 ring-indigo-500/30 hover:scale-105 active:scale-95 transition-all cursor-pointer backdrop-blur-md group/btn"
+                        title={`Inspect and configure ${spec.name}`}
+                      >
+                        <Sliders className="w-3 h-3 text-cyan-200 group-hover/btn:rotate-45 transition-transform" />
+                        <span>Inspect Element</span>
+                        <ArrowRight className="w-2.5 h-2.5 text-cyan-200 group-hover/btn:translate-x-0.5 transition-transform" />
+                      </button>
                     </div>
 
                     {/* Left Input Port */}
