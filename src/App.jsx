@@ -14,6 +14,7 @@ import chaosMonkeyImg from './assets/chaos_monkey.jpg';
 import gameplayDemoVideo from './assets/gameplay_demo.mp4';
 import heroImg from './assets/hero.png';
 import devilImg from './assets/devil.png';
+import angryManagerImg from './assets/angry_manager.png';
 import { sound } from './audioEngine.js';
 import { introAudioTour, INTRO_TOUR_STEPS } from './introAudioTour.js';
 import { cloudflareBackend } from './services/cloudflareBackend.js';
@@ -2305,6 +2306,291 @@ function AudioVisualizerWidget({ soundEngine, isMuted, isPlaying, className = ''
         {!isSilenced && beatInfo.intensity === 'CHAOS_P0' && (
           <span className="text-[10px] text-rose-400 animate-bounce leading-none" title="P0 High-Alert Tempo Surge!">🔥</span>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// 4.8. ANGRY ANIME ENGINEERING MANAGER COMPONENT ("KENJI")
+// Paces back & forth across the canvas shouting "Fix it ASAP!", scolding, and eating chips
+// ============================================================================
+function AngryAnimeManager({ isRunning, evaluation }) {
+  const [posX, setPosX] = useState(14); // Percentage 6% to 76% across canvas width
+  const [direction, setDirection] = useState(1); // 1 = walking right, -1 = walking left
+  const [isPaused, setIsPaused] = useState(false);
+  const [quoteIndex, setQuoteIndex] = useState(0);
+  const [snackCrunchText, setSnackCrunchText] = useState(null);
+  const [crumbs, setCrumbs] = useState([]);
+  const [isShaking, setIsShaking] = useState(false);
+  const [isDismissed, setIsDismissed] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [pokeCount, setPokeCount] = useState(0);
+  const [bobStep, setBobStep] = useState(0);
+
+  const baseQuotes = useMemo(() => [
+    "FIX IT ASAP!! THE BOARD OF DIRECTORS IS WATCHING THE DASHBOARD!!",
+    "P99 LATENCY IS SPIKING! ARE YOU RUNNING POSTGRES ON A TOASTER?!",
+    "WHO MERGED TO PRODUCTION ON A FRIDAY?! REVERT OR DIE!!",
+    "I DIDN'T PROMISE 99.999% SLA SO YOU COULD SLEEP!",
+    "EVERY PACKET YOU DROP IS COMING OUT OF MY ANNUAL BONUS!!",
+    "WHY IS THE MESSAGE QUEUE BACKLOGGED?! DO WORKERS HAVE A UNION NOW?!",
+    "DO I HAVE TO WRITE THE DISTRIBUTED CACHE MYSELF?! MOVE MOVE MOVE!!",
+    "OUR INVESTORS JUST HIT A 504 GATEWAY TIMEOUT! FIX IT RIGHT NOW!!",
+    "WE ARE BLEEDING 500 ERRORS!! STOP THE BLEEDING!!",
+    "SCALE THE CLUSTERS! ADD MORE REPLICAS! LESS CHATTING, MORE CODING!!",
+    "MY COFFEE IS COLD, MY BLOOD PRESSURE IS 200, AND SERVERS ARE BURNING!!"
+  ], []);
+
+  const pokeQuotes = useMemo(() => [
+    "DON'T CLICK ME!! CLICK THE DAMN SERVERS!!",
+    "HEY! WATCH THE HANDS! YOU MADE ME DROP A VOLCANO CHIP!!",
+    "WHAT DO YOU WANT?! ADD MORE CAPACITY AND LESS POKING!!",
+    "DO I LOOK LIKE A REDIS CACHE?! GO RE-ROUTE THE TRAFFIC!!"
+  ], []);
+
+  // Compute active shout
+  const activeQuote = useMemo(() => {
+    if (pokeCount > 0) {
+      return pokeQuotes[(pokeCount - 1) % pokeQuotes.length];
+    }
+    if (evaluation?.droppedRps > 10) {
+      return `WE ARE DROPPING ${Math.round(evaluation.droppedRps)} RPS RIGHT NOW!! MY BLOOD PRESSURE!! FIX IT ASAP!!`;
+    }
+    if (evaluation?.p99Latency > 80) {
+      return `P99 IS ${evaluation.p99Latency}MS?! SHOPPING CARTS ARE ABANDONED!! OPTIMIZE NOW!!`;
+    }
+    if (isRunning) {
+      return "PEAK LOAD WAVE IS INCOMING!! HOLD THE LINE OR WE'RE ALL GETTING REPLACED BY SCRIPTS!!";
+    }
+    return baseQuotes[quoteIndex % baseQuotes.length];
+  }, [pokeCount, evaluation?.droppedRps, evaluation?.p99Latency, isRunning, quoteIndex, baseQuotes, pokeQuotes]);
+
+  // Munch snack action
+  const triggerSnackCrunch = useCallback(() => {
+    if (!isMuted) {
+      sound.playSnackCrunch();
+    }
+    const sounds = ["*CRUNCH!*", "*CHOMP!*", "*NOM NOM!*", "*MUNCH!*", "*CRUNCH CRUNCH!*"];
+    const randomSound = sounds[Math.floor(Math.random() * sounds.length)];
+    setSnackCrunchText(randomSound);
+
+    // Spawn 4 flying crumbs
+    const newCrumbs = Array.from({ length: 4 }).map((_, i) => ({
+      id: Date.now() + i,
+      x: (Math.random() - 0.5) * 32,
+      y: (Math.random() - 0.5) * 16
+    }));
+    setCrumbs(newCrumbs);
+
+    setTimeout(() => {
+      setSnackCrunchText(null);
+      setCrumbs([]);
+    }, 1200);
+  }, [isMuted]);
+
+  // Pacing movement loop
+  useEffect(() => {
+    if (isDismissed) return;
+
+    let animId;
+    let lastTime = performance.now();
+    let stepTimer = 0;
+
+    const loop = (time) => {
+      const dt = Math.min(0.1, (time - lastTime) / 1000);
+      lastTime = time;
+
+      if (!isPaused) {
+        stepTimer += dt;
+        if (stepTimer > 0.18) {
+          stepTimer = 0;
+          setBobStep((prev) => (prev + 1) % 2);
+        }
+
+        setPosX((prev) => {
+          const speed = isRunning ? 7.5 : evaluation?.droppedRps > 10 ? 8.5 : 4.6;
+          let next = prev + direction * speed * dt;
+
+          if (next >= 76) {
+            next = 76;
+            setDirection(-1);
+            setIsPaused(true);
+            triggerSnackCrunch();
+            setQuoteIndex((q) => q + 1);
+            setTimeout(() => setIsPaused(false), 1600);
+          } else if (next <= 6) {
+            next = 6;
+            setDirection(1);
+            setIsPaused(true);
+            triggerSnackCrunch();
+            setQuoteIndex((q) => q + 1);
+            setTimeout(() => setIsPaused(false), 1600);
+          }
+          return next;
+        });
+      }
+
+      animId = requestAnimationFrame(loop);
+    };
+
+    animId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(animId);
+  }, [direction, isPaused, isRunning, evaluation?.droppedRps, isDismissed, triggerSnackCrunch]);
+
+  // Periodic scolding & snacking timer while walking
+  useEffect(() => {
+    if (isDismissed) return;
+    const interval = setInterval(() => {
+      if (Math.random() > 0.3) {
+        triggerSnackCrunch();
+      }
+      setQuoteIndex((q) => q + 1);
+      setPokeCount(0);
+    }, 5200);
+    return () => clearInterval(interval);
+  }, [isDismissed, triggerSnackCrunch]);
+
+  // Handle direct click on manager (poking him)
+  const handlePoke = (e) => {
+    e.stopPropagation();
+    if (!isMuted) {
+      sound.playManagerYell();
+      sound.playSnackCrunch();
+    }
+    setIsShaking(true);
+    setPokeCount((prev) => prev + 1);
+    triggerSnackCrunch();
+    setTimeout(() => setIsShaking(false), 600);
+  };
+
+  if (isDismissed) {
+    return (
+      <button
+        onClick={() => setIsDismissed(false)}
+        className="absolute bottom-16 right-4 z-30 px-2.5 py-1 rounded-full bg-slate-900/95 border border-rose-500/60 text-[10px] font-bold text-rose-300 flex items-center gap-1.5 shadow-2xl backdrop-blur-md hover:scale-105 active:scale-95 transition pointer-events-auto"
+        title="Summon Angry Engineering Manager"
+      >
+        <span className="text-xs">😡</span>
+        <span>Summon Manager Kenji</span>
+      </button>
+    );
+  }
+
+  return (
+    <div
+      data-testid="angry-manager"
+      className="absolute bottom-14 z-30 pointer-events-auto select-none transition-all duration-75"
+      style={{
+        left: `${posX}%`,
+        transform: `translateY(${!isPaused && bobStep === 1 ? '-4px' : '0px'})`
+      }}
+    >
+      <div className="relative flex flex-col items-center group">
+        {/* Comic Speech Bubble */}
+        <div className="relative mb-2 max-w-[280px] sm:max-w-xs bg-slate-950/95 border-2 border-rose-500/90 rounded-2xl p-2.5 shadow-2xl shadow-rose-950/90 text-left backdrop-blur-xl animate-in fade-in zoom-in-95">
+          <div className="flex items-center justify-between gap-1 pb-1 border-b border-rose-500/30 mb-1">
+            <div className="flex items-center gap-1">
+              <span className="text-xs animate-bounce">💢</span>
+              <span className="text-[10px] font-black uppercase tracking-wider text-rose-300 font-display">
+                Kenji • Eng Manager
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsMuted(!isMuted);
+                }}
+                className="text-[9px] text-slate-400 hover:text-white px-1 py-0.5 rounded hover:bg-slate-800 transition"
+                title={isMuted ? "Unmute Scolding & Crunches" : "Mute Scolding & Crunches"}
+              >
+                {isMuted ? "🔇" : "🔊"}
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsDismissed(true);
+                }}
+                className="text-[10px] text-slate-500 hover:text-rose-400 px-1 py-0.5 rounded hover:bg-slate-800 transition"
+                title="Dismiss Manager to office"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+
+          <div className="text-[11px] font-extrabold text-amber-200 leading-snug tracking-tight">
+            "{activeQuote}"
+          </div>
+
+          <div className="flex items-center justify-between text-[9px] pt-1.5 mt-1 border-t border-rose-950/80 text-slate-400 font-mono">
+            <span className="text-rose-400 flex items-center gap-1 font-bold">
+              <span>🔥 STRESS:</span>
+              <span className="text-rose-300">100%</span>
+            </span>
+            <span className="text-amber-300 flex items-center gap-1">
+              <span>🥔 Volcano Chips</span>
+              {snackCrunchText && (
+                <span className="text-emerald-400 font-black animate-pulse">{snackCrunchText}</span>
+              )}
+            </span>
+          </div>
+
+          {/* Speech Bubble Arrow pointing at Kenji */}
+          <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-slate-950 border-r-2 border-b-2 border-rose-500/90 rotate-45" />
+        </div>
+
+        {/* Manager Character Avatar & Animation Container */}
+        <div
+          onClick={handlePoke}
+          className={`relative cursor-pointer transition-transform duration-100 ${
+            isShaking ? 'scale-110 rotate-3' : 'hover:scale-105 active:scale-95'
+          }`}
+          title="Click to poke Kenji (Warning: He will yell louder!)"
+        >
+          {/* Vein Pop Emote */}
+          <span className="absolute -top-1 -right-1 text-base select-none z-20 animate-pulse">
+            💢
+          </span>
+
+          {/* Steam Puffs */}
+          <span className="absolute -top-3 left-1 text-xs select-none z-20 animate-bounce">
+            💨
+          </span>
+
+          {/* Flying Crumbs Particle Flakes */}
+          {crumbs.length > 0 && (
+            <div className="absolute top-8 right-2 pointer-events-none z-30">
+              {crumbs.map((c) => (
+                <span
+                  key={c.id}
+                  className="absolute w-1.5 h-1.5 bg-amber-400 rounded-sm shadow-md shadow-amber-500/50 animate-ping"
+                  style={{ transform: `translate(${c.x}px, ${c.y + 12}px)` }}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Floating Crunchy Text */}
+          {snackCrunchText && (
+            <div className="absolute top-2 -right-8 z-30 pointer-events-none whitespace-nowrap">
+              <span className="px-1.5 py-0.5 rounded-md bg-amber-500 text-slate-950 font-black text-[9px] shadow-lg animate-bounce uppercase">
+                {snackCrunchText}
+              </span>
+            </div>
+          )}
+
+          {/* Character Sprite Image - Mirrored horizontally when moving left */}
+          <img
+            src={angryManagerImg}
+            alt="Angry Manager Kenji"
+            className="w-20 h-20 sm:w-24 sm:h-24 object-contain drop-shadow-[0_8px_16px_rgba(225,29,72,0.45)] transition-transform duration-200"
+            style={{
+              transform: `scaleX(${direction})`
+            }}
+          />
+        </div>
       </div>
     </div>
   );
@@ -5113,6 +5399,10 @@ Can your architecture beat this? Test it in your browser:
               </div>
             </div>
           </div>
+
+          {/* Pacing Angry Anime Engineering Manager (Kenji) */}
+          <AngryAnimeManager isRunning={isRunning} evaluation={evaluation} />
+
           {/* Active Wire Connection Status Banner */}
           {connectingFromId && (() => {
             const fromNode = nodes.find((n) => n.id === connectingFromId);

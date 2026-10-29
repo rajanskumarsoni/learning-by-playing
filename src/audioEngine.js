@@ -392,6 +392,56 @@ class SoundEngine {
     }
   }
 
+  // 11b. Crunchy Snack Munch
+  playSnackCrunch() {
+    if (this.isMuted) return;
+    const ctx = this.ensureContext();
+    if (!ctx) return;
+    try {
+      const now = ctx.currentTime;
+      const bufferSize = Math.floor(ctx.sampleRate * 0.08);
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.02));
+      }
+      const noise = ctx.createBufferSource();
+      noise.buffer = buffer;
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(2600, now);
+      filter.Q.setValueAtTime(1.8, now);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.24, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.masterGain);
+      noise.start(now);
+    } catch (e) {}
+  }
+
+  // 11c. Angry Anime Manager Yell
+  playManagerYell() {
+    if (this.isMuted) return;
+    const ctx = this.ensureContext();
+    if (!ctx) return;
+    try {
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(320, now);
+      osc.frequency.exponentialRampToValueAtTime(160, now + 0.22);
+      gain.gain.setValueAtTime(0.22, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+      osc.start(now);
+      osc.stop(now + 0.23);
+    } catch (e) {}
+  }
+
   // 12. Victory Fanfare (Level Passed & Budget Preserved)
   playVictory() {
     if (this.isMuted) return;
