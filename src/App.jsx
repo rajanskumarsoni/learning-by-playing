@@ -6,7 +6,7 @@ import {
   FastForward, Eye, Sliders, Share2, Lock, Unlock, Box, HardDrive, Network,
   ArrowRight, Sparkles, Info, X, RefreshCw, ZoomIn, ZoomOut, Maximize2, Move,
   BookOpen, Search, Bot, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
-  ChevronLeft, Star, Trophy, Radio, Target, Volume2, VolumeX, Music, Headphones, Mic,
+  ChevronLeft, ChevronDown, Star, Trophy, Radio, Target, Volume2, VolumeX, Music, Headphones, Mic,
   Link as LinkIcon, Calendar, Crown, Medal, Cloud
 } from 'lucide-react';
 import mentorAdaImg from './assets/mentor_ada.jpg';
@@ -14,7 +14,6 @@ import chaosMonkeyImg from './assets/chaos_monkey.jpg';
 import gameplayDemoVideo from './assets/gameplay_demo.mp4';
 import heroImg from './assets/hero.png';
 import devilImg from './assets/devil.png';
-import heroCursorImg from './assets/hero_cursor.png';
 import { sound } from './audioEngine.js';
 import { introAudioTour, INTRO_TOUR_STEPS } from './introAudioTour.js';
 import { cloudflareBackend } from './services/cloudflareBackend.js';
@@ -2225,7 +2224,44 @@ export default function App() {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [activeCatalogTab, setActiveCatalogTab] = useState('ALL');
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(() => typeof window !== 'undefined' && window.innerWidth < 1024);
-  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(() => typeof window !== 'undefined' && window.innerWidth < 1024);
+  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(true);
+  const [rightPanelTab, setRightPanelTab] = useState('OBJECTIVES'); // 'OBJECTIVES' | 'INSPECTOR'
+  const [isModeMenuOpen, setIsModeMenuOpen] = useState(false);
+  const modeMenuRef = useRef(null);
+  const [isUtilitiesExpanded, setIsUtilitiesExpanded] = useState(false);
+  const utilitiesMenuRef = useRef(null);
+  const utilitiesTimeoutRef = useRef(null);
+
+  const handleUtilitiesEnter = () => {
+    if (utilitiesTimeoutRef.current) {
+      clearTimeout(utilitiesTimeoutRef.current);
+      utilitiesTimeoutRef.current = null;
+    }
+    setIsUtilitiesExpanded(true);
+  };
+
+  const handleUtilitiesLeave = () => {
+    utilitiesTimeoutRef.current = setTimeout(() => {
+      setIsUtilitiesExpanded(false);
+    }, 350);
+  };
+
+  // Close Utilities on click outside
+  useEffect(() => {
+    if (!isUtilitiesExpanded) return;
+    const handleClickOutside = (e) => {
+      if (utilitiesMenuRef.current && !utilitiesMenuRef.current.contains(e.target)) {
+        setIsUtilitiesExpanded(false);
+      }
+    };
+    window.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      window.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [isUtilitiesExpanded]);
+
   const mentorSectionRef = useRef(null);
   const prevDiagnosticsKeyRef = useRef('');
   const [highlightMentor, setHighlightMentor] = useState(false);
@@ -2234,6 +2270,22 @@ export default function App() {
   const touchStartDistRef = useRef(0);
   const touchStartZoomRef = useRef(1);
   const [chaosBanner, setChaosBanner] = useState(null);
+
+  // Close Mode Menu on click outside
+  useEffect(() => {
+    if (!isModeMenuOpen) return;
+    const handleClickOutside = (e) => {
+      if (modeMenuRef.current && !modeMenuRef.current.contains(e.target)) {
+        setIsModeMenuOpen(false);
+      }
+    };
+    window.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      window.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [isModeMenuOpen]);
 
   // Player Architect Rank progression based on cleared levels, survival waves, badges & streak
   const playerRank = useMemo(() => {
@@ -2355,6 +2407,7 @@ export default function App() {
   const handleSelectNode = useCallback((nodeId) => {
     sound.playClick();
     setSelectedNodeId(nodeId);
+    setRightPanelTab('INSPECTOR');
     if (rightPanelCollapsed) {
       setRightPanelCollapsed(false);
     }
@@ -2784,26 +2837,16 @@ Can your architecture beat this? Test it in your browser:
   }, [nodes, evaluation, gameMode, currentLevel, currentMaxBudget]);
 
 
-  // Automatically scroll Architecture Mentor & Diagnostics into screen view when diagnostics change
+  // Alert user when diagnostics change without involuntarily popping open the collapsed panel
   useEffect(() => {
     const currentKey = evaluation.diagnostics.join('||');
     if (prevDiagnosticsKeyRef.current && prevDiagnosticsKeyRef.current !== currentKey) {
-      if (rightPanelCollapsed) {
-        setRightPanelCollapsed(false);
-      }
-      // Small timeout to allow right panel expansion if it was collapsed
-      setTimeout(() => {
-        if (mentorSectionRef.current) {
-          mentorSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      }, 60);
-
       setHighlightMentor(true);
       const timer = setTimeout(() => setHighlightMentor(false), 2600);
       return () => clearTimeout(timer);
     }
     prevDiagnosticsKeyRef.current = currentKey;
-  }, [evaluation.diagnostics, rightPanelCollapsed]);
+  }, [evaluation.diagnostics]);
 
   // Global mouseup and touchend listener to reliably release drag and pan anywhere on window
   useEffect(() => {
@@ -3598,19 +3641,16 @@ Can your architecture beat this? Test it in your browser:
 
   return (
     <div
-      className="hero-cursor-game h-screen w-screen max-h-screen overflow-hidden bg-slate-950 text-slate-100 flex flex-col font-sans select-none fixed inset-0"
-      style={{
-        '--hero-cursor': `url(${heroCursorImg}) 4 6, auto`,
-        cursor: `url(${heroCursorImg}) 4 6, auto`
-      }}
+      className="h-screen w-screen max-h-screen overflow-hidden bg-slate-950 text-slate-100 flex flex-col font-sans select-none fixed inset-0"
     >
       {/* =================================================================== */}
-      {/* 1. TOP TELEMETRY & NAVIGATION HEADER                                */}
+      {/* 1. MASTER GAME HUD (STATUS, TELEMETRY, AUDIO & SYSTEM UTILITIES)    */}
       {/* =================================================================== */}
-      <header className="shrink-0 glass-header px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-2.5 sm:gap-3 z-30 shadow-xl">
-        <div className="flex items-center gap-2.5 sm:gap-3">
+      <header className="shrink-0 glass-header px-3 sm:px-4 py-2 flex flex-nowrap items-center justify-between gap-2 z-30 shadow-xl overflow-visible">
+        {/* Brand Lockup & Mode Selector */}
+        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
           <div className="relative">
-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 text-base sm:text-lg shrink-0">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 text-base shrink-0">
               ⚡
             </div>
             <span className="absolute -bottom-1 -right-1 text-[11px] leading-none" title={playerRank.title}>
@@ -3618,7 +3658,7 @@ Can your architecture beat this? Test it in your browser:
             </span>
           </div>
           <div>
-            <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className="flex items-center gap-1.5">
               <h1 className="font-black text-xs sm:text-sm tracking-wide text-white truncate font-display">
                 System Saviour <span className="text-cyan-400">Simulator</span>
               </h1>
@@ -3627,7 +3667,7 @@ Can your architecture beat this? Test it in your browser:
                   sound.playClick();
                   setShowBadgesModal(true);
                 }}
-                className="cursor-pointer hover:border-indigo-400 hover:scale-105 transition text-[9px] sm:text-[10px] font-bold uppercase px-1.5 sm:px-2 py-0.5 rounded-full bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-indigo-300 border border-indigo-500/40 shrink-0 flex items-center gap-1 shadow-sm active:scale-95"
+                className="cursor-pointer hover:border-indigo-400 hover:scale-105 transition text-[9px] sm:text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-indigo-300 border border-indigo-500/40 shrink-0 flex items-center gap-1 shadow-sm active:scale-95"
                 title="Click to view Architect Badges, Daily Streak Rewards & XP Showcase"
               >
                 <span>{playerRank.badge}</span>
@@ -3649,76 +3689,106 @@ Can your architecture beat this? Test it in your browser:
               <span className="hidden sm:inline text-slate-600">•</span>
               <span className="flex items-center gap-1 text-cyan-400">
                 <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-                <span className="hidden xs:inline">Ada AI Comms: Online</span>
+                <span className="hidden xs:inline">Ada: Online</span>
               </span>
             </div>
           </div>
 
-          {/* Mobile Mode Switcher Dropdown */}
-          <div className="md:hidden">
-            <select
-              value={gameMode}
-              onChange={(e) => setLevelBriefingModal({ mode: e.target.value, levelIdx: currentLevelIdx })}
-              className="glass-subpanel text-indigo-300 text-xs font-bold rounded-lg px-2 py-1 outline-none font-display"
+          {/* Compact Game Mode Selector Dropdown Pill */}
+          <div className="relative ml-1 sm:ml-2" ref={modeMenuRef}>
+            <button
+              onClick={() => {
+                sound.playClick();
+                setIsModeMenuOpen(!isModeMenuOpen);
+              }}
+              className="px-2.5 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-indigo-500/40 text-xs font-bold font-display tracking-wide text-white shadow-md flex items-center gap-2 transition-all active:scale-95 group"
+              title="Click to switch Game Mode (Campaign, Daily, Survival, Sandbox)"
             >
-              <option value="CAMPAIGN">🎓 Campaign</option>
-              <option value="DAILY">📅 Daily #{dailyIncident.dayNumber} {dailyStreak > 0 ? `🔥${dailyStreak}` : ''}</option>
-              <option value="SURVIVAL">🔥 Survival Wave</option>
-              <option value="SANDBOX">🧪 Sandbox</option>
-            </select>
-          </div>
+              <span className="text-sm">
+                {gameMode === 'CAMPAIGN' ? '🎓' : gameMode === 'DAILY' ? '📅' : gameMode === 'SURVIVAL' ? '🔥' : '🧪'}
+              </span>
+              <div className="flex flex-col text-left leading-none">
+                <span className="text-white text-xs font-black font-display">
+                  {gameMode === 'CAMPAIGN' ? 'Campaign' : gameMode === 'DAILY' ? `Daily #${dailyIncident.dayNumber}` : gameMode === 'SURVIVAL' ? `Survival` : 'Sandbox'}
+                </span>
+                <span className="text-[9px] text-indigo-300 font-mono mt-0.5">
+                  {gameMode === 'CAMPAIGN' ? `Lvl ${currentLevel.id}/5` : gameMode === 'DAILY' ? (dailyStreak > 0 ? `🔥${dailyStreak}d` : 'Puzzle') : gameMode === 'SURVIVAL' ? `Wave ${survivalWave}` : 'Uncapped'}
+                </span>
+              </div>
+              <ChevronDown className={`w-3.5 h-3.5 text-indigo-400 transition-transform ${isModeMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
 
-          {/* Desktop Mode Switcher */}
-          <div className="hidden md:flex glass-subpanel p-1 rounded-xl ml-2">
-            {[
-              { id: 'CAMPAIGN', label: '🎓 Campaign' },
-              {
-                id: 'DAILY',
-                label: `📅 Daily #${dailyIncident.dayNumber}${dailyStreak > 0 ? ` (🔥${dailyStreak})` : ''}`
-              },
-              { id: 'SURVIVAL', label: '🔥 Survival Wave' },
-              { id: 'SANDBOX', label: '🧪 Sandbox Lab' }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setLevelBriefingModal({ mode: tab.id, levelIdx: currentLevelIdx })}
-                className={`px-3 py-1 rounded-lg text-xs font-bold font-display tracking-wide transition-all ${
-                  gameMode === tab.id ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+            {/* Dropdown Menu */}
+            {isModeMenuOpen && (
+              <div className="absolute top-full left-0 mt-2 w-72 bg-slate-900/98 backdrop-blur-2xl border border-indigo-500/40 rounded-2xl p-2 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150">
+                <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">
+                  Select Game Mode
+                </div>
+                {[
+                  { id: 'CAMPAIGN', emoji: '🎓', title: 'Campaign Scenarios', desc: '5 progressive levels with real-world bottlenecks', badge: `Lvl ${unlockedLevelIdx + 1}/5` },
+                  { id: 'DAILY', emoji: '📅', title: `Daily Incident #${dailyIncident.dayNumber}`, desc: 'New incident every 24h with global leaderboard', badge: dailyStreak > 0 ? `🔥${dailyStreak}d` : 'Daily' },
+                  { id: 'SURVIVAL', emoji: '🔥', title: 'Endless Survival', desc: 'Survive infinite surges & chaos sabotage', badge: `Wave ${survivalWave}` },
+                  { id: 'SANDBOX', emoji: '🧪', title: 'Sandbox Playground', desc: 'Zero budget caps, 35k RPS load testing', badge: 'Freeform' }
+                ].map((m) => {
+                  const isActive = gameMode === m.id;
+                  return (
+                    <button
+                      key={m.id}
+                      onClick={() => {
+                        sound.playClick();
+                        setIsModeMenuOpen(false);
+                        setLevelBriefingModal({ mode: m.id, levelIdx: currentLevelIdx });
+                      }}
+                      className={`w-full text-left p-2.5 rounded-xl transition flex items-start gap-2.5 my-0.5 ${
+                        isActive
+                          ? 'bg-indigo-600/30 border border-indigo-500/50 text-white'
+                          : 'hover:bg-slate-800/80 text-slate-300 hover:text-white'
+                      }`}
+                    >
+                      <span className="text-xl shrink-0 mt-0.5">{m.emoji}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-xs">{m.title}</span>
+                          <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded-full bg-slate-800 text-indigo-300 border border-indigo-500/20">
+                            {m.badge}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-400 leading-tight mt-0.5">{m.desc}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Live Simulation SLA Metrics */}
-        <div className="flex items-center gap-2 overflow-x-auto max-w-full pb-0.5 scrollbar-none shrink-0">
+        {/* Live Simulation SLA Metrics HUD */}
+        <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto max-w-full pb-0.5 scrollbar-none shrink min-w-0">
           {/* RPS Counter */}
-          <div className="glass-subpanel px-2.5 sm:px-3 py-1.5 rounded-xl flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <div className="glass-subpanel px-2 sm:px-2.5 py-1 rounded-xl flex items-center gap-1.5 shrink-0">
             <span
               className={`w-2 h-2 rounded-full shrink-0 ${
                 isRunning ? 'bg-amber-400 animate-ping' : 'bg-emerald-400 animate-pulse'
               }`}
             />
-            <span className="text-[11px] sm:text-xs text-slate-400 whitespace-nowrap">
-              {isRunning ? 'Wave Surge:' : 'Active:'}
+            <span className="text-[11px] text-slate-400 whitespace-nowrap">
+              {isRunning ? 'Surge:' : 'Load:'}
             </span>
             <span className="text-xs font-mono font-bold text-white whitespace-nowrap">{currentLiveRps.toLocaleString()} RPS</span>
           </div>
 
           {/* P99 Latency SLA */}
           <div
-            className={`border px-2.5 sm:px-3 py-1.5 rounded-xl flex items-center gap-1.5 sm:gap-2 shrink-0 backdrop-blur-md ${
+            className={`border px-2 sm:px-2.5 py-1 rounded-xl flex items-center gap-1.5 shrink-0 backdrop-blur-md ${
               passedLatency
                 ? 'bg-slate-950/60 border-emerald-500/40 text-emerald-300'
                 : 'bg-rose-950/50 border-rose-500/50 text-rose-300'
             }`}
             title={`P99 Latency: ${evaluation.p99Latency}ms (Target: < ${targetLatency}ms)`}
           >
-            <span className="text-[11px] sm:text-xs text-slate-400">P99:</span>
+            <span className="text-[11px] text-slate-400">P99:</span>
             <span className="text-xs font-mono font-bold">{evaluation.p99Latency}ms</span>
-            <span className="text-[10px] text-slate-500 hidden sm:inline">(&lt;{targetLatency}ms)</span>
             <span className={`text-[10px] font-bold ${passedLatency ? 'text-emerald-400' : 'text-rose-400'}`}>
               {passedLatency ? '✓' : '✗'}
             </span>
@@ -3726,16 +3796,15 @@ Can your architecture beat this? Test it in your browser:
 
           {/* Uptime % */}
           <div
-            className={`border px-2.5 sm:px-3 py-1.5 rounded-xl flex items-center gap-1.5 sm:gap-2 shrink-0 backdrop-blur-md ${
+            className={`border px-2 sm:px-2.5 py-1 rounded-xl flex items-center gap-1.5 shrink-0 backdrop-blur-md ${
               passedUptime
                 ? 'bg-slate-950/60 border-emerald-500/40 text-emerald-300'
                 : 'bg-rose-950/50 border-rose-500/50 text-rose-300'
             }`}
             title={`Uptime: ${evaluation.uptimePct}% (Target: ≥ ${targetMinUptime}%)`}
           >
-            <span className="text-[11px] sm:text-xs text-slate-400">Uptime:</span>
+            <span className="text-[11px] text-slate-400">Uptime:</span>
             <span className="text-xs font-mono font-bold">{evaluation.uptimePct}%</span>
-            <span className="text-[10px] text-slate-500 hidden sm:inline">(&ge;{targetMinUptime}%)</span>
             <span className={`text-[10px] font-bold ${passedUptime ? 'text-emerald-400' : 'text-rose-400'}`}>
               {passedUptime ? '✓' : '✗'}
             </span>
@@ -3743,18 +3812,15 @@ Can your architecture beat this? Test it in your browser:
 
           {/* Hourly Cost */}
           <div
-            className={`border px-2.5 sm:px-3 py-1.5 rounded-xl flex items-center gap-1.5 shrink-0 backdrop-blur-md ${
+            className={`border px-2 sm:px-2.5 py-1 rounded-xl flex items-center gap-1.5 shrink-0 backdrop-blur-md ${
               passedBudget
                 ? 'bg-slate-950/60 border-emerald-500/40 text-emerald-300'
                 : 'bg-rose-950/50 border-rose-500/50 text-rose-300'
             }`}
             title={`Hourly Cost: $${evaluation.totalHourlyCost}/hr ${currentMaxBudget ? `(Budget: ≤ $${currentMaxBudget})` : ''}`}
           >
-            <span className="text-[11px] sm:text-xs text-slate-400">Cost:</span>
+            <span className="text-[11px] text-slate-400">Cost:</span>
             <span className="text-xs font-mono font-bold">${evaluation.totalHourlyCost}/hr</span>
-            {currentMaxBudget && (
-              <span className="text-[10px] text-slate-500 hidden sm:inline">(&le;${currentMaxBudget})</span>
-            )}
             {currentMaxBudget && (
               <span className={`text-[10px] font-bold ${passedBudget ? 'text-emerald-400' : 'text-rose-400'}`}>
                 {passedBudget ? '✓' : '✗'}
@@ -3765,23 +3831,283 @@ Can your architecture beat this? Test it in your browser:
           {/* Overall Level Readiness Pill (Campaign Mode) */}
           {gameMode === 'CAMPAIGN' && (
             <div
-              className={`hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-[11px] font-bold shrink-0 backdrop-blur-md ${
+              className={`hidden xl:flex items-center gap-1 px-2 py-1 rounded-xl border text-[11px] font-bold shrink-0 backdrop-blur-md ${
                 isLevelPassing
                   ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300'
                   : 'bg-rose-950/60 border-rose-500/50 text-rose-300'
               }`}
               title={isLevelPassing ? 'Current system status meets all targets to pass this level!' : 'Current system status breaches latency or uptime targets'}
             >
-              <span>{isLevelPassing ? '✅ Ready to Pass' : '❌ Targets Breached'}</span>
+              <span>{isLevelPassing ? '✅ Ready' : '❌ Breached'}</span>
             </div>
           )}
         </div>
 
-        {/* Simulation Controls & Quick Toggles */}
-        <div className="flex items-center gap-2 flex-wrap">
-
-          {/* Simulation Controls */}
+        {/* Audio Command Pill & Utilities */}
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-nowrap shrink-0">
+          {/* Audio Command Pill */}
           <div className="flex items-center gap-1 glass-subpanel p-1 rounded-xl">
+            <AudioVisualizerWidget
+              soundEngine={sound}
+              isMuted={isSoundMuted}
+              isPlaying={isAudioActive}
+              className="hidden lg:flex"
+            />
+            <button
+              onClick={toggleSound}
+              className={`px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition ${
+                isSoundMuted ? 'text-slate-500 hover:text-slate-300' : 'text-indigo-300 hover:text-white bg-indigo-600/30'
+              }`}
+              title={isSoundMuted ? 'Game Audio Muted — Click to Enable' : 'Game Audio Active — Click to Mute'}
+            >
+              {isSoundMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />}
+              <span className="hidden 2xl:inline text-[10px]">{isSoundMuted ? 'Muted' : 'Sound'}</span>
+            </button>
+            <button
+              onClick={() => {
+                sound.playClick();
+                sound.ensureContext();
+                const next = sound.toggleSaviourTheme();
+                setIsSaviourMusicPlaying(next);
+                setIsAudioActive(sound.isMusicActive());
+              }}
+              className={`px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition ${
+                isAudioActive && !isSoundMuted
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm shadow-amber-500/20'
+                  : 'text-slate-500 hover:text-slate-300'
+              }`}
+              title="Warrior Battle Music Soundtrack (Click to Toggle)"
+            >
+              <Music className={`w-3.5 h-3.5 ${isAudioActive && !isSoundMuted ? 'animate-bounce text-amber-400' : ''}`} />
+              <span className="hidden 2xl:inline text-[10px]">Theme</span>
+            </button>
+          </div>
+
+          {/* Continuous Bouncy Spring Utilities Capsule */}
+          <div
+            className="relative flex items-center justify-end"
+            ref={utilitiesMenuRef}
+            onMouseEnter={handleUtilitiesEnter}
+            onMouseLeave={handleUtilitiesLeave}
+          >
+            {/* Single Persistent Capsule - Springs horizontally on hover */}
+            <div
+              className={`flex items-center glass-subpanel border shadow-xl transition-all duration-500 ease-spring overflow-hidden ${
+                isUtilitiesExpanded
+                  ? 'rounded-2xl p-1 bg-slate-900/98 border-indigo-500/60 shadow-2xl shadow-indigo-950/80 gap-1'
+                  : 'rounded-full p-0.5 bg-slate-900/90 border-indigo-500/40 hover:border-cyan-400 hover:scale-110 active:scale-95 shadow-indigo-500/10 cursor-pointer'
+              }`}
+            >
+              {/* Collapsible Utility Items (Chaos, Leaderboard, Presets, Badges, Cloudflare) */}
+              <div
+                className={`flex items-center gap-1 transition-all duration-500 ease-spring overflow-hidden ${
+                  isUtilitiesExpanded
+                    ? 'max-w-[420px] opacity-100 scale-100 translate-x-0'
+                    : 'max-w-0 opacity-0 scale-75 -translate-x-4 pointer-events-none'
+                }`}
+              >
+                {/* 1. Chaos Monkey */}
+                <button
+                  onClick={() => {
+                    triggerManualChaos();
+                    setIsUtilitiesExpanded(false);
+                  }}
+                  className="px-2 py-1 rounded-lg text-xs text-rose-300 hover:text-rose-200 hover:bg-rose-950/60 hover:scale-110 active:scale-90 transition-all duration-200 flex items-center gap-1 font-bold whitespace-nowrap"
+                  title="Summon Chaos Monkey to snip an instance and test system failover!"
+                >
+                  <img src={chaosMonkeyImg} alt="Chaos" className="w-4 h-4 rounded-full object-cover ring-1 ring-rose-400" />
+                  <span className="text-[11px]">Chaos</span>
+                </button>
+
+                {/* 2. Leaderboard */}
+                <button
+                  onClick={() => {
+                    sound.playClick();
+                    setShowLeaderboardModal(true);
+                    setIsUtilitiesExpanded(false);
+                  }}
+                  className="px-2 py-1 rounded-lg text-xs text-amber-300 hover:text-amber-200 hover:bg-amber-950/60 hover:scale-110 active:scale-90 transition-all duration-200 flex items-center gap-1 font-bold whitespace-nowrap"
+                  title="View Daily Incident & Survival Leaderboard"
+                >
+                  <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="text-[11px]">Leaderboard</span>
+                </button>
+
+                {/* 3. Presets */}
+                <button
+                  onClick={() => {
+                    sound.playClick();
+                    setShowPresetsModal(true);
+                    setIsUtilitiesExpanded(false);
+                  }}
+                  className="px-2 py-1 rounded-lg text-xs text-purple-300 hover:text-purple-200 hover:bg-purple-950/60 hover:scale-110 active:scale-90 transition-all duration-200 flex items-center gap-1 font-bold whitespace-nowrap"
+                  title="Explore iconic architectures (Netflix, Spotify, Uber, Cloudflare)"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="text-[11px]">Presets</span>
+                </button>
+
+                {/* 4. Badges */}
+                <button
+                  onClick={() => {
+                    sound.playClick();
+                    setShowBadgesModal(true);
+                    setIsUtilitiesExpanded(false);
+                  }}
+                  className="px-2 py-1 rounded-lg text-xs text-emerald-300 hover:text-emerald-200 hover:bg-emerald-950/60 hover:scale-110 active:scale-90 transition-all duration-200 flex items-center gap-1 font-bold whitespace-nowrap"
+                  title={`View Architect Badges & Streak Rewards (${unlockedBadges.length} unlocked)`}
+                >
+                  <Award className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="text-[11px]">Badges ({unlockedBadges.length})</span>
+                </button>
+
+                {/* 5. Cloudflare R2 */}
+                <button
+                  onClick={() => {
+                    sound.playClick();
+                    setShowCloudflareModal(true);
+                    setIsUtilitiesExpanded(false);
+                  }}
+                  className="px-2 py-1 rounded-lg text-xs text-orange-300 hover:text-orange-200 hover:bg-orange-950/60 hover:scale-110 active:scale-90 transition-all duration-200 flex items-center gap-1 font-bold whitespace-nowrap"
+                  title="Cloudflare R2 Backend Console"
+                >
+                  <Cloud className="w-3.5 h-3.5 text-orange-400" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                </button>
+              </div>
+
+              {/* Anchor Button: Circular Ada Guide Trigger (Always visible at the right edge) */}
+              <button
+                onClick={() => {
+                  sound.playClick();
+                  if (isUtilitiesExpanded) {
+                    setShowWelcomeModal(true);
+                    setIsUtilitiesExpanded(false);
+                  } else {
+                    setIsUtilitiesExpanded(true);
+                  }
+                }}
+                className={`flex items-center gap-1 rounded-xl transition-all duration-300 active:scale-95 ${
+                  isUtilitiesExpanded
+                    ? 'px-2 py-1 text-xs text-cyan-300 hover:text-cyan-200 hover:bg-cyan-950/60 hover:scale-105 font-bold'
+                    : 'w-7 h-7 sm:w-8 sm:h-8 rounded-full justify-center relative'
+                }`}
+                title={isUtilitiesExpanded ? "Consult Ada (AI Lead) for briefing & game tutorial" : "Quick Utilities (Hover or click to expand)"}
+              >
+                <div className="relative shrink-0">
+                  <img
+                    src={mentorAdaImg}
+                    alt="Ada"
+                    className="w-6 h-6 sm:w-7 sm:h-7 rounded-full object-cover ring-1 ring-cyan-400 group-hover:ring-cyan-300 transition"
+                  />
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 absolute -bottom-0.5 -right-0.5 border-2 border-slate-950 animate-pulse" />
+                </div>
+                <span
+                  className={`text-[11px] font-bold text-cyan-300 transition-all duration-300 overflow-hidden whitespace-nowrap ${
+                    isUtilitiesExpanded ? 'max-w-[40px] opacity-100 ml-0.5' : 'max-w-0 opacity-0'
+                  }`}
+                >
+                  Guide
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* =================================================================== */}
+      {/* 2. MISSION COMMAND DECK (LEVEL PROGRESS, HERO SIMULATION, VIEW DOCK) */}
+      {/* =================================================================== */}
+      <div className="shrink-0 glass-header px-3 sm:px-4 py-1.5 flex items-center justify-between text-xs overflow-x-auto gap-4 z-20 border-t border-indigo-500/10">
+        {/* Left: Mission Context / Level Stepper */}
+        <div className="flex items-center gap-2 shrink-0">
+          {gameMode === 'CAMPAIGN' && (
+            <>
+              {CAMPAIGN_LEVELS.map((lvl, idx) => {
+                const isUnlocked = idx <= unlockedLevelIdx;
+                const isPassed = idx < unlockedLevelIdx;
+                const isCurrent = currentLevelIdx === idx;
+
+                return (
+                  <button
+                    key={lvl.id}
+                    disabled={!isUnlocked}
+                    onClick={() => isUnlocked && selectLevel(idx)}
+                    title={isUnlocked ? lvl.title : `🔒 Pass Level ${idx} to unlock this scenario`}
+                    className={`px-2.5 py-1 rounded-lg font-bold font-display tracking-wide text-xs transition flex items-center gap-1.5 shrink-0 ${
+                      isCurrent
+                        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-indigo-400/40'
+                        : isPassed
+                        ? 'bg-emerald-950/60 backdrop-blur text-emerald-300 border border-emerald-500/30 hover:bg-emerald-900/50'
+                        : isUnlocked
+                        ? 'glass-subpanel text-slate-300 hover:text-white'
+                        : 'bg-slate-950/30 text-slate-600 border border-slate-900/40 cursor-not-allowed opacity-50'
+                    }`}
+                  >
+                    {isPassed ? (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    ) : isUnlocked ? (
+                      <span className="w-2 h-2 rounded-full bg-indigo-400 shrink-0" />
+                    ) : (
+                      <Lock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                    )}
+                    <span>{lvl.title.split(':')[0]}</span>
+                  </button>
+                );
+              })}
+              <button
+                onClick={() => setLevelBriefingModal({ mode: 'CAMPAIGN', levelIdx: currentLevelIdx })}
+                className="px-2 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/40 text-[11px] font-bold font-display tracking-wide flex items-center gap-1.5 transition shrink-0 shadow-sm active:scale-95"
+                title="Inspect mission objectives and SLA targets to achieve"
+              >
+                <Target className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Briefing</span>
+              </button>
+            </>
+          )}
+
+          {gameMode === 'DAILY' && (
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-1 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/40 font-bold font-display flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-purple-400" />
+                <span>Daily #{dailyIncident.dayNumber}</span>
+              </span>
+              <button
+                onClick={() => setLevelBriefingModal({ mode: 'DAILY', levelIdx: currentLevelIdx })}
+                className="px-2 py-1 rounded-lg bg-purple-600/30 text-purple-300 border border-purple-500/40 font-bold text-[11px] hover:text-white transition"
+              >
+                Incident Briefing &rarr;
+              </button>
+            </div>
+          )}
+
+          {gameMode === 'SURVIVAL' && (
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold font-display flex items-center gap-1.5">
+                <Flame className="w-3.5 h-3.5 text-amber-400" />
+                <span>Survival Wave {survivalWave}</span>
+              </span>
+              <button
+                onClick={() => setLevelBriefingModal({ mode: 'SURVIVAL', levelIdx: currentLevelIdx })}
+                className="px-2 py-1 rounded-lg bg-amber-600/30 text-amber-300 border border-amber-500/40 font-bold text-[11px] hover:text-white transition"
+              >
+                Wave Briefing &rarr;
+              </button>
+            </div>
+          )}
+
+          {gameMode === 'SANDBOX' && (
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold font-display flex items-center gap-1.5">
+                <span>🧪 Unrestricted Sandbox Lab</span>
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Center: Authoritative Hero Simulation Command Trigger */}
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1 glass-subpanel p-1 rounded-xl shadow-lg border border-indigo-500/30">
             <button
               onClick={() => {
                 const next = !isRunning;
@@ -3794,24 +4120,26 @@ Can your architecture beat this? Test it in your browser:
                   sound.stopAmbientDrone();
                 }
               }}
-              className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition ${
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider flex items-center gap-2 transition active:scale-95 shadow ${
                 isRunning
                   ? 'bg-amber-500 text-slate-950 hover:bg-amber-400'
                   : tutorialStep === 'RUN_SIM'
                   ? 'bg-emerald-400 text-slate-950 hover:bg-emerald-300 ring-4 ring-emerald-400 shadow-[0_0_25px_rgba(16,185,129,0.9)] animate-pulse scale-105'
-                  : 'bg-emerald-500 text-slate-950 hover:bg-emerald-400'
+                  : isLevelPassing
+                  ? 'bg-emerald-400 hover:bg-emerald-300 text-slate-950 ring-2 ring-emerald-300 shadow-emerald-500/30'
+                  : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30'
               }`}
             >
-              {isRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-slate-950" />}
-              {isRunning ? 'Pause Wave' : 'Simulate Peak Wave'}
+              {isRunning ? <Pause className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+              <span>{isRunning ? `Simulating (${Math.round(waveProgress)}%)` : 'Simulate Peak Wave'}</span>
             </button>
             <button
               onClick={() => {
                 sound.playClick();
                 setSimSpeed(simSpeed === 1 ? 2 : simSpeed === 2 ? 5 : 1);
               }}
-              className="px-2 py-1 rounded-lg text-xs font-mono text-slate-300 hover:text-white hover:bg-slate-800"
-              title="Simulation Speed"
+              className="px-2 py-1 rounded-lg text-xs font-mono font-bold text-slate-300 hover:text-white hover:bg-slate-800"
+              title="Simulation Speed (Click to Toggle 1x / 2x / 5x)"
             >
               {simSpeed}x
             </button>
@@ -3824,288 +4152,20 @@ Can your architecture beat this? Test it in your browser:
             </button>
           </div>
 
-          {/* Panel Layout Toggles (Make Canvas Larger or Smaller) */}
-          <div className="flex items-center gap-1 glass-subpanel p-1 rounded-xl">
-            <button
-              onClick={() => setLeftPanelCollapsed(!leftPanelCollapsed)}
-              className={`px-2 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 transition ${
-                !leftPanelCollapsed
-                  ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/40'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-              }`}
-              title={leftPanelCollapsed ? "Expand Component Palette (Make Canvas Smaller)" : "Collapse Component Palette (Make Canvas Bigger)"}
-            >
-              {leftPanelCollapsed ? <PanelLeftOpen className="w-3.5 h-3.5" /> : <PanelLeftClose className="w-3.5 h-3.5" />}
-              <span className="hidden xl:inline text-[11px]">Palette</span>
-            </button>
-            <button
-              onClick={() => setRightPanelCollapsed(!rightPanelCollapsed)}
-              className={`px-2 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 transition ${
-                !rightPanelCollapsed
-                  ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/40'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-              }`}
-              title={rightPanelCollapsed ? "Expand Mission & Inspector (Make Canvas Smaller)" : "Collapse Mission & Inspector (Make Canvas Bigger)"}
-            >
-              <span className="hidden xl:inline text-[11px]">Inspector</span>
-              {rightPanelCollapsed ? <PanelRightOpen className="w-3.5 h-3.5" /> : <PanelRightClose className="w-3.5 h-3.5" />}
-            </button>
-          </div>
-
-          {/* Real-Time Audio Visualizer & Adaptive Traffic Beat Engine */}
-          <AudioVisualizerWidget
-            soundEngine={sound}
-            isMuted={isSoundMuted}
-            isPlaying={isAudioActive}
-            className="hidden sm:flex"
-          />
-
-          {/* Audio Synthesizer Mute / Unmute Button */}
-          <button
-            onClick={toggleSound}
-            className={`px-2.5 py-1 rounded-xl border text-xs flex items-center gap-1.5 transition active:scale-95 shadow-md ${
-              isSoundMuted
-                ? 'bg-slate-900/60 backdrop-blur-md border-slate-800 text-slate-500 hover:text-slate-300'
-                : 'bg-gradient-to-r from-indigo-950/80 to-purple-950/80 backdrop-blur-md border-indigo-500/40 text-indigo-300 hover:text-white shadow-indigo-950/40'
-            }`}
-            title={isSoundMuted ? 'Game Audio is Muted — Click to Enable Sound' : 'Game Audio is Active — Click to Mute'}
-          >
-            {isSoundMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4 animate-pulse text-indigo-400" />}
-            <span className="font-bold hidden md:inline">{isSoundMuted ? 'Muted' : 'Sound ON'}</span>
-          </button>
-
-          {/* Warrior Battle Music Track Toggle */}
-          <button
-            onClick={() => {
-              sound.playClick();
-              sound.ensureContext();
-              const next = sound.toggleSaviourTheme();
-              setIsSaviourMusicPlaying(next);
-              setIsAudioActive(sound.isMusicActive());
-            }}
-            className={`px-2.5 py-1 rounded-xl border text-xs flex items-center gap-1.5 transition active:scale-95 shadow-md ${
-              isAudioActive && !isSoundMuted
-                ? 'bg-amber-500/20 backdrop-blur-md border-amber-500/50 text-amber-300 shadow-amber-500/20'
-                : 'bg-slate-900/60 backdrop-blur-md border-slate-800 text-slate-500 hover:text-slate-300'
-            }`}
-            title="Warrior Battle Music Soundtrack (Click to Toggle)"
-          >
-            <Music className={`w-3.5 h-3.5 ${isAudioActive && !isSoundMuted ? 'animate-bounce text-amber-400' : ''}`} />
-            <span className="font-bold hidden lg:inline">Theme: {isAudioActive && !isSoundMuted ? 'ON (75%)' : 'OFF'}</span>
-          </button>
-
-          {/* Chaos Monkey Incident Trigger */}
-          <button
-            onClick={triggerManualChaos}
-            className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-rose-950/80 to-purple-950/80 backdrop-blur-md border border-rose-500/50 hover:border-rose-400 text-xs text-rose-200 flex items-center gap-1.5 transition shadow-md shadow-rose-950/30 group active:scale-95"
-            title="Summon Chaos Monkey to snip an instance and test system failover!"
-          >
-            <div className="relative">
-              <img
-                src={chaosMonkeyImg}
-                alt="Chaos Monkey"
-                className="w-5 h-5 rounded-full object-cover ring-1 ring-rose-400/80 group-hover:scale-110 transition-transform"
-              />
-              <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-400 animate-ping" />
-            </div>
-            <span className="font-bold text-rose-300 hidden sm:inline">Chaos</span>
-          </button>
-
-          {/* Global Architect Leaderboard Button */}
-          <button
-            onClick={() => {
-              sound.playClick();
-              setShowLeaderboardModal(true);
-            }}
-            className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-amber-950/80 to-yellow-950/80 backdrop-blur-md border border-amber-500/50 hover:border-amber-400 text-xs text-amber-200 flex items-center gap-1.5 transition shadow-md shadow-amber-950/30 group active:scale-95"
-            title="View Daily Incident & Survival Leaderboard / Hall of Fame"
-          >
-            <Trophy className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
-            <span className="font-bold text-amber-300 hidden sm:inline">Leaderboard</span>
-          </button>
-
-          {/* Iconic Presets Button */}
-          <button
-            onClick={() => {
-              sound.playClick();
-              setShowPresetsModal(true);
-            }}
-            className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-purple-950/80 to-indigo-950/80 backdrop-blur-md border border-purple-500/50 hover:border-purple-400 text-xs text-purple-200 flex items-center gap-1.5 transition shadow-md shadow-purple-950/30 group active:scale-95"
-            title="Explore and deploy battle-tested architectures from Netflix, Spotify, Uber & Cloudflare"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-amber-400 group-hover:rotate-12 transition-transform" />
-            <span className="font-bold text-purple-300 hidden sm:inline">Presets</span>
-          </button>
-
-          {/* Architect Badges & Streak Rewards Button */}
-          <button
-            onClick={() => {
-              sound.playClick();
-              setShowBadgesModal(true);
-            }}
-            className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-emerald-950/80 to-teal-950/80 backdrop-blur-md border border-emerald-500/50 hover:border-emerald-400 text-xs text-emerald-200 flex items-center gap-1.5 transition shadow-md shadow-emerald-950/30 group active:scale-95"
-            title="View Architect Badges, Daily Streak Rewards & Trophy Showcase"
-          >
-            <Award className="w-3.5 h-3.5 text-emerald-400 group-hover:scale-110 transition-transform" />
-            <span className="font-bold text-emerald-300 hidden sm:inline">Badges ({unlockedBadges.length})</span>
-          </button>
-
-          {/* Instant 30s Quest Button */}
-          <button
-            onClick={handleStartQuickOnboarding}
-            className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-emerald-600/40 via-teal-600/40 to-cyan-600/40 backdrop-blur-md border border-emerald-400 hover:border-emerald-300 text-xs text-emerald-200 flex items-center gap-1.5 transition shadow-lg shadow-emerald-500/20 group active:scale-95 animate-pulse"
-            title="Instant 30-Second Guided Quest (Deploy Cache -> Auto-Wire -> 1st Victory)"
-          >
-            <Zap className="w-3.5 h-3.5 text-emerald-300 fill-emerald-300/40 group-hover:scale-110 transition-transform" />
-            <span className="font-extrabold text-emerald-200">30s Quest</span>
-          </button>
-
-          {/* Cloudflare R2 Backend Sync Status Button */}
-          <button
-            onClick={() => {
-              sound.playClick();
-              setShowCloudflareModal(true);
-            }}
-            className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-orange-950/80 to-amber-950/80 backdrop-blur-md border border-orange-500/50 hover:border-orange-400 text-xs text-orange-200 flex items-center gap-1.5 transition shadow-md shadow-orange-950/30 group active:scale-95"
-            title="Cloudflare R2 Backend Console: Connected & Active"
-          >
-            <Cloud className="w-3.5 h-3.5 text-orange-400 group-hover:scale-110 transition-transform" />
-            <span className="font-bold text-orange-300 hidden sm:inline">Cloudflare R2</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          </button>
-
-          {/* Ada AI Mentor Guide Trigger */}
-          <button
-            onClick={() => setShowWelcomeModal(true)}
-            className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-indigo-950/90 to-cyan-950/90 backdrop-blur-md border border-cyan-500/40 hover:border-cyan-400 text-xs text-cyan-200 flex items-center gap-1.5 transition shadow-md shadow-cyan-950/30 group active:scale-95"
-            title="Consult Ada (AI Cloud Architect Lead) for briefing & game tutorial"
-          >
-            <img
-              src={mentorAdaImg}
-              alt="Ada Mentor"
-              className="w-5 h-5 rounded-full object-cover ring-1 ring-cyan-400/80 group-hover:scale-110 transition-transform"
-            />
-            <span className="font-bold text-cyan-300 hidden sm:inline">Ada Guide</span>
-          </button>
-        </div>
-      </header>
-
-      {/* Campaign Level Progress / Navigation Rail */}
-      {gameMode === 'CAMPAIGN' && (
-        <div className="shrink-0 glass-header px-4 py-1.5 flex items-center justify-between text-xs overflow-x-auto gap-4">
-          <div className="flex items-center gap-2">
-            {CAMPAIGN_LEVELS.map((lvl, idx) => {
-              const isUnlocked = idx <= unlockedLevelIdx;
-              const isPassed = idx < unlockedLevelIdx;
-              const isCurrent = currentLevelIdx === idx;
-
-              return (
-                <button
-                  key={lvl.id}
-                  disabled={!isUnlocked}
-                  onClick={() => isUnlocked && selectLevel(idx)}
-                  title={isUnlocked ? lvl.title : `🔒 Pass Level ${idx} to unlock this scenario`}
-                  className={`px-3 py-1 rounded-lg font-bold font-display tracking-wide text-xs transition flex items-center gap-1.5 shrink-0 ${
-                    isCurrent
-                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-indigo-400/40'
-                      : isPassed
-                      ? 'bg-emerald-950/60 backdrop-blur text-emerald-300 border border-emerald-500/30 hover:bg-emerald-900/50'
-                      : isUnlocked
-                      ? 'glass-subpanel text-slate-300 hover:text-white'
-                      : 'bg-slate-950/30 text-slate-600 border border-slate-900/40 cursor-not-allowed opacity-50'
-                  }`}
-                >
-                  {isPassed ? (
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  ) : isUnlocked ? (
-                    <span className="w-2 h-2 rounded-full bg-indigo-400 shrink-0" />
-                  ) : (
-                    <Lock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                  )}
-                  <span>{lvl.title.split(':')[0]}</span>
-                  {!isUnlocked && <span className="text-[10px] text-slate-500 font-normal">🔒 Locked</span>}
-                </button>
-              );
-            })}
-
-            {/* Inspect Targets & Briefing Button */}
-            <button
-              onClick={() => setLevelBriefingModal({ mode: 'CAMPAIGN', levelIdx: currentLevelIdx })}
-              className="px-2.5 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/40 text-[11px] font-bold font-display tracking-wide flex items-center gap-1.5 transition shrink-0 ml-1 shadow-sm active:scale-95"
-              title="Inspect mission objectives and SLA targets to achieve"
-            >
-              <Target className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Targets &amp; Briefing</span>
-            </button>
-          </div>
-
-          <div className="flex items-center gap-3 shrink-0">
-            {/* Wave Progress Bar */}
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] text-slate-400">Wave Progress:</span>
-              <div className="w-32 h-2 bg-slate-800/80 rounded-full overflow-hidden">
+          {/* Wave Progress Bar (Active during simulation) */}
+          {isRunning && (
+            <div className="hidden lg:flex items-center gap-2 glass-subpanel px-2.5 py-1 rounded-xl">
+              <div className="w-24 h-1.5 bg-slate-800 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-indigo-500 to-emerald-400 transition-all duration-100"
                   style={{ width: `${waveProgress}%` }}
                 />
               </div>
-              <span className="font-mono text-[11px] text-slate-300">{Math.round(waveProgress)}%</span>
+              <span className="font-mono text-[10px] text-slate-300">{Math.round(waveProgress)}%</span>
             </div>
-
-            {/* Auto-Save & Blueprint Controls */}
-            <div className="hidden md:flex items-center gap-1.5 glass-subpanel px-2 py-1 rounded-xl">
-              <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-mono" title="Architectural layout and progress are automatically saved to your browser localStorage">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Auto-Saved
-              </span>
-              <div className="w-px h-3 bg-indigo-500/20" />
-              <button
-                onClick={resetCurrentTopology}
-                className="px-2 py-0.5 rounded text-[11px] text-slate-400 hover:text-white hover:bg-slate-800/80 transition"
-                title="Reset current architecture to initial level blueprint"
-              >
-                Reset
-              </button>
-              <button
-                onClick={exportArchitectureBlueprint}
-                className="px-2 py-0.5 rounded text-[11px] text-slate-400 hover:text-indigo-300 hover:bg-slate-800/80 transition flex items-center gap-1"
-                title="Export blueprint as JSON file"
-              >
-                <Download className="w-3 h-3" />
-                <span>Export</span>
-              </button>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="px-2 py-0.5 rounded text-[11px] text-slate-400 hover:text-indigo-300 hover:bg-slate-800/80 transition flex items-center gap-1"
-                title="Import blueprint from JSON file"
-              >
-                <Upload className="w-3 h-3" />
-                <span>Import</span>
-              </button>
-              <button
-                onClick={handleCopyChallengeLink}
-                className="px-2 py-0.5 rounded text-[11px] text-cyan-300 hover:text-cyan-100 hover:bg-cyan-950/60 transition flex items-center gap-1 border border-cyan-500/20"
-                title="Copy 1-click shareable challenge link with current architecture"
-              >
-                {isChallengeLinkCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <LinkIcon className="w-3 h-3 text-cyan-400" />}
-                <span>{isChallengeLinkCopied ? 'Copied!' : 'Share Link'}</span>
-              </button>
-            </div>
-
-            <button
-              onClick={() => setShowBeginnerHints(!showBeginnerHints)}
-              className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold flex items-center gap-1.5 transition ${
-                showBeginnerHints
-                  ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40'
-                  : 'glass-subpanel text-slate-400'
-              }`}
-            >
-              <BookOpen className="w-3.5 h-3.5" />
-              <span>{showBeginnerHints ? 'Hints On' : 'Hints Off'}</span>
-            </button>
-          </div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* =================================================================== */}
       {/* LIVE P0 OUTAGE & INCIDENT TICKER (SRE COMMAND CENTER)               */}
@@ -4429,11 +4489,12 @@ Can your architecture beat this? Test it in your browser:
             </div>
           )}
 
-          {/* Floating Ada Tactical Advisor Widget */}
-          <div className="absolute bottom-16 lg:bottom-3 left-1/2 -translate-x-1/2 z-30 pointer-events-auto">
+          {/* Floating Ada Tactical Advisor Widget (Bottom Left Stack above Blueprint dock) */}
+          <div className="absolute bottom-16 lg:bottom-14 left-3 z-30 pointer-events-auto">
             <div
               onClick={() => {
                 setRightPanelCollapsed(false);
+                setRightPanelTab('INSPECTOR');
                 setTimeout(() => {
                   if (mentorSectionRef.current) {
                     mentorSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -4665,7 +4726,7 @@ Can your architecture beat this? Test it in your browser:
             </div>
           )}
 
-          {/* FLOATING CANVAS HUD CONTROLS (BOTTOM-RIGHT) */}
+          {/* FLOATING CANVAS VIEW CONTROLS (BOTTOM-RIGHT) */}
           <div className="absolute bottom-16 lg:bottom-3 right-3 flex items-center gap-1 z-30 pointer-events-auto glass-panel p-1 rounded-xl shadow-2xl">
             <button
               onClick={() => setZoom((z) => Math.min(2.5, +(z + 0.15).toFixed(2)))}
@@ -4703,6 +4764,18 @@ Can your architecture beat this? Test it in your browser:
             >
               <RotateCcw className="w-3.5 h-3.5" />
             </button>
+          </div>
+
+          {/* FLOATING BLUEPRINT & STATUS DOCK (BOTTOM-LEFT) */}
+          <div className="absolute bottom-16 lg:bottom-3 left-3 z-30 pointer-events-auto flex items-center gap-1.5 glass-panel p-1 rounded-xl shadow-2xl">
+            <div className="px-2 py-1 rounded-lg text-[10px] text-slate-300 font-mono flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+              <span>({Math.round(pan.x)}, {Math.round(pan.y)})</span>
+            </div>
+            <div className="px-2 py-1 rounded-lg text-[10px] text-emerald-400 font-mono flex items-center gap-1 hidden md:flex" title="Changes auto-saved to browser localStorage">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Auto-Saved</span>
+            </div>
             <div className="w-px h-4 bg-indigo-500/20 mx-0.5" />
             <button
               onClick={resetCurrentTopology}
@@ -4736,19 +4809,6 @@ Can your architecture beat this? Test it in your browser:
               {isChallengeLinkCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <LinkIcon className="w-3 h-3 text-cyan-400" />}
               <span className="hidden sm:inline">{isChallengeLinkCopied ? 'Copied!' : 'Share Link'}</span>
             </button>
-          </div>
-
-          {/* FLOATING STATUS PILL (BOTTOM-LEFT) */}
-          <div className="absolute bottom-16 lg:bottom-3 left-3 z-30 pointer-events-none flex items-center gap-2">
-            <div className="glass-pill px-2.5 py-1 rounded-lg text-[10px] text-slate-300 font-mono flex items-center gap-2 shadow-lg">
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
-              <span>({Math.round(pan.x)}, {Math.round(pan.y)})</span>
-              <span className="hidden sm:inline text-slate-400">• Pan anywhere</span>
-            </div>
-            <div className="glass-pill px-2.5 py-1 rounded-lg text-[10px] text-emerald-400 font-mono flex items-center gap-1.5 shadow-lg hidden md:flex" title="Changes auto-saved to browser localStorage">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Auto-Saved</span>
-            </div>
           </div>
 
           {/* GRAPH WORLD CONTAINER (TRANSFORMED BY PAN & ZOOM) */}
@@ -5344,7 +5404,7 @@ Can your architecture beat this? Test it in your browser:
           <div className="flex items-center justify-between pb-2 border-b border-indigo-500/20 shrink-0">
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-300 font-display">
-                Problem &amp; Diagnostics
+                Mission &amp; Node Terminal
               </span>
               {highlightMentor && (
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
@@ -5360,9 +5420,61 @@ Can your architecture beat this? Test it in your browser:
               <PanelRightClose className="w-3.5 h-3.5" />
             </button>
           </div>
+
+          {/* Pinned Mini SLA Status Capsule */}
+          <div className="p-2.5 rounded-xl glass-card flex items-center justify-between text-xs shrink-0 shadow-sm border border-slate-800">
+            <div className="flex items-center gap-2">
+              <span className="font-extrabold text-white text-[11px]">
+                {gameMode === 'CAMPAIGN' ? `Level ${currentLevel.id}` : gameMode}
+              </span>
+              <span className="text-[10px] text-slate-400 font-mono">
+                Cost: <strong className="text-emerald-400">${evaluation.totalHourlyCost}</strong>{currentMaxBudget ? `/$${currentMaxBudget}` : ''}
+              </span>
+            </div>
+            <div className={`px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 ${
+              isLevelPassing ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+            }`}>
+              <span>{isLevelPassing ? '✓ Targets Met' : '⚠️ Breached'}</span>
+            </div>
+          </div>
+
+          {/* Dual-Tab Switcher: Objectives vs. Node Tuning */}
+          <div className="grid grid-cols-2 gap-1 p-1 rounded-xl glass-subpanel text-xs font-bold font-display shrink-0">
+            <button
+              onClick={() => {
+                sound.playClick();
+                setRightPanelTab('OBJECTIVES');
+              }}
+              className={`py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition ${
+                rightPanelTab === 'OBJECTIVES'
+                  ? 'bg-indigo-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Target className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Objectives</span>
+            </button>
+            <button
+              onClick={() => {
+                sound.playClick();
+                setRightPanelTab('INSPECTOR');
+              }}
+              className={`py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition ${
+                rightPanelTab === 'INSPECTOR'
+                  ? 'bg-indigo-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Settings className="w-3.5 h-3.5 text-indigo-400" />
+              <span>{selectedNode && selectedSpec ? selectedSpec.name.split(' ')[0] : 'Inspector'}</span>
+            </button>
+          </div>
+
           {/* =============================================================== */}
-          {/* 1. SCENARIO PROBLEM STATEMENT (TOP OF RIGHT PANEL)              */}
+          {/* TAB 1: OBJECTIVES & MISSION BRIEFING                             */}
           {/* =============================================================== */}
+          {rightPanelTab === 'OBJECTIVES' && (
+            <>
           {gameMode === 'CAMPAIGN' || gameMode === 'DAILY' ? (
             <div className="glass-subpanel rounded-2xl p-4 space-y-3 shadow-xl">
               {/* Header */}
@@ -5680,10 +5792,14 @@ Can your architecture beat this? Test it in your browser:
               </p>
             </div>
           )}
+            </>
+          )}
 
           {/* =============================================================== */}
-          {/* 2. SELECTED COMPONENT INSPECTOR & TUNING                         */}
+          {/* TAB 2: COMPONENT INSPECTOR, TUNING & ADA AI COMMS               */}
           {/* =============================================================== */}
+          {rightPanelTab === 'INSPECTOR' && (
+            <>
           <div
             ref={inspectorSectionRef}
             className={`glass-subpanel rounded-2xl p-3.5 space-y-3 transition-all duration-500 ${
@@ -5875,6 +5991,8 @@ Can your architecture beat this? Test it in your browser:
               })}
             </div>
           </div>
+            </>
+          )}
         </aside>
       </div>
 
@@ -8025,7 +8143,7 @@ Can your architecture beat this? Test it in your browser:
             sound.playClick();
             setShowBadgesModal(true);
           }}
-          className="fixed top-16 right-4 z-50 p-4 rounded-2xl bg-slate-900/95 border-2 border-amber-400 shadow-[0_0_35px_rgba(245,158,11,0.5)] backdrop-blur-xl flex items-center gap-3.5 cursor-pointer animate-in slide-in-from-top duration-300 group max-w-sm"
+          className="fixed bottom-16 right-6 z-40 p-3.5 rounded-2xl bg-slate-900/95 border-2 border-amber-400 shadow-[0_0_35px_rgba(245,158,11,0.5)] backdrop-blur-xl flex items-center gap-3.5 cursor-pointer animate-in slide-in-from-bottom duration-300 group max-w-sm"
         >
           <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-amber-500 to-yellow-400 flex items-center justify-center text-2xl shadow-lg shadow-amber-500/30 group-hover:scale-110 transition-transform">
             {badgeToast.icon}
