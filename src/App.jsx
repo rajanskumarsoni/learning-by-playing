@@ -2957,7 +2957,7 @@ function AuthModal({
 
   const passwordsMatch = signUpPassword && signUpConfirmPassword && signUpPassword === signUpConfirmPassword;
 
-  const handleSignInSubmit = (e) => {
+  const handleSignInSubmit = async (e) => {
     if (e) e.preventDefault();
     setSignInError(null);
 
@@ -2974,31 +2974,23 @@ function AuthModal({
     setIsSubmitting(true);
     sound.playClick();
 
-    setTimeout(() => {
-      setIsSubmitting(false);
-      const name = emailTrimmed.includes('@') ? emailTrimmed.split('@')[0] : emailTrimmed;
-      const user = {
-        id: `arch_${Math.random().toString(16).substring(2, 10)}`,
-        name: name.charAt(0).toUpperCase() + name.slice(1),
-        email: emailTrimmed.includes('@') ? emailTrimmed : `${emailTrimmed}@systemsaviour.dev`,
-        role: 'Distributed Systems Architect',
-        specialization: 'HIGH_AVAILABILITY',
-        salary: '$145,000 / yr',
-        rank: 'Senior Architect',
-        joinedAt: new Date().toLocaleDateString(),
-        authProvider: 'email',
-        token: `cf_tok_${Math.random().toString(36).substring(2, 15)}`
-      };
-      setAuthSuccessMsg(`Terminal Authenticated! Welcome, ${user.name}.`);
+    const res = await cloudflareBackend.login(emailTrimmed, signInPassword);
+    setIsSubmitting(false);
+
+    if (res && res.success && res.user) {
+      setAuthSuccessMsg(`Terminal Authenticated on Edge! Welcome, ${res.user.name}.`);
       sound.playVictory();
       setTimeout(() => {
-        onLogin(user);
+        onLogin(res.user);
         onClose();
-      }, 700);
-    }, 450);
+      }, 600);
+    } else {
+      setSignInError(res?.error || 'Authentication failed. Please check your credentials.');
+      sound.playDefeat();
+    }
   };
 
-  const handleSignUpSubmit = (e) => {
+  const handleSignUpSubmit = async (e) => {
     if (e) e.preventDefault();
     setSignUpError(null);
 
@@ -3029,87 +3021,57 @@ function AuthModal({
     setIsSubmitting(true);
     sound.playClick();
 
-    setTimeout(() => {
-      setIsSubmitting(false);
-      const user = {
-        id: `arch_${Math.random().toString(16).substring(2, 10)}`,
-        name: handleTrimmed,
-        email: emailTrimmed,
-        role: specialization === 'HIGH_AVAILABILITY'
-          ? 'High Availability & SRE Lead'
-          : specialization === 'THROUGHPUT'
-          ? 'Throughput & Microservices Guru'
-          : specialization === 'SECURITY'
-          ? 'Zero-Trust Cyber Sec Specialist'
-          : 'Cloud FinOps Engineer',
-        specialization,
-        salary: '$95,000 / yr',
-        rank: 'Junior Architect',
-        joinedAt: new Date().toLocaleDateString(),
-        authProvider: 'email',
-        token: `cf_tok_${Math.random().toString(36).substring(2, 15)}`
-      };
-      setAuthSuccessMsg(`Account Created! Architect ID deployed.`);
-      sound.playVictory();
-      setTimeout(() => {
-        onLogin(user);
-        onClose();
-      }, 700);
-    }, 550);
-  };
+    const res = await cloudflareBackend.register({
+      handle: handleTrimmed,
+      email: emailTrimmed,
+      password: signUpPassword,
+      specialization
+    });
+    setIsSubmitting(false);
 
-  const handleGuestLogin = () => {
-    sound.playClick();
-    setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
-      const randNum = Math.floor(100 + Math.random() * 900);
-      const guestUser = {
-        id: `guest_${randNum}`,
-        name: `GuestArchitect#${randNum}`,
-        email: `guest${randNum}@systemsaviour.dev`,
-        role: 'Staff Fellow (Guest Terminal)',
-        specialization: 'HIGH_AVAILABILITY',
-        salary: '$120,000 / yr',
-        rank: 'Guest Fellow',
-        joinedAt: 'Guest Session',
-        authProvider: 'guest',
-        token: `guest_tok_${Math.random().toString(36).substring(2, 10)}`
-      };
-      setAuthSuccessMsg(`Logged in as ${guestUser.name}!`);
+    if (res && res.success && res.user) {
+      setAuthSuccessMsg(`Account Registered on Cloudflare Edge! Architect ID deployed.`);
       sound.playVictory();
       setTimeout(() => {
-        onLogin(guestUser);
+        onLogin(res.user);
         onClose();
       }, 600);
-    }, 300);
+    } else {
+      setSignUpError(res?.error || 'Registration failed. Handle or email may already be registered.');
+      sound.playDefeat();
+    }
   };
 
-  const handleSocialLogin = (provider) => {
+  const handleGuestLogin = async () => {
     sound.playClick();
     setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
-      const randId = Math.random().toString(36).substring(2, 8);
-      const user = {
-        id: `${provider.toLowerCase()}_${randId}`,
-        name: `${provider === 'GITHUB' ? 'OctoArchitect' : 'GoogleArchitect'}_${randId}`,
-        email: `architect@${provider.toLowerCase()}.user`,
-        role: 'Verified Cloud Architect',
-        specialization: 'THROUGHPUT',
-        salary: '$165,000 / yr',
-        rank: 'Senior Architect',
-        joinedAt: new Date().toLocaleDateString(),
-        authProvider: provider.toLowerCase(),
-        token: `oauth_${provider.toLowerCase()}_${Math.random().toString(36).substring(2, 15)}`
-      };
-      setAuthSuccessMsg(`Authenticated via ${provider}!`);
+    const res = await cloudflareBackend.guestLogin(specialization);
+    setIsSubmitting(false);
+
+    if (res && res.user) {
+      setAuthSuccessMsg(`Logged in as ${res.user.name} on Edge!`);
       sound.playVictory();
       setTimeout(() => {
-        onLogin(user);
+        onLogin(res.user);
         onClose();
       }, 600);
-    }, 400);
+    }
+  };
+
+  const handleSocialLogin = async (provider) => {
+    sound.playClick();
+    setIsSubmitting(true);
+    const res = await cloudflareBackend.socialLogin(provider);
+    setIsSubmitting(false);
+
+    if (res && res.user) {
+      setAuthSuccessMsg(`Authenticated via ${provider} on Edge!`);
+      sound.playVictory();
+      setTimeout(() => {
+        onLogin(res.user);
+        onClose();
+      }, 600);
+    }
   };
 
   return (

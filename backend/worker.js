@@ -41,8 +41,14 @@ function jsonResponse(data, status = 200, headers = {}) {
 async function storageGet(env, key) {
   if (env.SYSTEM_SAVIOUR_KV) {
     try {
-      const val = await env.SYSTEM_SAVIOUR_KV.get(key, 'json');
-      if (val) return val;
+      const text = await env.SYSTEM_SAVIOUR_KV.get(key, 'text');
+      if (text !== null && text !== undefined) {
+        try {
+          return JSON.parse(text);
+        } catch {
+          return text;
+        }
+      }
     } catch (e) {
       console.warn('KV get error:', e);
     }
@@ -50,7 +56,14 @@ async function storageGet(env, key) {
   if (env.SYSTEM_SAVIOUR_BUCKET) {
     try {
       const obj = await env.SYSTEM_SAVIOUR_BUCKET.get(key);
-      if (obj) return await obj.json();
+      if (obj) {
+        const text = await obj.text();
+        try {
+          return JSON.parse(text);
+        } catch {
+          return text;
+        }
+      }
     } catch (e) {
       console.warn('R2 get error:', e);
     }
@@ -59,7 +72,16 @@ async function storageGet(env, key) {
 }
 
 async function storagePut(env, key, data) {
-  const jsonStr = typeof data === 'string' ? data : JSON.stringify(data);
+  if (data === null || data === undefined) {
+    if (env.SYSTEM_SAVIOUR_KV) {
+      try { await env.SYSTEM_SAVIOUR_KV.delete(key); } catch {}
+    }
+    if (env.SYSTEM_SAVIOUR_BUCKET) {
+      try { await env.SYSTEM_SAVIOUR_BUCKET.delete(key); } catch {}
+    }
+    return;
+  }
+  const jsonStr = JSON.stringify(data);
   if (env.SYSTEM_SAVIOUR_KV) {
     try {
       await env.SYSTEM_SAVIOUR_KV.put(key, jsonStr);
@@ -93,6 +115,34 @@ const SEEDED_LEADERBOARD = {
     { rank: 3, name: 'Brendan Burns', wave: 12, nodes: 29, score: 22100, role: 'K8s Guardian' }
   ]
 };
+
+// Auth Cryptographic Helpers (Native Web Crypto API)
+async function hashPassword(password, salt) {
+  const enc = new TextEncoder();
+  const data = enc.encode(`${salt}:${password}:systemsaviour_edge_v2`);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+function generateToken() {
+  const rand = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
+  return `cf_arch_${Date.now()}_${rand.replace(/-/g, '')}`;
+}
+
+function roleBySpecialization(spec) {
+  switch (spec) {
+    case 'THROUGHPUT':
+      return 'Throughput & Microservices Guru';
+    case 'SECURITY':
+      return 'Zero-Trust Cyber Sec Specialist';
+    case 'FINOPS':
+      return 'Cloud FinOps Engineer';
+    case 'HIGH_AVAILABILITY':
+    default:
+      return 'High Availability & SRE Lead';
+  }
+}
 
 export default {
   async fetch(request, env, ctx) {
@@ -325,6 +375,252 @@ export default {
 
         await storagePut(env, `player_${playerId}`, profile);
         return jsonResponse({ success: true, message: 'Player cloud profile synced to Cloudflare Edge' });
+      }
+
+      // ====================================================================
+      // 11. ARCHITECT AUTHENTICATION & IDENTITY (SIGN IN, SIGN UP, GUEST, ME)
+      // Authoritative Cloudflare Edge Authentication stored in KV / R2
+      // ====================================================================
+
+      // Register / Sign Up (POST /api/auth/register or /api/auth/signup)
+      if ((path === '/api/auth/register' || path === '/api/auth/signup') && method === 'POST') {
+        const payload = await request.json();
+        const { handle, email, password, specialization } = payload;
+
+        const cleanHandle = (handle || '').trim();
+        const cleanEmail = (email || '').trim().toLowerCase();
+
+        if (!cleanHandle || cleanHandle.length < 3) {
+          return jsonResponse({ success: false, error: 'Architect Handle must be at least 3 characters' }, 400);
+        }
+        if (!cleanEmail || !cleanEmail.includes('@')) {
+          return jsonResponse({ success: false, error: 'Valid engineering email required' }, 400);
+        }
+        if (!password || password.length < 6) {
+          return jsonResponse({ success: false, error: 'Password must be at least 6 characters' }, 400);
+        }
+
+        // Check uniqueness in KV
+        const existingByEmail = await storageGet(env, `user_by_email_${cleanEmail}`);
+        if (existingByEmail) {
+          return jsonResponse({ success: false, error: 'An architect with this email already exists' }, 409);
+        }
+        const existingByHandle = await storageGet(env, `user_by_handle_${cleanHandle.toLowerCase()}`);
+        if (existingByHandle) {
+          return jsonResponse({ success: false, error: 'Architect handle is already claimed' }, 409);
+        }
+
+        // Salt and Hash
+        const salt = Math.random().toString(36).substring(2, 10);
+        const passwordHash = await hashPassword(password, salt);
+        const id = `arch_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+
+        const userRecord = {
+          id,
+          name: cleanHandle,
+          handle: cleanHandle.toLowerCase(),
+          email: cleanEmail,
+          role: roleBySpecialization(specialization),
+          specialization: specialization || 'HIGH_AVAILABILITY',
+          salary: '$95,000 / yr',
+          rank: 'Junior Architect',
+          passwordHash,
+          salt,
+          authProvider: 'email',
+          createdAt: new Date().toISOString(),
+          lastLoginAt: new Date().toISOString()
+        };
+
+        // Persist to KV
+        await storagePut(env, `user_${id}`, userRecord);
+        await storagePut(env, `user_by_email_${cleanEmail}`, id);
+        await storagePut(env, `user_by_handle_${cleanHandle.toLowerCase()}`, id);
+
+        // Generate session token
+        const token = generateToken();
+        await storagePut(env, `session_${token}`, {
+          userId: id,
+          createdAt: new Date().toISOString(),
+          expiresAt: Date.now() + 86400000 * 30
+        });
+
+        const { passwordHash: _p, salt: _s, ...safeUser } = userRecord;
+        return jsonResponse({
+          success: true,
+          token,
+          user: safeUser,
+          message: `Architect identity initialized for ${cleanHandle}`
+        }, 201);
+      }
+
+      // Login / Sign In (POST /api/auth/login or /api/auth/signin)
+      if ((path === '/api/auth/login' || path === '/api/auth/signin') && method === 'POST') {
+        const payload = await request.json();
+        const { emailOrHandle, password } = payload;
+        const clean = (emailOrHandle || '').trim().toLowerCase();
+
+        if (!clean || !password) {
+          return jsonResponse({ success: false, error: 'Email/Handle and password are required' }, 400);
+        }
+
+        let userId = await storageGet(env, `user_by_email_${clean}`);
+        if (!userId) {
+          userId = await storageGet(env, `user_by_handle_${clean}`);
+        }
+
+        if (!userId) {
+          return jsonResponse({ success: false, error: 'Architect account not found' }, 401);
+        }
+
+        const userRecord = await storageGet(env, `user_${userId}`);
+        if (!userRecord || !userRecord.passwordHash) {
+          return jsonResponse({ success: false, error: 'Invalid user account state' }, 401);
+        }
+
+        const computedHash = await hashPassword(password, userRecord.salt);
+        if (computedHash !== userRecord.passwordHash) {
+          return jsonResponse({ success: false, error: 'Incorrect terminal password' }, 401);
+        }
+
+        // Update login timestamp
+        userRecord.lastLoginAt = new Date().toISOString();
+        await storagePut(env, `user_${userId}`, userRecord);
+
+        // Issue session token
+        const token = generateToken();
+        await storagePut(env, `session_${token}`, {
+          userId,
+          createdAt: new Date().toISOString(),
+          expiresAt: Date.now() + 86400000 * 30
+        });
+
+        const { passwordHash: _p, salt: _s, ...safeUser } = userRecord;
+        return jsonResponse({
+          success: true,
+          token,
+          user: safeUser,
+          message: `Terminal authenticated for ${userRecord.name}`
+        });
+      }
+
+      // 1-Click Guest Terminal Access (POST /api/auth/guest)
+      if (path === '/api/auth/guest' && method === 'POST') {
+        const payload = (await request.json().catch(() => ({}))) || {};
+        const randNum = Math.floor(100 + Math.random() * 900);
+        const id = `guest_${Date.now()}_${randNum}`;
+
+        const guestUser = {
+          id,
+          name: `GuestArchitect#${randNum}`,
+          handle: `guestarchitect${randNum}`,
+          email: `guest${randNum}@systemsaviour.dev`,
+          role: 'Staff Fellow (Guest Terminal)',
+          specialization: payload.specialization || 'HIGH_AVAILABILITY',
+          salary: '$120,000 / yr',
+          rank: 'Guest Fellow',
+          authProvider: 'guest',
+          isGuest: true,
+          createdAt: new Date().toISOString()
+        };
+
+        await storagePut(env, `user_${id}`, guestUser);
+
+        const token = generateToken();
+        await storagePut(env, `session_${token}`, {
+          userId: id,
+          createdAt: new Date().toISOString(),
+          expiresAt: Date.now() + 86400000 * 7
+        });
+
+        return jsonResponse({
+          success: true,
+          token,
+          user: guestUser,
+          message: `Guest terminal activated for ${guestUser.name}`
+        });
+      }
+
+      // Social OAuth Connect (POST /api/auth/social)
+      if (path === '/api/auth/social' && method === 'POST') {
+        const payload = await request.json();
+        const { provider = 'github', email, name } = payload;
+        const randId = Math.random().toString(36).substring(2, 7);
+        const cleanName = name || `${provider === 'github' ? 'OctoArchitect' : 'GoogleArchitect'}_${randId}`;
+        const cleanEmail = email || `architect_${randId}@${provider.toLowerCase()}.user`;
+
+        let userId = await storageGet(env, `user_by_email_${cleanEmail.toLowerCase()}`);
+        let userRecord;
+
+        if (userId) {
+          userRecord = await storageGet(env, `user_${userId}`);
+        } else {
+          userId = `oauth_${provider.toLowerCase()}_${Date.now()}_${randId}`;
+          userRecord = {
+            id: userId,
+            name: cleanName,
+            handle: cleanName.toLowerCase(),
+            email: cleanEmail.toLowerCase(),
+            role: 'Verified Cloud Architect',
+            specialization: 'THROUGHPUT',
+            salary: '$165,000 / yr',
+            rank: 'Senior Architect',
+            authProvider: provider.toLowerCase(),
+            createdAt: new Date().toISOString()
+          };
+          await storagePut(env, `user_${userId}`, userRecord);
+          await storagePut(env, `user_by_email_${cleanEmail.toLowerCase()}`, userId);
+        }
+
+        const token = generateToken();
+        await storagePut(env, `session_${token}`, {
+          userId,
+          createdAt: new Date().toISOString(),
+          expiresAt: Date.now() + 86400000 * 30
+        });
+
+        const { passwordHash: _p, salt: _s, ...safeUser } = userRecord;
+        return jsonResponse({
+          success: true,
+          token,
+          user: safeUser,
+          message: `Authenticated via ${provider}`
+        });
+      }
+
+      // Current Authenticated User (GET /api/auth/me)
+      if (path === '/api/auth/me' && method === 'GET') {
+        const authHeader = request.headers.get('Authorization') || '';
+        const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+
+        if (!token) {
+          return jsonResponse({ success: false, error: 'Missing bearer authorization token' }, 401);
+        }
+
+        const session = await storageGet(env, `session_${token}`);
+        if (!session || !session.userId || (session.expiresAt && Date.now() > session.expiresAt)) {
+          return jsonResponse({ success: false, error: 'Session expired or invalid' }, 401);
+        }
+
+        const userRecord = await storageGet(env, `user_${session.userId}`);
+        if (!userRecord) {
+          return jsonResponse({ success: false, error: 'User record not found' }, 404);
+        }
+
+        const { passwordHash: _p, salt: _s, ...safeUser } = userRecord;
+        return jsonResponse({
+          success: true,
+          user: safeUser
+        });
+      }
+
+      // Logout (POST /api/auth/logout)
+      if (path === '/api/auth/logout' && method === 'POST') {
+        const authHeader = request.headers.get('Authorization') || '';
+        const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+        if (token) {
+          await storagePut(env, `session_${token}`, null);
+        }
+        return jsonResponse({ success: true, message: 'Terminal session terminated' });
       }
 
       return jsonResponse({ error: `Not found: ${method} ${path}` }, 404);
