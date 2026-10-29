@@ -689,7 +689,10 @@ export function isConnectionAllowed(fromType, toType) {
   return rule.allowed.includes(toType);
 }
 
-export function validateCloudConnection(fromType, toType, nodes = [], edges = [], fromId = null, toId = null) {
+export function validateCloudConnection(fromType, toType, nodes = [], edges = [], fromId = null, toId = null, options = {}) {
+  const isNewConnection = typeof options === 'boolean' ? options : (options.isNewConnection !== false);
+  const currentEdgeId = options.currentEdgeId || null;
+
   if (!fromType || !toType) {
     return {
       allowed: false,
@@ -717,18 +720,21 @@ export function validateCloudConnection(fromType, toType, nodes = [], edges = []
     };
   }
 
-  // 2. Duplicate Wire
-  if (fromId && toId && edges.some((e) => e.from === fromId && e.to === toId)) {
-    return {
-      allowed: false,
-      violation: {
-        title: 'Duplicate Wire Detected',
-        category: 'Redundant Wiring',
-        explanation: 'A communication wire already connects these two components. Adding duplicate wires between the exact same pair of nodes causes packet duplication.',
-        recommendation: 'Configure concurrency or replicas on the existing component rather than adding parallel duplicate wires between the same nodes.',
-        validTargets: CLOUD_CONNECTION_RULES[fromType]?.allowed || []
-      }
-    };
+  // 2. Duplicate Wire (Only check when proposing a new connection, or check if more than 1 duplicate edge exists)
+  if (fromId && toId) {
+    const existingMatches = edges.filter((e) => e.from === fromId && e.to === toId && (!currentEdgeId || e.id !== currentEdgeId));
+    if (isNewConnection ? existingMatches.length > 0 : existingMatches.length > 1) {
+      return {
+        allowed: false,
+        violation: {
+          title: 'Duplicate Wire Detected',
+          category: 'Redundant Wiring',
+          explanation: 'A communication wire already connects these two components. Adding duplicate wires between the exact same pair of nodes causes packet duplication.',
+          recommendation: 'Configure concurrency or replicas on the existing component rather than adding parallel duplicate wires between the same nodes.',
+          validTargets: CLOUD_CONNECTION_RULES[fromType]?.allowed || []
+        }
+      };
+    }
   }
 
   // 3. Matrix Rule Lookup
@@ -761,6 +767,11 @@ export function validateCloudConnection(fromType, toType, nodes = [], edges = []
     const queue = [toId];
     let hasCycle = false;
 
+    // Filter out current edge when checking for cycles in existing networks
+    const activeEdges = currentEdgeId
+      ? edges.filter((e) => e.id !== currentEdgeId)
+      : (isNewConnection ? edges : edges.filter((e) => !(e.from === fromId && e.to === toId)));
+
     while (queue.length > 0) {
       const curr = queue.shift();
       if (curr === fromId) {
@@ -768,7 +779,7 @@ export function validateCloudConnection(fromType, toType, nodes = [], edges = []
         break;
       }
       visited.add(curr);
-      const outgoing = edges.filter((e) => e.from === curr).map((e) => e.to);
+      const outgoing = activeEdges.filter((e) => e.from === curr).map((e) => e.to);
       for (const nextNode of outgoing) {
         if (!visited.has(nextNode)) {
           queue.push(nextNode);
@@ -1391,8 +1402,7 @@ function evaluateArchitecture(nodes, edges, incomingRps, trafficMix, maxBudgetHr
 
         // Check if edge is architecturally permitted in cloud systems
         if (fromNode && toNode) {
-          const check = validateCloudConnection(fromNode.type, toNode.type, nodes, edges, fromNode.id, toNode.id);
-          if (!check.allowed) {
+          if (!isConnectionAllowed(fromNode.type, toNode.type)) {
             edgeFlows[edge.id] = { flowRps: 0, dominantType: 'READ', total: 0 };
             return;
           }
@@ -1441,10 +1451,12 @@ function evaluateArchitecture(nodes, edges, incomingRps, trafficMix, maxBudgetHr
     const fromNode = nodes.find((n) => n.id === edge.from);
     const toNode = nodes.find((n) => n.id === edge.to);
     if (fromNode && toNode) {
-      const check = validateCloudConnection(fromNode.type, toNode.type, nodes, edges, fromNode.id, toNode.id);
-      if (!check.allowed) {
+      if (!isConnectionAllowed(fromNode.type, toNode.type)) {
+        const specificRule = CLOUD_CONNECTION_RULES[fromNode.type]?.rules?.[toNode.type];
         architecturalDrops += incomingRps * 0.4;
-        diagnostics.push(`ARCHITECTURAL VIOLATION: "${fromNode.type}" cannot wire directly to "${toNode.type}"! ${check.violation?.explanation || ''}`);
+        diagnostics.push(
+          `ARCHITECTURAL VIOLATION: "${fromNode.type}" cannot wire directly to "${toNode.type}"! ${specificRule?.explanation || ''}`
+        );
       }
     }
   });
