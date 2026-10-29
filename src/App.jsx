@@ -8,7 +8,7 @@ import {
   BookOpen, Search, Bot, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
   ChevronLeft, ChevronDown, Star, Trophy, Radio, Target, Volume2, VolumeX, Music, Headphones, Mic,
   Link as LinkIcon, Calendar, Crown, Medal, Cloud, ShieldAlert, CheckCircle,
-  User, UserPlus, LogIn, LogOut, Mail, Key, EyeOff
+  User, UserPlus, LogIn, LogOut, Mail, Key, EyeOff, Briefcase
 } from 'lucide-react';
 import mentorAdaImg from './assets/mentor_ada.jpg';
 import chaosMonkeyImg from './assets/chaos_monkey.jpg';
@@ -4704,6 +4704,8 @@ export default function App() {
   const [rightPanelTab, setRightPanelTab] = useState('OBJECTIVES'); // 'OBJECTIVES' | 'INSPECTOR'
   const [isModeMenuOpen, setIsModeMenuOpen] = useState(false);
   const modeMenuRef = useRef(null);
+  const [isProfilePaneOpen, setIsProfilePaneOpen] = useState(false);
+  const profilePaneRef = useRef(null);
   const [isUtilitiesExpanded, setIsUtilitiesExpanded] = useState(false);
   const utilitiesMenuRef = useRef(null);
   const utilitiesTimeoutRef = useRef(null);
@@ -4762,6 +4764,22 @@ export default function App() {
       window.removeEventListener('touchstart', handleClickOutside);
     };
   }, [isModeMenuOpen]);
+
+  // Close Profile Pane on click outside
+  useEffect(() => {
+    if (!isProfilePaneOpen) return;
+    const handleClickOutside = (e) => {
+      if (profilePaneRef.current && !profilePaneRef.current.contains(e.target)) {
+        setIsProfilePaneOpen(false);
+      }
+    };
+    window.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      window.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [isProfilePaneOpen]);
 
   // Player Architect Rank progression based on cleared levels, survival waves, badges & streak
   const playerRank = useMemo(() => {
@@ -6223,50 +6241,252 @@ Can your architecture beat this? Test it in your browser:
       <header className="shrink-0 glass-header px-3 sm:px-4 py-2 flex flex-nowrap items-center justify-between gap-2 z-30 shadow-xl overflow-visible">
         {/* Brand Lockup & Mode Selector */}
         <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
-          <div className="relative">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 text-base shrink-0">
-              ⚡
-            </div>
-            <span className="absolute -bottom-1 -right-1 text-[11px] leading-none" title={playerRank.title}>
-              {playerRank.badge}
-            </span>
-          </div>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <h1 className="font-black text-xs sm:text-sm tracking-wide text-white truncate font-display">
-                System Saviour <span className="text-cyan-400">Simulator</span>
-              </h1>
-              <button
-                onClick={() => {
-                  sound.playClick();
-                  setShowBadgesModal(true);
-                }}
-                className="cursor-pointer hover:border-indigo-400 hover:scale-105 transition text-[9px] sm:text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-indigo-300 border border-indigo-500/40 shrink-0 flex items-center gap-1 shadow-sm active:scale-95"
-                title="Click to view Architect Badges, Daily Streak Rewards & XP Showcase"
-              >
-                <span>{playerRank.badge}</span>
-                <span className="hidden xs:inline">{playerRank.title}</span>
-                <span className="text-amber-400 font-mono ml-0.5 font-black">🎖️{unlockedBadges.length}</span>
-              </button>
-            </div>
-            <div className="flex items-center gap-2 text-[10px] text-slate-400">
-              <span
-                onClick={() => {
-                  sound.playClick();
-                  setShowBadgesModal(true);
-                }}
-                className="hidden sm:inline font-mono text-indigo-300 hover:text-white cursor-pointer transition font-bold"
-                title="Total Architect XP (Click to view breakdown & badges)"
-              >
-                XP: {playerRank.xp.toLocaleString()}
-              </span>
-              <span className="hidden sm:inline text-slate-600">•</span>
-              <span className="flex items-center gap-1 text-cyan-400">
-                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-                <span className="hidden xs:inline">Ada: Online</span>
+          {/* User Profile Button with Emerging Profile Pane */}
+          <div className="relative shrink-0" ref={profilePaneRef}>
+          <button
+            onClick={() => {
+              sound.playClick();
+              setIsProfilePaneOpen(!isProfilePaneOpen);
+            }}
+            className="flex items-center gap-2 sm:gap-2.5 p-1 -m-1 sm:px-2 rounded-2xl hover:bg-slate-900/90 border border-transparent hover:border-indigo-500/40 transition active:scale-95 cursor-pointer text-left group"
+            title="Click to open Architect Profile & Career Dossier"
+          >
+            {/* Avatar with Rank Badge */}
+            <div className="relative shrink-0">
+              {currentUser?.avatar ? (
+                <img
+                  src={currentUser.avatar}
+                  alt={currentUser.name}
+                  className="w-8 h-8 rounded-xl object-cover ring-2 ring-cyan-400 shadow-md group-hover:ring-cyan-300 transition"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 text-base font-black text-white shrink-0 group-hover:scale-105 transition">
+                  {currentUser ? currentUser.name.charAt(0).toUpperCase() : '⚡'}
+                </div>
+              )}
+              <span className="absolute -bottom-1 -right-1 text-[11px] leading-none" title={playerRank.title}>
+                {playerRank.badge}
               </span>
             </div>
-          </div>
+
+            {/* Profile Name & Designation */}
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="font-black text-xs sm:text-sm tracking-wide text-white truncate font-display max-w-[120px] sm:max-w-[170px]">
+                  {currentUser ? currentUser.name : 'System Saviour'}
+                </span>
+                {currentUser?.authProvider === 'github' && (
+                  <span title="Verified via GitHub"><Github className="w-3 h-3 text-slate-300 shrink-0" /></span>
+                )}
+                {currentUser?.authProvider === 'google' && (
+                  <span title="Verified via Google"><GoogleIcon className="w-3 h-3 shrink-0" /></span>
+                )}
+                <ChevronDown className={`w-3 h-3 text-indigo-400 group-hover:text-cyan-400 transition-transform duration-200 ${isProfilePaneOpen ? 'rotate-180 text-cyan-400' : ''}`} />
+              </div>
+              <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono">
+                <span className="text-cyan-300 font-bold truncate max-w-[110px] sm:max-w-[150px]">
+                  {currentUser?.role || LEVEL_MANAGERS[currentLevelIdx]?.currentJobTitle || 'Junior Systems Engineer'}
+                </span>
+                <span className="text-slate-600 hidden xs:inline">•</span>
+                <span className="text-amber-300 font-bold hidden xs:inline">
+                  {currentUser?.salary || LEVEL_MANAGERS[currentLevelIdx]?.baseSalary || '$95k'}
+                </span>
+              </div>
+            </div>
+          </button>
+
+          {/* Emerging Profile Pane Component */}
+          {isProfilePaneOpen && (
+            <div id="emerging-profile-pane" data-testid="emerging-profile-pane" className="absolute top-full left-0 mt-2.5 w-80 sm:w-96 bg-slate-950/98 backdrop-blur-2xl border-2 border-indigo-500/50 rounded-3xl p-4 sm:p-5 shadow-[0_12px_50px_rgba(0,0,0,0.85)] z-50 animate-in fade-in zoom-in-95 duration-150 text-slate-100 space-y-3.5 ring-1 ring-cyan-500/20">
+              {/* Header: Photo Avatar + Full Name + Handle + Status */}
+              <div className="flex items-start gap-3.5 border-b border-slate-800/80 pb-3.5">
+                <div className="relative shrink-0">
+                  {currentUser?.avatar ? (
+                    <img
+                      src={currentUser.avatar}
+                      alt={currentUser.name}
+                      className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl object-cover ring-2 ring-cyan-400 shadow-xl"
+                    />
+                  ) : (
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-tr from-cyan-500 to-indigo-600 flex items-center justify-center text-white text-xl font-black shadow-xl ring-2 ring-cyan-400">
+                      {currentUser ? currentUser.name.charAt(0).toUpperCase() : '⚡'}
+                    </div>
+                  )}
+                  <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 ring-2 ring-slate-950 animate-pulse" title="Online & Connected" />
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <h3 className="font-black text-sm sm:text-base text-white truncate">{currentUser ? currentUser.name : 'Guest Architect'}</h3>
+                    {currentUser?.authProvider === 'github' ? (
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-200 border border-slate-700 font-bold flex items-center gap-1">
+                        <Github className="w-2.5 h-2.5 text-white" /> GitHub
+                      </span>
+                    ) : currentUser?.authProvider === 'google' ? (
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-200 border border-slate-700 font-bold flex items-center gap-1">
+                        <GoogleIcon className="w-2.5 h-2.5" /> Google
+                      </span>
+                    ) : (
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-indigo-950/70 text-indigo-300 border border-indigo-500/40 font-bold">
+                        {currentUser ? 'Verified' : 'Guest Terminal'}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] font-mono text-slate-400 truncate">
+                    {currentUser?.email || (currentUser?.handle ? `@${currentUser.handle}` : 'terminal@systemsaviour.dev')}
+                  </p>
+                  <div className="text-[11px] font-semibold text-cyan-300 mt-0.5 flex items-center gap-1 truncate">
+                    <span>💼</span>
+                    <span className="truncate">{currentUser?.role || LEVEL_MANAGERS[currentLevelIdx]?.currentJobTitle || 'Junior Systems Engineer'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Career & Compensation Overview */}
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800/80">
+                  <div className="text-[9px] text-slate-400 font-mono uppercase tracking-wider">Current Standing</div>
+                  <div className="font-bold text-white text-xs mt-0.5 truncate">
+                    {currentUser?.role || LEVEL_MANAGERS[currentLevelIdx]?.currentJobTitle || 'Junior Systems Engineer'}
+                  </div>
+                </div>
+                <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800/80">
+                  <div className="text-[9px] text-slate-400 font-mono uppercase tracking-wider">Annual Base Pay</div>
+                  <div className="font-bold text-amber-300 text-xs mt-0.5 font-mono">
+                    {currentUser?.salary || LEVEL_MANAGERS[currentLevelIdx]?.baseSalary || '$95,000 / yr'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Active Manager & Level Dossier */}
+              {LEVEL_MANAGERS[currentLevelIdx] && (
+                <div className="p-3 rounded-2xl bg-indigo-950/30 border border-indigo-500/30 space-y-2">
+                  <div className="flex items-center justify-between text-[10px] font-mono">
+                    <span className="text-slate-400 uppercase tracking-wider">Direct Supervisor</span>
+                    <span className="text-indigo-300 font-bold">Level {currentLevelIdx + 1} of 5</span>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl overflow-hidden bg-slate-900 border border-indigo-400/40 shrink-0">
+                      <img
+                        src={LEVEL_MANAGERS[currentLevelIdx].avatar}
+                        alt={LEVEL_MANAGERS[currentLevelIdx].name}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-white text-xs truncate">{LEVEL_MANAGERS[currentLevelIdx].name}</span>
+                        <span className="text-[10px]">{LEVEL_MANAGERS[currentLevelIdx].snackEmoji}</span>
+                      </div>
+                      <p className="text-[10px] text-indigo-300 truncate">{LEVEL_MANAGERS[currentLevelIdx].title}</p>
+                    </div>
+                  </div>
+                  <p className="text-[10px] italic text-slate-300 line-clamp-1 bg-slate-950/60 p-1.5 rounded-lg border border-slate-800">
+                    "{LEVEL_MANAGERS[currentLevelIdx].scoldQuote}"
+                  </p>
+                </div>
+              )}
+
+              {/* Telemetry & Progress Grid */}
+              <div className="grid grid-cols-3 gap-2 text-center text-[10px] font-mono">
+                <div className="p-2 rounded-xl bg-slate-900/60 border border-slate-800">
+                  <div className="text-slate-400 text-[9px]">Total XP</div>
+                  <div className="font-bold text-indigo-300 text-xs mt-0.5">{playerRank.xp.toLocaleString()}</div>
+                </div>
+                <div className="p-2 rounded-xl bg-slate-900/60 border border-slate-800">
+                  <div className="text-slate-400 text-[9px]">Badges</div>
+                  <div className="font-bold text-amber-400 text-xs mt-0.5">🎖️ {unlockedBadges.length}/12</div>
+                </div>
+                <div className="p-2 rounded-xl bg-slate-900/60 border border-slate-800">
+                  <div className="text-slate-400 text-[9px]">Daily Streak</div>
+                  <div className="font-bold text-emerald-400 text-xs mt-0.5">🔥 {dailyStreak}d</div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="space-y-1.5 pt-1">
+                <button
+                  onClick={() => {
+                    sound.playClick();
+                    setIsProfilePaneOpen(false);
+                    setDesignationModal(true);
+                  }}
+                  className="w-full py-2 px-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-bold transition flex items-center justify-between group active:scale-95"
+                >
+                  <div className="flex items-center gap-2">
+                    <Briefcase className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Inspect Career Dossier & Promotion SLA</span>
+                  </div>
+                  <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                </button>
+
+                <button
+                  onClick={() => {
+                    sound.playClick();
+                    setIsProfilePaneOpen(false);
+                    setShowBadgesModal(true);
+                  }}
+                  className="w-full py-2 px-3 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 text-xs font-bold transition flex items-center justify-between group active:scale-95"
+                >
+                  <div className="flex items-center gap-2">
+                    <Award className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>View Architect Badges & XP</span>
+                  </div>
+                  <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                </button>
+
+                <div className="flex items-center gap-2 pt-1 border-t border-slate-800/80">
+                  {currentUser ? (
+                    <>
+                      <button
+                        onClick={() => {
+                          sound.playClick();
+                          setIsProfilePaneOpen(false);
+                          setAuthModal({ isOpen: true, initialTab: 'SIGNIN' });
+                        }}
+                        className="flex-1 py-2 px-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 text-[11px] font-bold transition flex items-center justify-center gap-1.5 active:scale-95"
+                      >
+                        <User className="w-3 h-3 text-cyan-400" />
+                        <span>Manage Account</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          sound.playClick();
+                          setIsProfilePaneOpen(false);
+                          setCurrentUser(null);
+                          try {
+                            localStorage.removeItem('systemsaviour_auth_user');
+                          } catch (e) {}
+                          setToastNotification({
+                            type: 'info',
+                            message: 'Signed out of terminal.'
+                          });
+                          setTimeout(() => setToastNotification(null), 3000);
+                        }}
+                        className="py-2 px-3 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 border border-rose-500/40 text-rose-300 text-[11px] font-bold transition flex items-center gap-1.5 active:scale-95"
+                      >
+                        <LogOut className="w-3 h-3 text-rose-400" />
+                        <span>Sign Out</span>
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        sound.playClick();
+                        setIsProfilePaneOpen(false);
+                        setAuthModal({ isOpen: true, initialTab: 'SIGNIN' });
+                      }}
+                      className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-slate-950 font-black text-xs shadow-lg shadow-cyan-500/25 flex items-center justify-center gap-2 transition active:scale-95"
+                    >
+                      <LogIn className="w-3.5 h-3.5" />
+                      <span>Sign In / Create Account &rarr;</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
 
           {/* Compact Game Mode Selector Dropdown Pill */}
           <div className="relative ml-1 sm:ml-2" ref={modeMenuRef}>
