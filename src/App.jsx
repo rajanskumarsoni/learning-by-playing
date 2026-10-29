@@ -3089,6 +3089,7 @@ function AuthModal({
 
   const [tab, setTab] = useState(initialTab); // 'SIGNIN' | 'SIGNUP'
   const [socialModal, setSocialModal] = useState(null); // 'GITHUB' | 'GOOGLE' | null
+  const [isSwitchingAccount, setIsSwitchingAccount] = useState(false);
 
   // Sign In State
   const [signInEmail, setSignInEmail] = useState('');
@@ -3508,8 +3509,8 @@ function AuthModal({
           </div>
         )}
 
-        {/* If user is ALREADY LOGGED IN: Show Active Architect Card */}
-        {currentUser ? (
+        {/* If user is ALREADY LOGGED IN: Show Active Architect Card (unless switching/signing in another) */}
+        {currentUser && !isSwitchingAccount ? (
           <div className="space-y-4 p-4 rounded-2xl bg-slate-900/90 border border-indigo-500/40">
             <div className="flex items-center gap-3.5">
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-500 to-indigo-600 flex items-center justify-center text-white text-xl font-black shadow-lg shadow-cyan-500/30 ring-2 ring-cyan-400 shrink-0 overflow-hidden">
@@ -3557,23 +3558,33 @@ function AuthModal({
               </div>
             </div>
 
-            <div className="flex items-center gap-2.5 pt-2">
+            <div className="flex flex-col sm:flex-row items-center gap-2 pt-2">
               <button
                 onClick={() => {
                   sound.playClick();
                   onLogout();
                 }}
-                className="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-rose-950/80 hover:text-rose-300 border border-slate-700 hover:border-rose-500/50 text-slate-300 font-bold text-xs transition flex items-center justify-center gap-1.5 active:scale-95"
+                className="w-full sm:w-auto py-2.5 px-3.5 rounded-xl bg-slate-800 hover:bg-rose-950/80 hover:text-rose-300 border border-slate-700 hover:border-rose-500/50 text-slate-300 font-bold text-xs transition flex items-center justify-center gap-1.5 active:scale-95"
               >
                 <LogOut className="w-3.5 h-3.5" />
                 <span>Sign Out</span>
               </button>
               <button
                 onClick={() => {
+                  sound.playClick();
+                  setIsSwitchingAccount(true);
+                }}
+                className="w-full sm:w-auto py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-cyan-300 font-bold text-xs transition flex items-center justify-center gap-1.5 active:scale-95"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>Switch / Sign In Other</span>
+              </button>
+              <button
+                onClick={() => {
                   sound.playSelect();
                   onClose();
                 }}
-                className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-1.5 active:scale-95 transition"
+                className="flex-1 w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-1.5 active:scale-95 transition"
               >
                 <span>Enter Architecture Arena →</span>
               </button>
@@ -3843,6 +3854,29 @@ function AuthModal({
           </div>
         ) : (
           <>
+            {/* If switching account while currently logged in, show return indicator */}
+            {currentUser && isSwitchingAccount && (
+              <div className="p-3 rounded-2xl bg-indigo-950/70 border border-indigo-500/40 flex items-center justify-between text-xs text-indigo-200">
+                <span>Signed in as <strong>{currentUser.name}</strong></span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsSwitchingAccount(false)}
+                    className="text-cyan-400 hover:underline font-bold text-[11px]"
+                  >
+                    ← Active Profile
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="px-2.5 py-1 rounded-xl bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 text-[11px] font-bold"
+                  >
+                    Enter Arena →
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Segmented Tab Switcher (Sign In vs Sign Up) */}
             <div className="flex rounded-2xl bg-slate-900/90 p-1 border border-indigo-500/30">
               <button
@@ -4019,6 +4053,19 @@ function AuthModal({
                 >
                   <Zap className="w-3.5 h-3.5 text-amber-400" />
                   <span>Instant Guest Architect Access (Zero Password)</span>
+                </button>
+
+                {/* Direct Skip to Simulation Arena */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    sound.playSelect();
+                    onClose();
+                  }}
+                  className="w-full pt-1 pb-0.5 text-center text-xs font-semibold text-slate-400 hover:text-cyan-300 transition flex items-center justify-center gap-1.5 group cursor-pointer"
+                >
+                  <span>Explore Simulation Arena as Guest</span>
+                  <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
                 </button>
               </form>
             ) : (
@@ -4229,6 +4276,19 @@ function AuthModal({
                     </>
                   )}
                 </button>
+
+                {/* Direct Skip to Simulation Arena */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    sound.playSelect();
+                    onClose();
+                  }}
+                  className="w-full pt-1 pb-0.5 text-center text-xs font-semibold text-slate-400 hover:text-cyan-300 transition flex items-center justify-center gap-1.5 group cursor-pointer"
+                >
+                  <span>Explore Simulation Arena as Guest</span>
+                  <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                </button>
               </form>
             )}
           </>
@@ -4386,14 +4446,8 @@ export default function App() {
     }
   });
 
-  // Welcome Screen, Level Targets Briefing & Component Details Modal States (Skip welcome if loading deep link challenge or auth)
-  const [showWelcomeModal, setShowWelcomeModal] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const h = window.location.hash;
-      if (h === '#signin' || h === '#signup' || h === '#auth' || h === '#register') return false;
-    }
-    return !initialChallengeRef.current;
-  });
+  // Welcome Screen, Level Targets Briefing & Component Details Modal States (Disabled by default so Sign In/Sign Up is the primary landing page)
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [levelBriefingModal, setLevelBriefingModal] = useState(null); // { mode: 'CAMPAIGN' | 'SURVIVAL' | 'SANDBOX', levelIdx?: number }
   const [detailModalComponent, setDetailModalComponent] = useState(null);
   const [showLeaderboardModal, setShowLeaderboardModal] = useState(() => initialChallengeRef.current?.isLeaderboardDirect || false);
@@ -4411,12 +4465,21 @@ export default function App() {
       return null;
     }
   });
+  // Default landing view is the Sign In / Sign Up page
   const [authModal, setAuthModal] = useState(() => {
     if (typeof window !== 'undefined') {
-      if (window.location.hash === '#signin' || window.location.hash === '#auth') return { isOpen: true, initialTab: 'SIGNIN' };
-      if (window.location.hash === '#signup' || window.location.hash === '#register') return { isOpen: true, initialTab: 'SIGNUP' };
+      if (window.location.hash === '#signup' || window.location.hash === '#register') {
+        return { isOpen: true, initialTab: 'SIGNUP' };
+      }
+      if (window.location.hash === '#arena' || window.location.hash === '#play' || window.location.hash === '#game') {
+        return null;
+      }
+      if (initialChallengeRef.current) {
+        return null;
+      }
     }
-    return null;
+    // Default page is Sign In / Sign Up!
+    return { isOpen: true, initialTab: 'SIGNIN' };
   }); // { isOpen: boolean, initialTab: 'SIGNIN' | 'SIGNUP' } | null
   const [isBadgesShareCopied, setIsBadgesShareCopied] = useState(false);
   const [badgeToast, setBadgeToast] = useState(null); // { badge, timestamp }
@@ -4572,6 +4635,10 @@ export default function App() {
       if (window.location.hash === '#signup' || window.location.hash === '#register') {
         setShowWelcomeModal(false);
         setAuthModal({ isOpen: true, initialTab: 'SIGNUP' });
+        return;
+      }
+      if (window.location.hash === '#arena' || window.location.hash === '#play' || window.location.hash === '#game') {
+        setAuthModal(null);
         return;
       }
       if (window.location.hash === '#leaderboard') {
@@ -11041,7 +11108,12 @@ Can your architecture beat this? Test it in your browser:
       <AuthModal
         isOpen={Boolean(authModal?.isOpen)}
         initialTab={authModal?.initialTab || 'SIGNIN'}
-        onClose={() => setAuthModal(null)}
+        onClose={() => {
+          setAuthModal(null);
+          if (typeof window !== 'undefined' && (window.location.hash === '#signin' || window.location.hash === '#signup' || window.location.hash === '#auth' || window.location.hash === '#register')) {
+            window.history.replaceState(null, '', window.location.pathname + window.location.search);
+          }
+        }}
         currentUser={currentUser}
         onLogin={(user) => {
           setCurrentUser(user);
