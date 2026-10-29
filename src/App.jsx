@@ -2752,6 +2752,171 @@ function AngryAnimeManager({ manager = LEVEL_MANAGERS[0], isRunning, evaluation 
 }
 
 // ============================================================================
+// 4.8.5. DESIGNATION DETAILS & MANAGER DOSSIER MODAL (READ-ONLY INSPECTION)
+// Displays current job role, base salary, manager dossier, and promotion criteria
+// Does NOT promote the player (promotion only happens by winning the level)
+// ============================================================================
+function DesignationDetailsModal({ isOpen, onClose, currentLevelIdx, currentLevel, isLevelPassing }) {
+  if (!isOpen) return null;
+
+  const manager = LEVEL_MANAGERS[currentLevelIdx] || LEVEL_MANAGERS[0];
+  const nextManager = LEVEL_MANAGERS[currentLevelIdx + 1] || null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-xl animate-fade-in overflow-y-auto">
+      <div className="relative w-full max-w-lg rounded-3xl bg-slate-900/98 border border-amber-500/50 p-6 sm:p-7 shadow-[0_0_60px_rgba(245,158,11,0.3)] text-slate-100 space-y-4 z-10 overflow-hidden my-auto">
+        {/* Glow Gradients */}
+        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-48 h-48 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-48 h-48 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none" />
+
+        {/* Header with Title and Close button */}
+        <div className="flex items-start justify-between relative z-10 border-b border-slate-800 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-xl shadow-lg shadow-amber-500/20 ring-1 ring-amber-400">
+              👔
+            </div>
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-wider text-amber-400 font-mono">
+                Architect Career Dossier • Level {currentLevelIdx + 1}
+              </div>
+              <h3 className="text-base sm:text-lg font-black text-white font-display">
+                Current Designation & Standing
+              </h3>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              sound.playClick();
+              onClose();
+            }}
+            className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Current Job Role & Salary Card */}
+        <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2">
+          <div className="text-[10px] font-mono uppercase tracking-wider text-slate-400 flex items-center justify-between">
+            <span>Your Active Job Designation</span>
+            <span className="text-emerald-400 font-bold">● Active Assignment</span>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h4 className="text-sm sm:text-base font-extrabold text-cyan-300">
+                {manager.currentJobTitle}
+              </h4>
+              <div className="text-xs text-slate-400 mt-0.5">
+                Department: {currentLevel?.title?.split(':')[1]?.trim() || 'Core Infrastructure'}
+              </div>
+            </div>
+            <div className="text-right shrink-0">
+              <div className="text-[10px] font-mono text-slate-400 uppercase">Current Base Pay</div>
+              <div className="text-base sm:text-lg font-black font-mono text-amber-300">
+                {manager.baseSalary}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Current Level Manager Card */}
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900/90 to-slate-950 border border-amber-500/40 space-y-3">
+          <div className="text-[10px] font-black uppercase tracking-wider text-amber-400 font-mono flex items-center justify-between">
+            <span>Current Reporting Manager</span>
+            <span className="text-rose-400 font-bold flex items-center gap-1">
+              <span>🔥 Stress:</span>
+              <span>{manager.stressLevel}%</span>
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3.5">
+            <div className="relative shrink-0">
+              <img
+                src={manager.avatar}
+                alt={manager.name}
+                className="w-14 h-14 rounded-2xl object-contain bg-slate-900 border-2 border-amber-400/60 shadow-lg"
+              />
+              <span className="absolute -bottom-1 -right-1 text-sm bg-slate-950 rounded-full px-1 border border-slate-800">
+                {manager.snackEmoji}
+              </span>
+            </div>
+            <div className="space-y-0.5 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-sm text-white">{manager.name}</span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold">
+                  {manager.roleTag}
+                </span>
+              </div>
+              <div className="text-xs text-slate-300 font-medium">
+                {manager.title}
+              </div>
+              <div className="text-[11px] text-slate-400 flex items-center gap-2 pt-0.5">
+                <span>Snack: <strong className="text-amber-200">{manager.snackName}</strong></span>
+                <span>•</span>
+                <span>Drink: <strong className="text-cyan-200">{manager.drink}</strong></span>
+              </div>
+            </div>
+          </div>
+
+          {/* Random Scold / Focus Quote */}
+          <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-[11px] text-amber-200/90 italic leading-snug">
+            "{manager.scoldQuotes[0]}"
+          </div>
+        </div>
+
+        {/* Promotion Target & Criteria Card (LOCKED) */}
+        <div className="p-4 rounded-2xl bg-indigo-950/30 border border-indigo-500/40 space-y-2.5">
+          <div className="text-[10px] font-black uppercase tracking-wider text-indigo-300 font-mono flex items-center justify-between">
+            <span>Next Career Promotion Track</span>
+            <span className="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 font-bold text-[9px] flex items-center gap-1">
+              <Lock className="w-3 h-3 text-amber-400" />
+              <span>Promotion Locked</span>
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between gap-3 text-xs">
+            <div>
+              <div className="text-[10px] text-slate-400 uppercase font-mono">Promoted Role</div>
+              <div className="font-extrabold text-white text-xs sm:text-sm text-cyan-300">
+                {manager.promotedJobTitle}
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-[10px] text-emerald-400 uppercase font-mono font-bold">Salary Increase</div>
+              <div className="font-black text-emerald-300 font-mono text-xs sm:text-sm">
+                {manager.hikeAmount} ({manager.promotedSalary})
+              </div>
+            </div>
+          </div>
+
+          {/* Requirement To Unlock */}
+          <div className="p-2.5 rounded-xl bg-slate-950/70 border border-indigo-500/30 text-xs text-slate-300 space-y-1">
+            <div className="font-bold text-indigo-300 text-[11px] flex items-center gap-1">
+              <span>🎯 How to Earn This Promotion:</span>
+            </div>
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              Design an architecture that passes Level {currentLevelIdx + 1} SLAs under <strong>{currentLevel?.targetRps?.toLocaleString() || 'peak'} RPS</strong> load:
+              maintain <strong>P99 &lt; {currentLevel?.maxLatencyMs || 120}ms</strong> and <strong>Uptime &ge; {currentLevel?.minUptimePct || 99.0}%</strong>.
+            </p>
+          </div>
+        </div>
+
+        {/* Close Button */}
+        <button
+          onClick={() => {
+            sound.playClick();
+            onClose();
+          }}
+          className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs active:scale-95 transition"
+        >
+          Got It • Return to Arena
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
 // 4.9. MANAGER PROMOTION & SALARY HIKE CELEBRATION MODAL
 // Congratulates the player, awards salary hike, promotes title, and introduces next manager!
 // ============================================================================
@@ -3744,6 +3909,7 @@ export default function App() {
   const [showPresetsModal, setShowPresetsModal] = useState(() => initialChallengeRef.current?.isPresetsModalOpen || false);
   const [showBadgesModal, setShowBadgesModal] = useState(() => initialChallengeRef.current?.isBadgesDirect || false);
   const [promotionModal, setPromotionModal] = useState(null); // { manager, nextManager, levelIdx, stars, p99Latency, uptimePct }
+  const [designationModal, setDesignationModal] = useState(false); // Career & Designation Inspection Modal (Read-Only)
 
   // Architect Authentication & Cloud Identity State (Persisted in localStorage)
   const [currentUser, setCurrentUser] = useState(() => {
@@ -5684,17 +5850,10 @@ Can your architecture beat this? Test it in your browser:
             <button
               onClick={() => {
                 sound.playClick();
-                setPromotionModal({
-                  manager: LEVEL_MANAGERS[currentLevelIdx],
-                  nextManager: LEVEL_MANAGERS[currentLevelIdx + 1] || null,
-                  levelIdx: currentLevelIdx,
-                  stars: 3,
-                  p99Latency: evaluation.p99Latency,
-                  uptimePct: evaluation.uptimePct
-                });
+                setDesignationModal(true);
               }}
               className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-xs shrink-0 cursor-pointer active:scale-95 transition"
-              title={`Manager: ${LEVEL_MANAGERS[currentLevelIdx].name} (${LEVEL_MANAGERS[currentLevelIdx].title})\nRole: ${LEVEL_MANAGERS[currentLevelIdx].currentJobTitle}\nSalary: ${LEVEL_MANAGERS[currentLevelIdx].baseSalary}\nClick to view Career Promotion Track`}
+              title={`Designation: ${LEVEL_MANAGERS[currentLevelIdx].currentJobTitle}\nBase Salary: ${LEVEL_MANAGERS[currentLevelIdx].baseSalary}\nManager: ${LEVEL_MANAGERS[currentLevelIdx].name} (${LEVEL_MANAGERS[currentLevelIdx].title})\nClick to inspect Designation & Promotion Requirements`}
             >
               <span className="text-sm">{LEVEL_MANAGERS[currentLevelIdx].snackEmoji}</span>
               <span className="text-amber-300 font-bold font-mono text-[11px]">{LEVEL_MANAGERS[currentLevelIdx].baseSalary.split(' ')[0]}</span>
@@ -10122,6 +10281,17 @@ Can your architecture beat this? Test it in your browser:
           </div>
         </div>
       )}
+
+      {/* =================================================================== */}
+      {/* 11.4. DESIGNATION DETAILS & MANAGER DOSSIER MODAL (READ-ONLY)       */}
+      {/* =================================================================== */}
+      <DesignationDetailsModal
+        isOpen={designationModal}
+        onClose={() => setDesignationModal(false)}
+        currentLevelIdx={currentLevelIdx}
+        currentLevel={currentLevel}
+        isLevelPassing={isLevelPassing}
+      />
 
       {/* =================================================================== */}
       {/* 11.5. ANIME MANAGER PROMOTION & SALARY HIKE CELEBRATION MODAL       */}
