@@ -15,6 +15,10 @@ import gameplayDemoVideo from './assets/gameplay_demo.mp4';
 import heroImg from './assets/hero.png';
 import devilImg from './assets/devil.png';
 import angryManagerImg from './assets/angry_manager.png';
+import managerDaikiImg from './assets/manager_daiki.png';
+import managerRyokoImg from './assets/manager_ryoko.png';
+import managerViktorImg from './assets/manager_viktor.png';
+import managerHiroshiImg from './assets/manager_hiroshi.png';
 import { sound } from './audioEngine.js';
 import { introAudioTour, INTRO_TOUR_STEPS } from './introAudioTour.js';
 import { cloudflareBackend } from './services/cloudflareBackend.js';
@@ -2312,10 +2316,178 @@ function AudioVisualizerWidget({ soundEngine, isMuted, isPlaying, className = ''
 }
 
 // ============================================================================
-// 4.8. ANGRY ANIME ENGINEERING MANAGER COMPONENT ("KENJI")
+// 4.8. ANIME LEVEL MANAGERS DATA & CONFIGURATIONS
+// Every level has its own distinct stressed, snack-eating engineering manager!
+// ============================================================================
+export const LEVEL_MANAGERS = [
+  {
+    level: 1,
+    name: 'Kenji',
+    roleTag: 'Startup Tech Lead',
+    avatar: angryManagerImg,
+    badgeColor: 'from-rose-500 to-amber-500',
+    snackName: 'Crunchy Volcano Chips',
+    snackEmoji: '🥔',
+    snackSounds: ['*CRUNCH!*', '*CHOMP!*', '*CRUNCH CRUNCH!*'],
+    drinkName: 'Code Fueled Coffee',
+    drinkEmoji: '☕',
+    baseSalary: '$95,000 / yr',
+    hikeAmount: '+$50,000 / yr (+52.6% Hike!)',
+    promotedSalary: '$145,000 / yr',
+    currentJobTitle: 'Junior SRE Associate',
+    promotedJobTitle: 'Mid-Level Infrastructure Engineer',
+    scoldQuotes: [
+      'FIX IT ASAP!! THE BOARD OF DIRECTORS IS WATCHING THE DASHBOARD!!',
+      'P99 LATENCY IS SPIKING! ARE YOU RUNNING POSTGRES ON A TOASTER?!',
+      'WHO MERGED TO PRODUCTION ON A FRIDAY?! REVERT OR DIE!!',
+      'I DIDN\'T PROMISE 99.999% SLA SO YOU COULD SLEEP!',
+      'EVERY PACKET YOU DROP IS COMING OUT OF MY ANNUAL BONUS!!',
+      'WHY IS THE MESSAGE QUEUE BACKLOGGED?! DO WORKERS HAVE A UNION NOW?!'
+    ],
+    pokeQuotes: [
+      'DON\'T CLICK ME!! CLICK THE DAMN SERVERS!!',
+      'HEY! WATCH THE SUIT! YOU MADE ME DROP A VOLCANO CHIP!!',
+      'WHAT DO YOU WANT?! ADD MORE CACHE AND LESS POKING!!'
+    ],
+    congratsTitle: 'HOLY CRAP, YOU ACTUALLY DID IT!!',
+    congratsSpeech: 'I was convinced the database would melt and the VCs would pull our funding! But the cluster held! My quarterly bonus is safe! YOU EARNED THIS PROMOTION AND SALARY HIKE, ARCHITECT!!',
+    nextManagerWarning: 'Beware... on Level 2, your new manager is Daiki. He is on a permanent donut sugar rush and his throughput expectations are completely unhinged. Good luck!'
+  },
+  {
+    level: 2,
+    name: 'Daiki',
+    roleTag: 'Throughput & Scaling Guru',
+    avatar: managerDaikiImg,
+    badgeColor: 'from-pink-500 to-purple-500',
+    snackName: 'Hyper-Glazed Sprinkles Donut',
+    snackEmoji: '🍩',
+    snackSounds: ['*NOM NOM!*', '*MUNCH!*', '*SUGAR RUSH!*'],
+    drinkName: 'Triple-Shot Taro Boba',
+    drinkEmoji: '🧋',
+    baseSalary: '$145,000 / yr',
+    hikeAmount: '+$65,000 / yr (+44.8% Hike!)',
+    promotedSalary: '$210,000 / yr',
+    currentJobTitle: 'Mid-Level Infrastructure Engineer',
+    promotedJobTitle: 'Senior Distributed Systems Architect',
+    scoldQuotes: [
+      'P99 IS OVER 45MS?! WE ARE LOSING 10,000 VIRAL USERS PER MINUTE!!',
+      'I EAT DONUTS WHEN I\'M ANXIOUS AND I\'VE EATEN FOURTEEN TODAY!!',
+      'NOM NOM NOM... RE-ROUTE THROUGH THE CDN OR I\'M REVOKING AWS KEYS!!',
+      'SCALE THE WEB REPLICAS! WHY IS HORIZONTAL AUTOSCALING SLEEPING?!',
+      'DO NOT LOOK AT MY BOBA! LOOK AT THE TRAFFIC SATURATION BARS!!'
+    ],
+    pokeQuotes: [
+      'HANDS OFF THE GLASSES! GO OPTIMIZE THE CACHE HIT RATIO!!',
+      'YOU MADE ME DROP SPRINKLES ON THE PRODUCTION RUNBOOK!!',
+      'I DON\'T HAVE TIME FOR YOUR CLICKS! 30,000 RPS IS ROLLING IN!!'
+    ],
+    congratsTitle: 'VIRAL LAUNCH SURVIVED!! SENSATIONAL WORK!!',
+    congratsSpeech: 'The viral surge was off the charts, but your caching layer absorbed 88% of queries! Executive leadership was blown away! Here is your official promotion and a massive salary jump!',
+    nextManagerWarning: 'Level 3 is headed by Director Ryoko from Security & Compliance. She is ruthless, eats pure wasabi, and will fail you if even one bot slips through!'
+  },
+  {
+    level: 3,
+    name: 'Ryoko',
+    roleTag: 'Director of Security & Compliance',
+    avatar: managerRyokoImg,
+    badgeColor: 'from-rose-600 to-red-800',
+    snackName: 'Ultra-Spicy Wasabi Crackers',
+    snackEmoji: '🍘',
+    snackSounds: ['*CRUNCH!*', '*SPICY HUFF!*', '*WASABI CRUNCH!*'],
+    drinkName: 'Pure Ceremonial Matcha',
+    drinkEmoji: '🍵',
+    baseSalary: '$210,000 / yr',
+    hikeAmount: '+$90,000 / yr (+42.8% Hike!)',
+    promotedSalary: '$300,000 / yr',
+    currentJobTitle: 'Senior Distributed Systems Architect',
+    promotedJobTitle: 'Principal Reliability & Security Commander',
+    scoldQuotes: [
+      'DDOS BOTS DETECTED! WHERE IS THE WAF SHIELD AT THE PERIMETER?!',
+      'ZERO TRUST! ZERO EXCUSES! *CRUNCH* IS TRAFFIC PROPERLY FILTERED?!',
+      'IF AUDITORS SEE UNFILTERED BOT PACKETS, WE\'RE WEARING ORANGE SUITS!!',
+      'THE PERIMETER IS LEAKING! BLOCK THE BAD ACTORS IMMEDIATELY!!',
+      'THIS WASABI IS BURNING MY TONGUE AND YOUR LATENCY IS BURNING MY EYES!!'
+    ],
+    pokeQuotes: [
+      'DO NOT TOUCH COMPLIANCE PROTOCOLS!! GET BACK TO HARDENING THE PERIMETER!!',
+      'YOU DARE INTERRUPT A ZERO-TRUST AUDIT WITH A MOUSE CLICK?!',
+      'ONE MORE POKE AND I\'M QUARANTINING YOUR WORKSTATION!!'
+    ],
+    congratsTitle: 'PERIMETER SECURED! ZERO PENETRATIONS!!',
+    congratsSpeech: '99.8% of malicious bot traffic dropped at the edge without single origin degradation. The CISO sent personal commendations. You\'ve earned this Senior Principal title and a lucrative pay bump!',
+    nextManagerWarning: 'Brace yourself. Level 4 is commanded by Viktor. He runs live Chaos Monkey drills in production and eats popcorn while servers combust!'
+  },
+  {
+    level: 4,
+    name: 'Viktor',
+    roleTag: 'Chaos Resilience Commander',
+    avatar: managerViktorImg,
+    badgeColor: 'from-amber-500 to-orange-600',
+    snackName: 'Mega-Butter Cyber-Popcorn',
+    snackEmoji: '🍿',
+    snackSounds: ['*CHOMP!*', '*POPCORN CRUNCH!*', '*BUTTERY MUNCH!*'],
+    drinkName: 'High-Voltage Overclock Energy Drink',
+    drinkEmoji: '⚡',
+    baseSalary: '$300,000 / yr',
+    hikeAmount: '+$120,000 / yr (+40.0% Hike!)',
+    promotedSalary: '$420,000 / yr',
+    currentJobTitle: 'Principal Reliability & Security Commander',
+    promotedJobTitle: 'Chief Distinguished Infrastructure Fellow',
+    scoldQuotes: [
+      'CHAOS MONKEY IS RIPPING CORDS OUT OF THE SERVERS!! FAILOVER NOW!!',
+      'THE QUEUE IS BURNING!! *CHOMP CHOMP* DECOUPLE THE WORKERS!!',
+      'WHY ARE WE BUFFERING?! DO WORKERS HAVE A UNION MEETING RIGHT NOW?!',
+      'MULTI-REGION REDUNDANCY! WHERE ARE THE STANDBY NODES?! MOVE!!',
+      'I LOVE THE SMELL OF MELTING SERVERS WITH FRESH POPCORN!!'
+    ],
+    pokeQuotes: [
+      'DON\'T POKE THE COMMANDER WHILE CHAOS MONKEY IS ON THE LOOSE!!',
+      'YOU SHOOK MY POPCORN BUCKET! I\'M UNLEASHING ANOTHER OUTAGE!!',
+      'FIRE IN THE HOLE! FIX THE REDUNDANT PATHWAYS!!'
+    ],
+    congratsTitle: 'CHAOS DEFEATED! UNBREAKABLE RESILIENCE!!',
+    congratsSpeech: 'Instances were assassinated left and right, yet your decoupled pipeline rerouted packets in sub-20ms with 100% uptime! You are officially an Infrastructure Legend. Take this executive salary hike!',
+    nextManagerWarning: 'The final frontier awaits: Level 5. Executive VP Hiroshi himself is overseeing the Black Friday global mega-sale. He eats gold-leaf macarons and fires people for 10ms spikes!'
+  },
+  {
+    level: 5,
+    name: 'Hiroshi',
+    roleTag: 'Executive VP & Board Member',
+    avatar: managerHiroshiImg,
+    badgeColor: 'from-amber-400 via-yellow-300 to-amber-600',
+    snackName: '24k Gold-Leaf French Macarons',
+    snackEmoji: '🧁',
+    snackSounds: ['*DELICATE MUNCH!*', '*ROYAL CRUNCH!*', '*GOLDEN CHEW!*'],
+    drinkName: 'Vintage Sparkling Glacier Water',
+    drinkEmoji: '🍾',
+    baseSalary: '$420,000 / yr',
+    hikeAmount: '+$180,000 / yr + 15,000 RSUs (Ultimate Executive Package!)',
+    promotedSalary: '$600,000 / yr + Equity',
+    currentJobTitle: 'Chief Distinguished Infrastructure Fellow',
+    promotedJobTitle: '👑 Global Chief Architecture Officer (Legendary Partner)',
+    scoldQuotes: [
+      'WALL STREET OPENS IN 5 MINUTES!! FIX THE BLACK FRIDAY TRAFFIC SURGE!!',
+      'MY STOCK OPTIONS ARE MELTING!! *MUNCH* SCALE TO 50,000 RPS RIGHT NOW!!',
+      'DO I LOOK LIKE A C-SUITE TITAN WHO ACCEPTS 99.9%?! FIVE NINES OR RETIREMENT IS OVER!!',
+      'THE BOARD IS WATCHING THE TELEMETRY TICKER LIVE ON BLOOMBERG!!',
+      'ONE GLITCH AND MY YACHT RESERVATION CANCELS!! FIX THE TOPOLOGY!!'
+    ],
+    pokeQuotes: [
+      'DO NOT TOUCH MY BESPOKE PINSTRIPE SUIT WITH YOUR GREASY CODING HANDS!!',
+      'YOU MADE ME CHOKE ON MY 24K GOLD-LEAF MACARON!! WORK FASTER!!',
+      'DO YOU WANT ME TO FIRE YOUR ENTIRE DIVISION?! GO TUNE THE DATABASE!!'
+    ],
+    congratsTitle: '👑 THE PINNACLE OF CLOUD ARCHITECTURE REACHED!!',
+    congratsSpeech: 'Black Friday traffic shattered all world records. Zero dropped packets. Sub-15ms P99 across the entire planetary grid. The Board of Directors has unanimously appointed you Global Chief Architecture Officer! You have conquered System Saviour!!',
+    nextManagerWarning: 'You have conquered all 5 enterprise tiers! Enjoy your limitless sandbox and global leaderboards!'
+  }
+];
+
+// ============================================================================
+// 4.8. ANGRY ANIME ENGINEERING MANAGER COMPONENT
 // Paces back & forth across the canvas shouting "Fix it ASAP!", scolding, and eating chips
 // ============================================================================
-function AngryAnimeManager({ isRunning, evaluation }) {
+function AngryAnimeManager({ manager = LEVEL_MANAGERS[0], isRunning, evaluation }) {
   const [posX, setPosX] = useState(14); // Percentage 6% to 76% across canvas width
   const [direction, setDirection] = useState(1); // 1 = walking right, -1 = walking left
   const [isPaused, setIsPaused] = useState(false);
@@ -2328,26 +2500,8 @@ function AngryAnimeManager({ isRunning, evaluation }) {
   const [pokeCount, setPokeCount] = useState(0);
   const [bobStep, setBobStep] = useState(0);
 
-  const baseQuotes = useMemo(() => [
-    "FIX IT ASAP!! THE BOARD OF DIRECTORS IS WATCHING THE DASHBOARD!!",
-    "P99 LATENCY IS SPIKING! ARE YOU RUNNING POSTGRES ON A TOASTER?!",
-    "WHO MERGED TO PRODUCTION ON A FRIDAY?! REVERT OR DIE!!",
-    "I DIDN'T PROMISE 99.999% SLA SO YOU COULD SLEEP!",
-    "EVERY PACKET YOU DROP IS COMING OUT OF MY ANNUAL BONUS!!",
-    "WHY IS THE MESSAGE QUEUE BACKLOGGED?! DO WORKERS HAVE A UNION NOW?!",
-    "DO I HAVE TO WRITE THE DISTRIBUTED CACHE MYSELF?! MOVE MOVE MOVE!!",
-    "OUR INVESTORS JUST HIT A 504 GATEWAY TIMEOUT! FIX IT RIGHT NOW!!",
-    "WE ARE BLEEDING 500 ERRORS!! STOP THE BLEEDING!!",
-    "SCALE THE CLUSTERS! ADD MORE REPLICAS! LESS CHATTING, MORE CODING!!",
-    "MY COFFEE IS COLD, MY BLOOD PRESSURE IS 200, AND SERVERS ARE BURNING!!"
-  ], []);
-
-  const pokeQuotes = useMemo(() => [
-    "DON'T CLICK ME!! CLICK THE DAMN SERVERS!!",
-    "HEY! WATCH THE HANDS! YOU MADE ME DROP A VOLCANO CHIP!!",
-    "WHAT DO YOU WANT?! ADD MORE CAPACITY AND LESS POKING!!",
-    "DO I LOOK LIKE A REDIS CACHE?! GO RE-ROUTE THE TRAFFIC!!"
-  ], []);
+  const baseQuotes = manager.scoldQuotes || LEVEL_MANAGERS[0].scoldQuotes;
+  const pokeQuotes = manager.pokeQuotes || LEVEL_MANAGERS[0].pokeQuotes;
 
   // Compute active shout
   const activeQuote = useMemo(() => {
@@ -2361,7 +2515,7 @@ function AngryAnimeManager({ isRunning, evaluation }) {
       return `P99 IS ${evaluation.p99Latency}MS?! SHOPPING CARTS ARE ABANDONED!! OPTIMIZE NOW!!`;
     }
     if (isRunning) {
-      return "PEAK LOAD WAVE IS INCOMING!! HOLD THE LINE OR WE'RE ALL GETTING REPLACED BY SCRIPTS!!";
+      return 'PEAK LOAD WAVE IS INCOMING!! HOLD THE LINE OR WE\'RE ALL GETTING REPLACED BY SCRIPTS!!';
     }
     return baseQuotes[quoteIndex % baseQuotes.length];
   }, [pokeCount, evaluation?.droppedRps, evaluation?.p99Latency, isRunning, quoteIndex, baseQuotes, pokeQuotes]);
@@ -2371,7 +2525,7 @@ function AngryAnimeManager({ isRunning, evaluation }) {
     if (!isMuted) {
       sound.playSnackCrunch();
     }
-    const sounds = ["*CRUNCH!*", "*CHOMP!*", "*NOM NOM!*", "*MUNCH!*", "*CRUNCH CRUNCH!*"];
+    const sounds = manager.snackSounds || ['*CRUNCH!*', '*CHOMP!*', '*NOM NOM!*'];
     const randomSound = sounds[Math.floor(Math.random() * sounds.length)];
     setSnackCrunchText(randomSound);
 
@@ -2387,7 +2541,7 @@ function AngryAnimeManager({ isRunning, evaluation }) {
       setSnackCrunchText(null);
       setCrumbs([]);
     }, 1200);
-  }, [isMuted]);
+  }, [isMuted, manager.snackSounds]);
 
   // Pacing movement loop
   useEffect(() => {
@@ -2469,10 +2623,10 @@ function AngryAnimeManager({ isRunning, evaluation }) {
       <button
         onClick={() => setIsDismissed(false)}
         className="absolute bottom-16 right-4 z-30 px-2.5 py-1 rounded-full bg-slate-900/95 border border-rose-500/60 text-[10px] font-bold text-rose-300 flex items-center gap-1.5 shadow-2xl backdrop-blur-md hover:scale-105 active:scale-95 transition pointer-events-auto"
-        title="Summon Angry Engineering Manager"
+        title={`Summon Manager ${manager.name}`}
       >
         <span className="text-xs">😡</span>
-        <span>Summon Manager Kenji</span>
+        <span>Summon Manager {manager.name}</span>
       </button>
     );
   }
@@ -2490,22 +2644,22 @@ function AngryAnimeManager({ isRunning, evaluation }) {
         {/* Comic Speech Bubble */}
         <div className="relative mb-2 max-w-[280px] sm:max-w-xs bg-slate-950/95 border-2 border-rose-500/90 rounded-2xl p-2.5 shadow-2xl shadow-rose-950/90 text-left backdrop-blur-xl animate-in fade-in zoom-in-95">
           <div className="flex items-center justify-between gap-1 pb-1 border-b border-rose-500/30 mb-1">
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 min-w-0">
               <span className="text-xs animate-bounce">💢</span>
-              <span className="text-[10px] font-black uppercase tracking-wider text-rose-300 font-display">
-                Kenji • Eng Manager
+              <span className="text-[10px] font-black uppercase tracking-wider text-rose-300 font-display truncate">
+                {manager.name} • {manager.roleTag}
               </span>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 shrink-0">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   setIsMuted(!isMuted);
                 }}
                 className="text-[9px] text-slate-400 hover:text-white px-1 py-0.5 rounded hover:bg-slate-800 transition"
-                title={isMuted ? "Unmute Scolding & Crunches" : "Mute Scolding & Crunches"}
+                title={isMuted ? 'Unmute Scolding & Crunches' : 'Mute Scolding & Crunches'}
               >
-                {isMuted ? "🔇" : "🔊"}
+                {isMuted ? '🔇' : '🔊'}
               </button>
               <button
                 onClick={(e) => {
@@ -2529,15 +2683,15 @@ function AngryAnimeManager({ isRunning, evaluation }) {
               <span>🔥 STRESS:</span>
               <span className="text-rose-300">100%</span>
             </span>
-            <span className="text-amber-300 flex items-center gap-1">
-              <span>🥔 Volcano Chips</span>
+            <span className="text-amber-300 flex items-center gap-1 truncate max-w-[140px]">
+              <span>{manager.snackEmoji} {manager.snackName}</span>
               {snackCrunchText && (
                 <span className="text-emerald-400 font-black animate-pulse">{snackCrunchText}</span>
               )}
             </span>
           </div>
 
-          {/* Speech Bubble Arrow pointing at Kenji */}
+          {/* Speech Bubble Arrow pointing at manager */}
           <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-slate-950 border-r-2 border-b-2 border-rose-500/90 rotate-45" />
         </div>
 
@@ -2547,7 +2701,7 @@ function AngryAnimeManager({ isRunning, evaluation }) {
           className={`relative cursor-pointer transition-transform duration-100 ${
             isShaking ? 'scale-110 rotate-3' : 'hover:scale-105 active:scale-95'
           }`}
-          title="Click to poke Kenji (Warning: He will yell louder!)"
+          title={`Click to poke Manager ${manager.name} (Warning: He will yell louder!)`}
         >
           {/* Vein Pop Emote */}
           <span className="absolute -top-1 -right-1 text-base select-none z-20 animate-pulse">
@@ -2583,13 +2737,156 @@ function AngryAnimeManager({ isRunning, evaluation }) {
 
           {/* Character Sprite Image - Mirrored horizontally when moving left */}
           <img
-            src={angryManagerImg}
-            alt="Angry Manager Kenji"
+            src={manager.avatar}
+            alt={`Angry Manager ${manager.name}`}
             className="w-20 h-20 sm:w-24 sm:h-24 object-contain drop-shadow-[0_8px_16px_rgba(225,29,72,0.45)] transition-transform duration-200"
             style={{
               transform: `scaleX(${direction})`
             }}
           />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// 4.9. MANAGER PROMOTION & SALARY HIKE CELEBRATION MODAL
+// Congratulates the player, awards salary hike, promotes title, and introduces next manager!
+// ============================================================================
+function ManagerPromotionModal({ promotion, onAccept, onReplay, onClose }) {
+  if (!promotion) return null;
+  const { manager, nextManager, levelIdx, stars, p99Latency, uptimePct } = promotion;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-xl animate-fade-in overflow-y-auto">
+      <ConfettiOverlay />
+      <div className="relative w-full max-w-xl rounded-3xl bg-slate-900/98 border-2 border-emerald-400 p-6 sm:p-7 shadow-[0_0_80px_rgba(16,185,129,0.5)] text-slate-100 space-y-5 z-10 overflow-hidden my-auto">
+        {/* Glow gradients */}
+        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-56 h-56 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-56 h-56 bg-cyan-500/20 rounded-full blur-3xl pointer-events-none" />
+
+        {/* Top Header */}
+        <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🏆</span>
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-mono">
+                Official Promotion & Compensation Hike
+              </span>
+              <h2 className="text-base sm:text-lg font-black text-white font-display mt-0.5">
+                Level {levelIdx + 1} Conquered!
+              </h2>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Manager Speech Callout Card */}
+        <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-950 to-indigo-950/50 border border-indigo-500/30 flex items-start gap-4">
+          <div className="relative shrink-0">
+            <img
+              src={manager.avatar}
+              alt={manager.name}
+              className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-contain bg-slate-900/80 border-2 border-emerald-400 shadow-xl"
+            />
+            <span className="absolute -bottom-1 -right-1 text-sm bg-slate-900 rounded-full p-0.5 shadow">
+              {manager.snackEmoji}
+            </span>
+          </div>
+          <div className="space-y-1 min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-xs font-black text-white uppercase font-display">{manager.name}</span>
+              <span className="text-[10px] text-indigo-300 font-semibold font-mono">({manager.roleTag})</span>
+            </div>
+            <div className="text-xs font-black text-emerald-300 leading-tight">
+              "{manager.congratsTitle}"
+            </div>
+            <p className="text-[11px] text-slate-300 leading-relaxed italic">
+              "{manager.congratsSpeech}"
+            </p>
+          </div>
+        </div>
+
+        {/* Official Promotion Notice & Salary Hike Box */}
+        <div className="p-4 rounded-2xl bg-slate-950/80 border-2 border-emerald-500/50 space-y-3">
+          <div className="text-[10px] font-black uppercase tracking-wider text-emerald-400 font-mono flex items-center justify-between">
+            <span>OFFICIAL NOTICE OF PROMOTION & SALARY INCREASE</span>
+            <span>⭐ {stars} STARS</span>
+          </div>
+
+          {/* Job Title Transition */}
+          <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs">
+            <div>
+              <div className="text-[10px] text-slate-400 uppercase font-mono">Previous Role</div>
+              <div className="font-semibold text-slate-300 line-through text-[11px]">{manager.currentJobTitle}</div>
+            </div>
+            <div className="text-emerald-400 text-lg font-black">➔</div>
+            <div className="text-right">
+              <div className="text-[10px] text-emerald-400 uppercase font-mono font-bold">PROMOTED TITLE</div>
+              <div className="font-extrabold text-white text-xs sm:text-sm text-cyan-300">{manager.promotedJobTitle}</div>
+            </div>
+          </div>
+
+          {/* Salary Hike Breakdown */}
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="p-2 rounded-xl bg-slate-900/80 border border-slate-800">
+              <div className="text-[9px] text-slate-400 uppercase font-mono">Old Salary</div>
+              <div className="text-xs font-bold text-slate-300 mt-0.5">{manager.baseSalary}</div>
+            </div>
+            <div className="p-2 rounded-xl bg-emerald-950/80 border border-emerald-500/60 ring-1 ring-emerald-400/40">
+              <div className="text-[9px] text-emerald-400 uppercase font-mono font-bold">SALARY HIKE</div>
+              <div className="text-xs font-black text-emerald-300 mt-0.5">{manager.hikeAmount}</div>
+            </div>
+            <div className="p-2 rounded-xl bg-cyan-950/80 border border-cyan-500/50">
+              <div className="text-[9px] text-cyan-400 uppercase font-mono font-bold">New Base Pay</div>
+              <div className="text-xs font-black text-white mt-0.5">{manager.promotedSalary}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Next Level & Next Manager Intel Warning */}
+        {nextManager ? (
+          <div className="p-3.5 rounded-2xl bg-slate-950/90 border border-amber-500/40 flex items-center gap-3">
+            <img
+              src={nextManager.avatar}
+              alt={nextManager.name}
+              className="w-12 h-12 rounded-xl object-contain bg-slate-900 border border-amber-400/50 shrink-0"
+            />
+            <div className="space-y-0.5 text-xs min-w-0">
+              <div className="text-[10px] font-black uppercase tracking-wider text-amber-400 font-mono">
+                Incoming Boss: Level {levelIdx + 2} • {nextManager.name} ({nextManager.roleTag})
+              </div>
+              <p className="text-[11px] text-slate-300 leading-snug">
+                {manager.nextManagerWarning}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="p-3.5 rounded-2xl bg-amber-950/60 border border-amber-400 text-xs text-amber-200">
+            👑 <strong>Global Chief Architect Status Attained!</strong> You have conquered every enterprise manager and attained limitless partner equity.
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="flex items-center gap-3 pt-2">
+          <button
+            onClick={onReplay}
+            className="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition"
+          >
+            Replay Level
+          </button>
+          <button
+            onClick={onAccept}
+            className="flex-1 py-3 px-5 rounded-xl bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-emerald-500/30 flex items-center justify-center gap-2 active:scale-95 transition ring-2 ring-emerald-200"
+          >
+            <span>{nextManager ? `Accept Promotion & Meet ${nextManager.name} (Level ${levelIdx + 2}) →` : 'Enter Master Architect Sandbox →'}</span>
+          </button>
         </div>
       </div>
     </div>
@@ -2751,6 +3048,7 @@ export default function App() {
   const [showLeaderboardModal, setShowLeaderboardModal] = useState(() => initialChallengeRef.current?.isLeaderboardDirect || false);
   const [showPresetsModal, setShowPresetsModal] = useState(() => initialChallengeRef.current?.isPresetsModalOpen || false);
   const [showBadgesModal, setShowBadgesModal] = useState(() => initialChallengeRef.current?.isBadgesDirect || false);
+  const [promotionModal, setPromotionModal] = useState(null); // { manager, nextManager, levelIdx, stars, p99Latency, uptimePct }
   const [isBadgesShareCopied, setIsBadgesShareCopied] = useState(false);
   const [badgeToast, setBadgeToast] = useState(null); // { badge, timestamp }
   const [leaderboardTab, setLeaderboardTab] = useState('DAILY'); // 'DAILY' | 'SURVIVAL'
@@ -3244,7 +3542,31 @@ export default function App() {
     }
   }, [nodes, edges, gameMode, currentLevelIdx, dailyIncident.dayNumber]);
 
-  // Load level when switched (validates unlocked levels and restores saved progress)
+  // Advance to next level after promotion
+  const advanceToNextLevel = useCallback((nextIdx) => {
+    if (nextIdx >= CAMPAIGN_LEVELS.length) {
+      setPromotionModal(null);
+      return;
+    }
+    sound.playSelect();
+    setPromotionModal(null);
+    setPostMortemModal(null);
+    setUnlockedLevelIdx((prev) => Math.max(prev, nextIdx));
+    setCurrentLevelIdx(nextIdx);
+    try {
+      localStorage.setItem('systemsaviour_active_level', nextIdx.toString());
+      localStorage.setItem('systemsaviour_unlocked_level', Math.max(unlockedLevelIdx, nextIdx).toString());
+    } catch (e) {}
+    const saved = getSavedTopology('CAMPAIGN', nextIdx);
+    setNodes(saved.nodes);
+    setEdges(saved.edges);
+    setSelectedNodeId(saved.nodes[1]?.id || saved.nodes[0]?.id || 'src');
+    setConnectingFromId(null);
+    setIsRunning(false);
+    setWaveProgress(0);
+    setPan({ x: 0, y: 0 });
+    setZoom(1);
+  }, [unlockedLevelIdx]);
   const selectLevel = useCallback((idx) => {
     if (idx > unlockedLevelIdx) return;
     sound.playSelect();
@@ -3769,6 +4091,18 @@ Can your architecture beat this? Test it in your browser:
                     localStorage.setItem('systemsaviour_tutorial_completed', 'true');
                   } catch {}
                 }
+
+                // Trigger Anime Manager Congratulations & Promotion Ceremony!
+                const currentMgr = LEVEL_MANAGERS[currentLevelIdx] || LEVEL_MANAGERS[0];
+                const nextMgr = LEVEL_MANAGERS[currentLevelIdx + 1] || null;
+                setPromotionModal({
+                  manager: currentMgr,
+                  nextManager: nextMgr,
+                  levelIdx: currentLevelIdx,
+                  stars: 1 + (passedSLA ? 1 : 0) + (passedBudget ? 1 : 0),
+                  p99Latency: evaluation.p99Latency,
+                  uptimePct: evaluation.uptimePct
+                });
               } else if (gameMode === 'DAILY') {
                 recordDailyCompletion(evaluation.p99Latency);
               }
@@ -4622,6 +4956,32 @@ Can your architecture beat this? Test it in your browser:
               </div>
             )}
           </div>
+
+          {/* Active Level Manager & Career Salary Pill (Campaign Mode) */}
+          {gameMode === 'CAMPAIGN' && LEVEL_MANAGERS[currentLevelIdx] && (
+            <button
+              onClick={() => {
+                sound.playClick();
+                setPromotionModal({
+                  manager: LEVEL_MANAGERS[currentLevelIdx],
+                  nextManager: LEVEL_MANAGERS[currentLevelIdx + 1] || null,
+                  levelIdx: currentLevelIdx,
+                  stars: 3,
+                  p99Latency: evaluation.p99Latency,
+                  uptimePct: evaluation.uptimePct
+                });
+              }}
+              className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-xs shrink-0 cursor-pointer active:scale-95 transition"
+              title={`Manager: ${LEVEL_MANAGERS[currentLevelIdx].name} (${LEVEL_MANAGERS[currentLevelIdx].title})\nRole: ${LEVEL_MANAGERS[currentLevelIdx].currentJobTitle}\nSalary: ${LEVEL_MANAGERS[currentLevelIdx].baseSalary}\nClick to view Career Promotion Track`}
+            >
+              <span className="text-sm">{LEVEL_MANAGERS[currentLevelIdx].snackEmoji}</span>
+              <span className="text-amber-300 font-bold font-mono text-[11px]">{LEVEL_MANAGERS[currentLevelIdx].baseSalary.split(' ')[0]}</span>
+              <span className="text-slate-600">•</span>
+              <span className="text-slate-200 font-semibold text-[11px] max-w-[120px] truncate">
+                {LEVEL_MANAGERS[currentLevelIdx].currentJobTitle}
+              </span>
+            </button>
+          )}
         </div>
 
         {/* Live Simulation SLA Metrics HUD */}
@@ -5400,8 +5760,12 @@ Can your architecture beat this? Test it in your browser:
             </div>
           </div>
 
-          {/* Pacing Angry Anime Engineering Manager (Kenji) */}
-          <AngryAnimeManager isRunning={isRunning} evaluation={evaluation} />
+          {/* Pacing Angry Anime Engineering Manager (Changes per level: Kenji, Daiki, Ryoko, Viktor, Hiroshi) */}
+          <AngryAnimeManager
+            manager={LEVEL_MANAGERS[currentLevelIdx] || LEVEL_MANAGERS[0]}
+            isRunning={isRunning}
+            evaluation={evaluation}
+          />
 
           {/* Active Wire Connection Status Banner */}
           {connectingFromId && (() => {
@@ -6408,6 +6772,25 @@ Can your architecture beat this? Test it in your browser:
                     <Trophy className="w-3.5 h-3.5 text-amber-400" />
                     <span>Leaderboard</span>
                   </button>
+                  {postMortemModal.won && gameMode === 'CAMPAIGN' && (
+                    <button
+                      onClick={() => {
+                        sound.playVictory();
+                        setPromotionModal({
+                          manager: LEVEL_MANAGERS[currentLevelIdx] || LEVEL_MANAGERS[0],
+                          nextManager: LEVEL_MANAGERS[currentLevelIdx + 1] || null,
+                          levelIdx: currentLevelIdx,
+                          stars: postMortemModal.stars,
+                          p99Latency: postMortemModal.p99Latency,
+                          uptimePct: postMortemModal.uptimePct
+                        });
+                      }}
+                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 active:scale-95 transition flex items-center gap-1.5"
+                    >
+                      <span>👔 Manager Review & Promotion</span>
+                      <span>🎉</span>
+                    </button>
+                  )}
                   {postMortemModal.won && gameMode === 'CAMPAIGN' && currentLevelIdx < CAMPAIGN_LEVELS.length - 1 && (
                     <button
                       onClick={() => {
@@ -8951,6 +9334,25 @@ Can your architecture beat this? Test it in your browser:
           </div>
         </div>
       )}
+
+      {/* =================================================================== */}
+      {/* 11.5. ANIME MANAGER PROMOTION & SALARY HIKE CELEBRATION MODAL       */}
+      {/* =================================================================== */}
+      <ManagerPromotionModal
+        promotion={promotionModal}
+        onAccept={() => {
+          if (promotionModal && typeof promotionModal.levelIdx === 'number' && promotionModal.nextManager) {
+            advanceToNextLevel(promotionModal.levelIdx + 1);
+          } else {
+            setPromotionModal(null);
+          }
+        }}
+        onReplay={() => {
+          setPromotionModal(null);
+          resetWave();
+        }}
+        onClose={() => setPromotionModal(null)}
+      />
 
       {/* =================================================================== */}
       {/* 12. CLOUDFLARE R2 BACKEND CONSOLE & STORAGE MODAL                   */}
