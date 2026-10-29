@@ -2916,8 +2916,14 @@ export default function App() {
   };
 
 
-  // Select node and smoothly bring Component Inspector into screen view in right panel
+  // Select node without forcing right panel open
   const handleSelectNode = useCallback((nodeId) => {
+    sound.playClick();
+    setSelectedNodeId(nodeId);
+  }, []);
+
+  // Inspect node: explicitly opens right panel and brings Component Inspector into view
+  const handleInspectNode = useCallback((nodeId) => {
     sound.playClick();
     setSelectedNodeId(nodeId);
     setRightPanelTab('INSPECTOR');
@@ -5623,7 +5629,7 @@ Can your architecture beat this? Test it in your browser:
                       }
                       handleSelectNode(node.id);
                     }}
-                    title="Click to inspect and configure this component"
+                    title={`${spec.name} (Drag to reposition, or click Inspect Element above)`}
                     className={`no-pan pointer-events-auto absolute z-20 glass-subpanel rounded-xl border ${statusColor} p-2.5 shadow-2xl transition-all cursor-pointer group hover:border-indigo-400/60`}
                   >
                     {/* Hover "Inspect Element" Popup Button */}
@@ -5633,7 +5639,7 @@ Can your architecture beat this? Test it in your browser:
                         data-inspect-btn={node.id}
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleSelectNode(node.id);
+                          handleInspectNode(node.id);
                         }}
                         className="px-3 py-1 rounded-full bg-gradient-to-r from-indigo-600 via-indigo-500 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 text-white text-[11px] font-black tracking-wide shadow-2xl shadow-indigo-600/60 flex items-center gap-1.5 border border-indigo-300/40 ring-2 ring-indigo-500/30 hover:scale-105 active:scale-95 transition-all cursor-pointer backdrop-blur-md group/btn"
                         title={`Inspect and configure ${spec.name}`}
@@ -5771,7 +5777,7 @@ Can your architecture beat this? Test it in your browser:
                         {/* Subtle Hover Hint inside Node */}
                         <div className="hidden group-hover:flex items-center justify-center gap-1 pt-1 border-t border-indigo-500/20 text-[9px] text-indigo-300 font-semibold transition-all">
                           <Sliders className="w-2.5 h-2.5" />
-                          <span>Click to inspect &amp; tune</span>
+                          <span>Click Inspect Element above</span>
                         </div>
                       </div>
                     )}
