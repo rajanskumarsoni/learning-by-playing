@@ -7,7 +7,7 @@ import {
   ArrowRight, Sparkles, Info, X, RefreshCw, ZoomIn, ZoomOut, Maximize2, Move,
   BookOpen, Search, Bot, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
   ChevronLeft, ChevronDown, Star, Trophy, Radio, Target, Volume2, VolumeX, Music, Headphones, Mic,
-  Link as LinkIcon, Calendar, Crown, Medal, Cloud
+  Link as LinkIcon, Calendar, Crown, Medal, Cloud, ShieldAlert, CheckCircle
 } from 'lucide-react';
 import mentorAdaImg from './assets/mentor_ada.jpg';
 import chaosMonkeyImg from './assets/chaos_monkey.jpg';
@@ -335,6 +335,465 @@ const COMPONENT_CATALOG = {
 };
 
 // ============================================================================
+// 2.5. REAL-WORLD CLOUD ARCHITECTURE CONNECTION RULES & VALIDATION MATRIX
+// ============================================================================
+export const CLOUD_CONNECTION_RULES = {
+  SOURCE: {
+    allowed: ['WAF', 'CDN', 'LB', 'WEB'],
+    rules: {
+      SQL: {
+        title: 'Direct Database Ingress Violation',
+        category: 'Perimeter Security Rule',
+        explanation: 'Relational databases (PostgreSQL/MySQL) reside strictly in isolated private VPC subnets. Exposing port 5432 directly to public Internet Ingress bypasses authentication, rate limiting, and connection pooling, risking massive DDoS attacks and immediate data exfiltration.',
+        recommendation: 'Route traffic through a Load Balancer and API / Web Server first: Ingress ➔ Load Balancer ➔ Web Server ➔ PostgreSQL Database.'
+      },
+      CACHE: {
+        title: 'Direct In-Memory Cache Ingress Violation',
+        category: 'Perimeter Security Rule',
+        explanation: 'Redis lacks robust HTTP perimeter protection and is designed strictly as an internal low-latency key-value store. Public clients cannot speak the Redis RESP protocol directly.',
+        recommendation: 'Route traffic through an API / Web Server or Cloud CDN Edge before querying Redis.'
+      },
+      QUEUE: {
+        title: 'Unauthenticated Event Ingress Violation',
+        category: 'Perimeter Architecture Rule',
+        explanation: 'Kafka broker ports should never face public client traffic directly. Unauthenticated internet traffic could flood partition commit logs, exhaust broker disk I/O, and compromise message schemas.',
+        recommendation: 'Terminate incoming HTTP requests at an API / Web Server, which parses, validates, and publishes verified events to Kafka.'
+      },
+      WORKER: {
+        title: 'Bypassed Orchestration Violation',
+        category: 'Async Workflow Rule',
+        explanation: 'Async Worker Pools do not run public HTTP listeners. Workers pull jobs asynchronously from message queues or task schedulers in the background.',
+        recommendation: 'Route Ingress ➔ Web Server ➔ Kafka Queue ➔ Async Worker Pool.'
+      },
+      SEARCH: {
+        title: 'Exposed Internal Search Cluster',
+        category: 'Perimeter Security Rule',
+        explanation: 'Elasticsearch clusters in internal VPCs must not accept raw unauthenticated HTTP requests. Wildcard search scans would quickly cause JVM heap exhaustion and cluster outages.',
+        recommendation: 'Route queries through an API / Web Server to sanitize search parameters before querying Elasticsearch.'
+      },
+      STORAGE: {
+        title: 'Direct Object Storage Ingress',
+        category: 'Cloud Storage Rule',
+        explanation: 'Raw public client requests should not hit private S3 buckets directly without caching or authentication.',
+        recommendation: 'Deliver media via Cloud CDN Edge (for cached reads) or issue presigned URLs via an API / Web Server (for uploads).'
+      },
+      VECTOR_AI: {
+        title: 'Unauthenticated GPU Cluster Exposure',
+        category: 'Cost & Perimeter Rule',
+        explanation: 'GPU LLM inference and Vector DB nodes are high-cost resources. Exposing them to raw public ingress invites immediate Denial of Wallet attacks.',
+        recommendation: 'Shield GPU clusters behind an API / Web Server to enforce rate limits, user auth, and prompt validation.'
+      },
+      SOURCE: {
+        title: 'Self-Connection Loop',
+        category: 'Topology Rule',
+        explanation: 'Internet Ingress is the root traffic origin and cannot route packets into itself.',
+        recommendation: 'Connect Ingress downstream to WAF, CDN, Load Balancer, or Web Server.'
+      }
+    }
+  },
+
+  WAF: {
+    allowed: ['CDN', 'LB', 'WEB', 'CACHE'],
+    rules: {
+      SOURCE: {
+        title: 'Reverse Traffic Inversion',
+        category: 'Dataflow Direction Rule',
+        explanation: 'Traffic flows from the Internet into your cloud perimeter, not backwards into client ingress.',
+        recommendation: 'Direct scrubbed traffic forward to a Load Balancer, Cloud CDN, or Web Server.'
+      },
+      WAF: {
+        title: 'Redundant Perimeter Scrubbing',
+        category: 'Optimization Rule',
+        explanation: 'Chaining multiple WAF instances in series multiplies TLS termination latency without improving security posture.',
+        recommendation: 'Direct scrubbed traffic downstream to a Load Balancer or Web Server.'
+      },
+      SQL: {
+        title: 'Protocol Incompatibility: WAF to Database',
+        category: 'Protocol Mismatch Rule',
+        explanation: 'WAFs inspect Layer 7 HTTP/HTTPS traffic. They do not speak PostgreSQL wire protocols or parse SQL query statements.',
+        recommendation: 'Connect WAF ➔ Load Balancer ➔ API / Web Server ➔ PostgreSQL Database.'
+      },
+      QUEUE: {
+        title: 'Missing Event Serialization',
+        category: 'Dataflow Rule',
+        explanation: 'WAF proxies inspect and scrub HTTP headers/payloads; they cannot serialize messages into Kafka topic partitions.',
+        recommendation: 'Route clean traffic to an API / Web Server, which serializes and dispatches events to Kafka.'
+      },
+      WORKER: {
+        title: 'Worker Ingestion Mismatch',
+        category: 'Async Architecture Rule',
+        explanation: 'Async workers consume queue messages; they do not terminate HTTP connections from perimeter firewalls.',
+        recommendation: 'Route through Web Server ➔ Kafka Queue ➔ Worker Pool.'
+      },
+      SEARCH: {
+        title: 'Missing Query Parsing',
+        category: 'Protocol Mismatch Rule',
+        explanation: 'WAF does not generate Elasticsearch Query DSL from raw HTTP requests.',
+        recommendation: 'Route through an API / Web Server.'
+      },
+      STORAGE: {
+        title: 'Storage Routing Mismatch',
+        category: 'Architecture Rule',
+        explanation: 'WAF filters ingress traffic; it does not host an S3 object store.',
+        recommendation: 'Route to Cloud CDN or an API / Web Server.'
+      },
+      VECTOR_AI: {
+        title: 'Missing Inference Gateway',
+        category: 'Compute Gateway Rule',
+        explanation: 'WAF cannot generate vector embeddings or format JSON chat payloads for LLM inference engines.',
+        recommendation: 'Route through an API / Web Server.'
+      }
+    }
+  },
+
+  CDN: {
+    allowed: ['LB', 'WEB', 'STORAGE', 'WAF', 'CACHE'],
+    rules: {
+      SOURCE: {
+        title: 'Reverse Traffic Inversion',
+        category: 'Dataflow Direction Rule',
+        explanation: 'Edge CDNs receive traffic from Ingress and forward origin cache misses inward, not back out to client ingress.',
+        recommendation: 'Connect CDN downstream to an origin Load Balancer, Web Server, or S3 Storage bucket.'
+      },
+      CDN: {
+        title: 'Edge CDN Loop Detected',
+        category: 'Edge Topology Rule',
+        explanation: 'Chaining edge CDNs to each other causes cache fragmentation, stale invalidations, and routing loops.',
+        recommendation: 'Route cache misses directly to an origin Load Balancer or Web Server.'
+      },
+      SQL: {
+        title: 'Protocol Incompatibility: CDN to Database',
+        category: 'Protocol Mismatch Rule',
+        explanation: 'CDNs cache and proxy HTTP content. They cannot connect over TCP sockets to PostgreSQL or execute relational queries.',
+        recommendation: 'Connect CDN ➔ Load Balancer ➔ API / Web Server ➔ PostgreSQL Database.'
+      },
+      QUEUE: {
+        title: 'Edge Proxy to Queue Mismatch',
+        category: 'Async Architecture Rule',
+        explanation: 'CDNs do not publish messages to Kafka message queues directly.',
+        recommendation: 'Forward dynamic traffic to an API / Web Server first.'
+      },
+      WORKER: {
+        title: 'Worker Decoupling Violation',
+        category: 'Async Workflow Rule',
+        explanation: 'CDN edge POPs do not invoke background compute workers directly.',
+        recommendation: 'Route through Web Server ➔ Kafka Queue ➔ Async Workers.'
+      },
+      VECTOR_AI: {
+        title: 'Missing Compute Orchestrator',
+        category: 'Compute Rule',
+        explanation: 'CDNs cannot run matrix math or vector indexing directly without an application server.',
+        recommendation: 'Route dynamic AI queries through an API / Web Server.'
+      }
+    }
+  },
+
+  LB: {
+    allowed: ['WEB', 'WAF', 'CDN', 'SEARCH', 'STORAGE', 'VECTOR_AI'],
+    rules: {
+      SOURCE: {
+        title: 'Reverse Traffic Inversion',
+        category: 'Dataflow Direction Rule',
+        explanation: 'Load balancers distribute ingress traffic inward; they cannot send traffic back out to internet ingress.',
+        recommendation: 'Connect Load Balancer to downstream API / Web Servers.'
+      },
+      LB: {
+        title: 'Redundant Load Balancer Chaining',
+        category: 'Network Optimization Rule',
+        explanation: 'Chaining public application load balancers together introduces double-hop proxy latency without scaling backend capacity.',
+        recommendation: 'Wire a single Load Balancer to multiple parallel Web Servers.'
+      },
+      SQL: {
+        title: 'Missing Application Layer & Connection Pool',
+        category: 'Protocol Mismatch Rule',
+        explanation: 'HTTP Load Balancers route REST/HTTP packets, not SQL query connections. Relational databases require connection poolers and ORM logic.',
+        recommendation: 'Wire Load Balancer to API / Web Servers, and connect Web Servers to PostgreSQL.'
+      },
+      CACHE: {
+        title: 'Binary Protocol Mismatch: LB to Redis',
+        category: 'Protocol Mismatch Rule',
+        explanation: 'Standard HTTP load balancers cannot translate incoming REST requests into Redis key-value binary commands.',
+        recommendation: 'Wire Load Balancer to Web Servers, which query Redis via an in-memory client.'
+      },
+      QUEUE: {
+        title: 'Missing Message Producer',
+        category: 'Event Architecture Rule',
+        explanation: 'Load balancers forward HTTP streams; they do not serialize payloads into structured Kafka partition messages.',
+        recommendation: 'Route traffic through an API / Web Server that formats and produces Kafka records.'
+      },
+      WORKER: {
+        title: 'Direct Worker Invocation Antipattern',
+        category: 'Coupling Antipattern Rule',
+        explanation: 'Async workers process tasks from queues in the background; they do not accept incoming HTTP traffic from public load balancers.',
+        recommendation: 'Connect Load Balancer ➔ Web Server ➔ Kafka Queue ➔ Async Workers.'
+      }
+    }
+  },
+
+  WEB: {
+    allowed: ['CACHE', 'SQL', 'QUEUE', 'SEARCH', 'STORAGE', 'VECTOR_AI', 'LB', 'WEB'],
+    rules: {
+      SOURCE: {
+        title: 'Reverse Traffic Inversion',
+        category: 'Dataflow Direction Rule',
+        explanation: 'Backend compute servers cannot route client requests backward into public internet ingress.',
+        recommendation: 'Direct data requests downstream to Caches, Databases, Queues, or Search clusters.'
+      },
+      WAF: {
+        title: 'Directional Inversion: Web to Perimeter WAF',
+        category: 'Perimeter Rule',
+        explanation: 'WAF is an ingress perimeter security filter. Application web servers do not route outgoing database/API traffic back to the perimeter.',
+        recommendation: 'Place WAF upstream of Web Servers (Ingress ➔ WAF ➔ Web).'
+      },
+      CDN: {
+        title: 'Directional Inversion: Web to Edge CDN',
+        category: 'Edge Caching Rule',
+        explanation: 'Edge CDNs sit in front of web servers to cache content before it reaches origin compute. Web servers do not push queries into a CDN.',
+        recommendation: 'Place Cloud CDN between Internet Ingress and your Load Balancer / Web Servers.'
+      },
+      WORKER: {
+        title: 'Tight Coupling Antipattern: Web to Worker',
+        category: 'Decoupling Architecture Rule',
+        explanation: 'Connecting Web Servers directly to Worker Pools introduces synchronous thread blocking and cascading failures under heavy load. In cloud systems, web servers must decouple background jobs via an asynchronous message buffer.',
+        recommendation: 'Connect Web Server ➔ Kafka Message Queue ➔ Async Worker Pool to buffer write bursts cleanly!'
+      }
+    }
+  },
+
+  CACHE: {
+    allowed: ['SQL', 'WEB', 'SEARCH', 'VECTOR_AI'],
+    rules: {
+      SOURCE: { title: 'Reverse Flow', category: 'Dataflow Rule', explanation: 'Internal caches cannot route back to external internet ingress.', recommendation: 'Connect Cache to PostgreSQL as a cache-aside fallback.' },
+      WAF: { title: 'Directional Inversion', category: 'Dataflow Rule', explanation: 'Caches do not route to ingress perimeter firewalls.', recommendation: 'Connect Cache to PostgreSQL.' },
+      CDN: { title: 'Tier Inversion', category: 'Dataflow Rule', explanation: 'Origin caches do not route upstream to edge CDNs.', recommendation: 'Connect Cache to PostgreSQL.' },
+      LB: { title: 'Directional Inversion', category: 'Dataflow Rule', explanation: 'Internal caches do not route backwards to load balancers.', recommendation: 'Connect Cache to PostgreSQL.' },
+      CACHE: { title: 'Redundant Cache Tiering', category: 'Optimization Rule', explanation: 'Chaining Redis to Redis directly causes dual-write anomalies and cache invalidation drift.', recommendation: 'Use a single configured Redis cluster with LRU eviction.' },
+      QUEUE: { title: 'Protocol Mismatch', category: 'Dataflow Rule', explanation: 'Redis key-value stores do not produce streaming messages to Kafka.', recommendation: 'Have Web Servers publish to Kafka.' },
+      WORKER: { title: 'Consumer Mismatch', category: 'Async Rule', explanation: 'Workers consume tasks from persistent commit logs, not ephemeral cache keys.', recommendation: 'Connect Kafka Queue ➔ Worker Pool.' },
+      STORAGE: { title: 'Storage Pipeline Mismatch', category: 'Dataflow Rule', explanation: 'Redis does not archive directly to S3 without worker compute.', recommendation: 'Use an Async Worker to archive data to S3.' }
+    }
+  },
+
+  QUEUE: {
+    allowed: ['WORKER', 'SQL', 'SEARCH', 'STORAGE'],
+    rules: {
+      SOURCE: { title: 'Async Inversion', category: 'Dataflow Rule', explanation: 'Kafka brokers cannot send HTTP response packets to public ingress.', recommendation: 'Connect Kafka ➔ Async Worker Pool.' },
+      WAF: { title: 'Directional Inversion', category: 'Dataflow Rule', explanation: 'Message queues do not route to perimeter firewalls.', recommendation: 'Connect Kafka ➔ Async Worker Pool.' },
+      CDN: { title: 'Directional Inversion', category: 'Dataflow Rule', explanation: 'Message queues do not route to edge CDNs.', recommendation: 'Connect Kafka ➔ Async Worker Pool.' },
+      LB: { title: 'Async Inversion', category: 'Dataflow Rule', explanation: 'Kafka cannot push asynchronous messages to synchronous HTTP load balancers.', recommendation: 'Connect Kafka ➔ Async Worker Pool.' },
+      WEB: {
+        title: 'Push vs. Pull Antipattern: Queue to Web Server',
+        category: 'Async Workflow Rule',
+        explanation: 'Kafka brokers do not push unsolicited messages back to synchronous stateless web servers. Web servers handle client request-response cycles, not async batch jobs.',
+        recommendation: 'Connect Kafka ➔ Async Worker Pool, which polls and processes queue partitions.'
+      },
+      CACHE: { title: 'Invalid Cache Mutation', category: 'Dataflow Rule', explanation: 'Queues do not write directly to in-memory key-value caches without compute.', recommendation: 'Connect Kafka ➔ Worker, and have the Worker update Redis.' },
+      QUEUE: { title: 'Redundant Queue Chaining', category: 'Optimization Rule', explanation: 'Chaining Kafka brokers directly to other Kafka brokers creates message lag and duplicate offsets.', recommendation: 'Connect Kafka ➔ Async Worker Pool.' }
+    }
+  },
+
+  WORKER: {
+    allowed: ['SQL', 'STORAGE', 'SEARCH', 'CACHE', 'VECTOR_AI', 'QUEUE'],
+    rules: {
+      SOURCE: { title: 'Reverse Flow', category: 'Dataflow Rule', explanation: 'Background worker pools cannot route packets back to public client ingress.', recommendation: 'Connect Worker to PostgreSQL or S3 Storage to persist job output.' },
+      WAF: { title: 'Directional Inversion', category: 'Dataflow Rule', explanation: 'Workers do not route to perimeter firewalls.', recommendation: 'Connect Worker to PostgreSQL.' },
+      CDN: { title: 'Directional Inversion', category: 'Dataflow Rule', explanation: 'Workers do not push directly to edge CDNs.', recommendation: 'Connect Worker to S3 Storage, then deliver via CDN.' },
+      LB: { title: 'Directional Inversion', category: 'Dataflow Rule', explanation: 'Workers do not send traffic to ingress load balancers.', recommendation: 'Connect Worker to PostgreSQL.' },
+      WEB: {
+        title: 'Architectural Inversion: Worker to Web Server',
+        category: 'Decoupling Rule',
+        explanation: 'Background worker pools execute asynchronous tasks; they do not call frontend web servers. Workers write their completed status and output directly to databases, caches, or object stores.',
+        recommendation: 'Connect Worker ➔ PostgreSQL Database or S3 Object Storage.'
+      },
+      WORKER: {
+        title: 'Worker-to-Worker Tight Coupling',
+        category: 'Decoupling Rule',
+        explanation: 'Directly chaining worker pools creates brittle synchronous coupling between background jobs.',
+        recommendation: 'Decouple multi-stage worker pipelines using a Kafka Message Queue (Worker ➔ Kafka ➔ Next Worker).'
+      }
+    }
+  },
+
+  SQL: {
+    allowed: ['SQL', 'CACHE', 'SEARCH', 'STORAGE'],
+    rules: {
+      SOURCE: { title: 'Security Boundary Violation', category: 'Data Security Rule', explanation: 'Private databases must never route directly to public internet ingress.', recommendation: 'Traffic flows from Web Server ➔ PostgreSQL.' },
+      WAF: { title: 'Security Inversion', category: 'Data Security Rule', explanation: 'Databases do not send packets to perimeter firewalls.', recommendation: 'Databases are terminal data tiers.' },
+      CDN: { title: 'Security Inversion', category: 'Data Security Rule', explanation: 'Databases cannot connect directly to edge CDNs.', recommendation: 'Deliver cached reads via Web Server ➔ CDN.' },
+      LB: { title: 'Security Inversion', category: 'Dataflow Rule', explanation: 'Databases do not route to application load balancers.', recommendation: 'Connect Web Server ➔ Database.' },
+      WEB: {
+        title: 'Dataflow Inversion: Database to Web Server',
+        category: 'Dataflow Direction Rule',
+        explanation: 'Traffic flows from Web Servers querying the Database, not from the Database pushing unsolicited traffic into Web Servers.',
+        recommendation: 'Connect Web Server ➔ PostgreSQL Database.'
+      },
+      QUEUE: { title: 'Missing CDC Connector', category: 'Architecture Rule', explanation: 'Relational databases do not write to message queues without an application worker or Change Data Capture (CDC) agent.', recommendation: 'Use Web Servers or Workers to publish events.' },
+      WORKER: { title: 'Push Inversion', category: 'Async Rule', explanation: 'Databases do not push jobs into worker pools.', recommendation: 'Workers query the database or consume from queues.' },
+      VECTOR_AI: { title: 'Missing ML Orchestrator', category: 'Compute Rule', explanation: 'Relational databases cannot drive GPU inference without application compute.', recommendation: 'Connect Web Server ➔ Vector DB + GPU Node.' }
+    }
+  },
+
+  SEARCH: {
+    allowed: ['STORAGE'],
+    rules: {
+      SOURCE: { title: 'Security Boundary', category: 'Perimeter Rule', explanation: 'Elasticsearch clusters must be protected behind an API / Web Server.', recommendation: 'Connect Web Server ➔ Elasticsearch.' },
+      WAF: { title: 'Directional Inversion', category: 'Dataflow Rule', explanation: 'Search indexes do not route to perimeter firewalls.', recommendation: 'Query search via Web Server.' },
+      CDN: { title: 'Directional Inversion', category: 'Dataflow Rule', explanation: 'Search clusters do not route to edge CDNs directly.', recommendation: 'Query search via Web Server.' },
+      LB: { title: 'Directional Inversion', category: 'Dataflow Rule', explanation: 'Search clusters do not route backwards to load balancers.', recommendation: 'Connect Load Balancer ➔ Web Server ➔ Search.' },
+      WEB: { title: 'Terminal Query Sink', category: 'Dataflow Rule', explanation: 'Elasticsearch is a query termination index. It returns results to calling web servers, but does not initiate connections into web servers.', recommendation: 'Connect Web Server ➔ Elasticsearch.' },
+      SQL: { title: 'Terminal Sink', category: 'Architecture Rule', explanation: 'Search indexes do not query relational databases directly.', recommendation: 'Sync data via Web Servers or Async Workers.' },
+      CACHE: { title: 'Terminal Sink', category: 'Architecture Rule', explanation: 'Search clusters do not manage Redis caches.', recommendation: 'Cache search results at the Web Server layer.' },
+      QUEUE: { title: 'Terminal Sink', category: 'Architecture Rule', explanation: 'Search clusters do not produce events to Kafka.', recommendation: 'Have Web Servers or Workers produce events.' },
+      WORKER: { title: 'Terminal Sink', category: 'Architecture Rule', explanation: 'Search clusters do not dispatch tasks to worker pools.', recommendation: 'Use message queues to orchestrate workers.' },
+      VECTOR_AI: { title: 'Index Mismatch', category: 'Compute Rule', explanation: 'Text search clusters do not run vector LLM inference directly.', recommendation: 'Connect Web Server to Vector DB + GPU Node.' },
+      SEARCH: { title: 'Redundant Index Layering', category: 'Optimization Rule', explanation: 'Chaining search clusters directly together is not a standard cloud pattern.', recommendation: 'Scale Elasticsearch shards within a single cluster.' }
+    }
+  },
+
+  STORAGE: {
+    allowed: ['CDN', 'WORKER'],
+    rules: {
+      SOURCE: { title: 'Security Boundary', category: 'Perimeter Rule', explanation: 'Private S3 buckets cannot connect directly to internet ingress.', recommendation: 'Route public downloads via Cloud CDN.' },
+      WAF: { title: 'Directional Inversion', category: 'Dataflow Rule', explanation: 'Object stores do not route to perimeter firewalls.', recommendation: 'Route uploads via Web Server.' },
+      LB: { title: 'Directional Inversion', category: 'Dataflow Rule', explanation: 'Object storage does not route to load balancers.', recommendation: 'Connect Web Server to S3 Storage.' },
+      WEB: { title: 'Static Blob Sink', category: 'Dataflow Rule', explanation: 'S3 stores blobs; it does not initiate connections into web servers.', recommendation: 'Connect Web Server ➔ S3 Storage.' },
+      SQL: { title: 'Static Blob Sink', category: 'Dataflow Rule', explanation: 'Object storage cannot query relational SQL databases.', recommendation: 'Use an Async Worker to transfer data between S3 and SQL.' },
+      CACHE: { title: 'Static Blob Sink', category: 'Dataflow Rule', explanation: 'S3 does not write directly into in-memory Redis caches.', recommendation: 'Cache media URLs in Redis via Web Servers.' },
+      QUEUE: { title: 'Missing Event Driver', category: 'Dataflow Rule', explanation: 'S3 buckets do not publish directly to Kafka without S3 event notifications and workers.', recommendation: 'Connect S3 ➔ Async Worker.' },
+      SEARCH: { title: 'Static Blob Sink', category: 'Dataflow Rule', explanation: 'S3 does not index itself into Elasticsearch.', recommendation: 'Use an Async Worker to parse and index S3 documents.' },
+      STORAGE: { title: 'Redundant Storage Chaining', category: 'Optimization Rule', explanation: 'Direct bucket-to-bucket chaining is not a standard dataflow.', recommendation: 'Enable Multi-AZ replication in the storage node configuration.' },
+      VECTOR_AI: { title: 'Missing Feature Extractor', category: 'Compute Rule', explanation: 'S3 cannot generate vector embeddings without compute.', recommendation: 'Connect Worker or Web Server ➔ Vector DB + GPU Node.' }
+    }
+  },
+
+  VECTOR_AI: {
+    allowed: ['SQL', 'STORAGE', 'CACHE'],
+    rules: {
+      SOURCE: { title: 'Perimeter Security Violation', category: 'Perimeter Rule', explanation: 'GPU clusters and Vector databases must be shielded behind an API / Web Server to prevent Denial of Wallet attacks.', recommendation: 'Connect Web Server ➔ Vector DB + GPU Node.' },
+      WAF: { title: 'Directional Inversion', category: 'Dataflow Rule', explanation: 'Vector DBs do not route to perimeter firewalls.', recommendation: 'Route queries via Web Server.' },
+      CDN: { title: 'Directional Inversion', category: 'Dataflow Rule', explanation: 'GPU clusters do not route to edge CDNs.', recommendation: 'Connect Web Server ➔ Vector DB + GPU Node.' },
+      LB: { title: 'Directional Inversion', category: 'Dataflow Rule', explanation: 'GPU nodes do not route backwards to load balancers.', recommendation: 'Route through Load Balancer ➔ Web Server ➔ Vector DB.' },
+      WEB: { title: 'Terminal Compute Sink', category: 'Dataflow Rule', explanation: 'Vector DB & GPU nodes return inference tokens to calling web servers, but do not initiate requests into web servers.', recommendation: 'Connect Web Server ➔ Vector DB + GPU Node.' },
+      QUEUE: { title: 'Terminal Compute Sink', category: 'Dataflow Rule', explanation: 'Vector DBs do not publish to message queues natively.', recommendation: 'Use Web Servers or Workers to publish AI results.' },
+      WORKER: { title: 'Terminal Compute Sink', category: 'Dataflow Rule', explanation: 'GPU nodes do not dispatch jobs to worker pools.', recommendation: 'Have Workers call Vector DB for batch embedding.' },
+      SEARCH: { title: 'Architecture Mismatch', category: 'Architecture Rule', explanation: 'Vector search and Elasticsearch are separate search paradigms.', recommendation: 'Orchestrate hybrid search via an API / Web Server.' },
+      VECTOR_AI: { title: 'Redundant Vector Node Chaining', category: 'Optimization Rule', explanation: 'Chaining GPU nodes directly together is not a valid pattern.', recommendation: 'Scale GPU batching options in node configuration.' }
+    }
+  }
+};
+
+export function isConnectionAllowed(fromType, toType) {
+  if (!fromType || !toType) return false;
+  const rule = CLOUD_CONNECTION_RULES[fromType];
+  if (!rule) return true;
+  return rule.allowed.includes(toType);
+}
+
+export function validateCloudConnection(fromType, toType, nodes = [], edges = [], fromId = null, toId = null) {
+  if (!fromType || !toType) {
+    return {
+      allowed: false,
+      violation: {
+        title: 'Unknown Component Tier',
+        category: 'Validation Error',
+        explanation: 'One or both components could not be identified in the architecture catalog.',
+        recommendation: 'Select valid components from the cloud components catalog.',
+        validTargets: []
+      }
+    };
+  }
+
+  // 1. Self-Connection Loop
+  if (fromId && toId && fromId === toId) {
+    return {
+      allowed: false,
+      violation: {
+        title: 'Self-Connection Loop Violation',
+        category: 'Topology Constraint',
+        explanation: 'A component cannot route traffic into its own input port. In distributed systems, this creates an instantaneous recursive packet cycle that causes buffer overflow.',
+        recommendation: 'Connect this component downstream to a distinct service tier in your pipeline (e.g. Ingress ➔ Load Balancer, or Web Server ➔ Database).',
+        validTargets: CLOUD_CONNECTION_RULES[fromType]?.allowed || []
+      }
+    };
+  }
+
+  // 2. Duplicate Wire
+  if (fromId && toId && edges.some((e) => e.from === fromId && e.to === toId)) {
+    return {
+      allowed: false,
+      violation: {
+        title: 'Duplicate Wire Detected',
+        category: 'Redundant Wiring',
+        explanation: 'A communication wire already connects these two components. Adding duplicate wires between the exact same pair of nodes causes packet duplication.',
+        recommendation: 'Configure concurrency or replicas on the existing component rather than adding parallel duplicate wires between the same nodes.',
+        validTargets: CLOUD_CONNECTION_RULES[fromType]?.allowed || []
+      }
+    };
+  }
+
+  // 3. Matrix Rule Lookup
+  const sourceRules = CLOUD_CONNECTION_RULES[fromType];
+  if (!sourceRules) {
+    return { allowed: true };
+  }
+
+  const isAllowed = sourceRules.allowed.includes(toType);
+  if (!isAllowed) {
+    const specificRule = sourceRules.rules?.[toType] || {
+      title: `Architectural Constraint: ${fromType} to ${toType}`,
+      category: 'Cloud Engineering Rule',
+      explanation: `In standard cloud architectures, ${COMPONENT_CATALOG[fromType]?.name || fromType} cannot route directly into ${COMPONENT_CATALOG[toType]?.name || toType}. Distributed systems require proper separation of concerns between perimeter, compute, and data tiers.`,
+      recommendation: `Insert an appropriate intermediate tier (such as an API / Web Server or Load Balancer) between ${COMPONENT_CATALOG[fromType]?.name || fromType} and ${COMPONENT_CATALOG[toType]?.name || toType}.`
+    };
+
+    return {
+      allowed: false,
+      violation: {
+        ...specificRule,
+        validTargets: sourceRules.allowed || []
+      }
+    };
+  }
+
+  // 4. Circular Path Detection (Cycle Check)
+  if (fromId && toId) {
+    const visited = new Set();
+    const queue = [toId];
+    let hasCycle = false;
+
+    while (queue.length > 0) {
+      const curr = queue.shift();
+      if (curr === fromId) {
+        hasCycle = true;
+        break;
+      }
+      visited.add(curr);
+      const outgoing = edges.filter((e) => e.from === curr).map((e) => e.to);
+      for (const nextNode of outgoing) {
+        if (!visited.has(nextNode)) {
+          queue.push(nextNode);
+        }
+      }
+    }
+
+    if (hasCycle) {
+      return {
+        allowed: false,
+        violation: {
+          title: 'Infinite Circular Loop Detected',
+          category: 'Topology Constraint',
+          explanation: 'Connecting this node creates an infinite directed cycle in your network graph. Packets would loop endlessly between tiers, causing buffer overflow and exponential latency amplification.',
+          recommendation: 'Cloud architectures must follow a Directed Acyclic Graph (DAG) for primary request pipelines. Remove the opposing wire before connecting in this direction.',
+          validTargets: sourceRules.allowed || []
+        }
+      };
+    }
+  }
+
+  return { allowed: true };
+}
+
+// ============================================================================
 // 3. CAMPAIGN SCENARIOS & GAME MODES
 // ============================================================================
 const CAMPAIGN_LEVELS = [
@@ -525,7 +984,8 @@ export const ICONIC_PRESETS = [
       { id: 'e9', from: 'cache-1', to: 'sql-1' },
       { id: 'e10', from: 'web-1', to: 'kafka-1' },
       { id: 'e11', from: 'web-2', to: 'kafka-1' },
-      { id: 'e12', from: 'kafka-1', to: 'worker-1' }
+      { id: 'e12', from: 'kafka-1', to: 'worker-1' },
+      { id: 'e13', from: 'worker-1', to: 'sql-1' }
     ]
   },
   {
@@ -546,8 +1006,7 @@ export const ICONIC_PRESETS = [
       { id: 'web-1', type: 'WEB', x: 480, y: 220, config: { tier: 1 } },
       { id: 'cache-1', type: 'CACHE', x: 700, y: 120, config: { eviction: 1 } },
       { id: 'sql-1', type: 'SQL', x: 920, y: 120, config: { scaling: 1 } },
-      { id: 'vector-1', type: 'VECTOR', x: 700, y: 320, config: { indexing: 1 } },
-      { id: 'gpu-1', type: 'GPU', x: 920, y: 320, config: { modelSize: 1 } }
+      { id: 'vector-1', type: 'VECTOR_AI', x: 700, y: 320, config: { batching: 1 } }
     ],
     edges: [
       { id: 'e1', from: 'src', to: 'cdn-1' },
@@ -556,7 +1015,7 @@ export const ICONIC_PRESETS = [
       { id: 'e4', from: 'web-1', to: 'cache-1' },
       { id: 'e5', from: 'cache-1', to: 'sql-1' },
       { id: 'e6', from: 'web-1', to: 'vector-1' },
-      { id: 'e7', from: 'vector-1', to: 'gpu-1' }
+      { id: 'e7', from: 'vector-1', to: 'sql-1' }
     ]
   },
   {
@@ -927,6 +1386,18 @@ function evaluateArchitecture(nodes, edges, incomingRps, trafficMix, maxBudgetHr
       const splitCount = activeEdges.length;
 
       activeEdges.forEach((edge) => {
+        const fromNode = nodes.find((n) => n.id === edge.from);
+        const toNode = nodes.find((n) => n.id === edge.to);
+
+        // Check if edge is architecturally permitted in cloud systems
+        if (fromNode && toNode) {
+          const check = validateCloudConnection(fromNode.type, toNode.type, nodes, edges, fromNode.id, toNode.id);
+          if (!check.allowed) {
+            edgeFlows[edge.id] = { flowRps: 0, dominantType: 'READ', total: 0 };
+            return;
+          }
+        }
+
         let edgeTotal = 0;
         let maxType = 'READ';
         let maxVal = -1;
@@ -964,6 +1435,19 @@ function evaluateArchitecture(nodes, edges, incomingRps, trafficMix, maxBudgetHr
   // Architectural completeness & end-to-end SLA validation
   const diagnostics = [];
   let architecturalDrops = 0;
+
+  // Validate all edges against cloud architecture rules
+  edges.forEach((edge) => {
+    const fromNode = nodes.find((n) => n.id === edge.from);
+    const toNode = nodes.find((n) => n.id === edge.to);
+    if (fromNode && toNode) {
+      const check = validateCloudConnection(fromNode.type, toNode.type, nodes, edges, fromNode.id, toNode.id);
+      if (!check.allowed) {
+        architecturalDrops += incomingRps * 0.4;
+        diagnostics.push(`ARCHITECTURAL VIOLATION: "${fromNode.type}" cannot wire directly to "${toNode.type}"! ${check.violation?.explanation || ''}`);
+      }
+    }
+  });
 
   const webNodes = nodes.filter((n) => n.type === 'WEB' && !n.crashed);
   const sqlNodes = nodes.filter((n) => n.type === 'SQL' && !n.crashed);
@@ -1142,7 +1626,7 @@ function getDailyIncident() {
       maxLatencyMs: 90,
       minUptimePct: 98.5,
       maxBudgetHr: 480,
-      allowedComponents: ['WAF', 'CDN', 'LB', 'WEB', 'CACHE', 'KAFKA', 'WORKER', 'SQL'],
+      allowedComponents: ['WAF', 'CDN', 'LB', 'WEB', 'CACHE', 'QUEUE', 'WORKER', 'SQL'],
       initialNodes: [
         { id: 'src', type: 'SOURCE', x: 50, y: 220, config: {} },
         { id: 'lb-1', type: 'LB', x: 260, y: 220, config: { algorithm: 1 } },
@@ -1184,7 +1668,7 @@ function getDailyIncident() {
       maxLatencyMs: 110,
       minUptimePct: 98.8,
       maxBudgetHr: 520,
-      allowedComponents: ['AI', 'LB', 'WEB', 'CACHE', 'SQL', 'SEARCH'],
+      allowedComponents: ['VECTOR_AI', 'LB', 'WEB', 'CACHE', 'SQL', 'SEARCH'],
       initialNodes: [
         { id: 'src', type: 'SOURCE', x: 50, y: 220, config: {} },
         { id: 'lb-1', type: 'LB', x: 260, y: 220, config: { algorithm: 1 } },
@@ -1948,6 +2432,7 @@ export default function App() {
 
   const [selectedNodeId, setSelectedNodeId] = useState('web-1');
   const [connectingFromId, setConnectingFromId] = useState(null);
+  const [connectionViolation, setConnectionViolation] = useState(null); // { fromNode, toNode, title, category, explanation, recommendation, validTargets }
   const [toastNotification, setToastNotification] = useState(null);
   const [lastSavedTimestamp, setLastSavedTimestamp] = useState(Date.now());
 
@@ -2072,6 +2557,22 @@ export default function App() {
       window.removeEventListener('pointerdown', handleUserGesture, { capture: true });
     };
   }, []);
+
+  // Handle ESC key to dismiss connection violation modal or cancel active wire drawing
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (connectionViolation) {
+          setConnectionViolation(null);
+        } else if (connectingFromId) {
+          sound.playClick();
+          setConnectingFromId(null);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [connectionViolation, connectingFromId]);
 
   // Handle shared challenge deep linking & live hash navigation
   useEffect(() => {
@@ -3092,16 +3593,67 @@ Can your architecture beat this? Test it in your browser:
     if (portType === 'out') {
       sound.playClick();
       setConnectingFromId(connectingFromId === nodeId ? null : nodeId);
-    } else if (portType === 'in' && connectingFromId && connectingFromId !== nodeId) {
-      const exists = edges.some((ed) => ed.from === connectingFromId && ed.to === nodeId);
-      if (!exists) {
-        sound.playConnectWire();
-        setEdges((prev) => [
-          ...prev,
-          { id: `e_${Date.now()}`, from: connectingFromId, to: nodeId }
-        ]);
+      setConnectionViolation(null);
+    } else if (portType === 'in' && connectingFromId) {
+      const fromNode = nodes.find((n) => n.id === connectingFromId);
+      const toNode = nodes.find((n) => n.id === nodeId);
+
+      if (!fromNode || !toNode) {
+        setConnectingFromId(null);
+        return;
       }
+
+      // Check self-connection
+      if (connectingFromId === nodeId) {
+        sound.playWarning();
+        setConnectionViolation({
+          fromNode,
+          toNode,
+          title: 'Self-Connection Loop Violation',
+          category: 'Topology Constraint',
+          explanation: 'A component cannot route traffic into its own input port. In distributed systems, this creates an instantaneous recursive packet cycle that causes buffer overflow.',
+          recommendation: 'Connect this component downstream to a distinct service tier in your pipeline.',
+          validTargets: CLOUD_CONNECTION_RULES[fromNode.type]?.allowed || []
+        });
+        return;
+      }
+
+      // Check if wire already exists
+      const exists = edges.some((ed) => ed.from === connectingFromId && ed.to === nodeId);
+      if (exists) {
+        sound.playWarning();
+        setToastNotification({
+          type: 'info',
+          message: `Wire already connects ${fromNode.name || fromNode.type} to ${toNode.name || toNode.type}.`
+        });
+        setConnectingFromId(null);
+        return;
+      }
+
+      // Validate Real-World Cloud Architecture Rules
+      const validation = validateCloudConnection(fromNode.type, toNode.type, nodes, edges, connectingFromId, nodeId);
+      if (!validation.allowed) {
+        sound.playWarning();
+        setConnectionViolation({
+          fromNode,
+          toNode,
+          title: validation.violation.title,
+          category: validation.violation.category,
+          explanation: validation.violation.explanation,
+          recommendation: validation.violation.recommendation,
+          validTargets: validation.violation.validTargets || []
+        });
+        return;
+      }
+
+      // Connection is valid!
+      sound.playConnectWire();
+      setEdges((prev) => [
+        ...prev,
+        { id: `e_${Date.now()}`, from: connectingFromId, to: nodeId }
+      ]);
       setConnectingFromId(null);
+      setConnectionViolation(null);
     }
   };
 
@@ -3563,9 +4115,16 @@ Can your architecture beat this? Test it in your browser:
   const selectedMetrics = selectedNode ? evaluation.nodeMetrics[selectedNode.id] : null;
 
   const availableCatalog = useMemo(() => {
-    return Object.values(COMPONENT_CATALOG).filter(
-      (item) => item.type !== 'SOURCE' && (activeCatalogTab === 'ALL' || item.category === activeCatalogTab)
-    );
+    return Object.values(COMPONENT_CATALOG).filter((item) => {
+      if (item.type === 'SOURCE') return false;
+      if (activeCatalogTab === 'ALL') return true;
+      if (activeCatalogTab === 'Edge') return item.category === 'Edge' || item.category === 'Routing';
+      if (activeCatalogTab === 'Compute') return item.category === 'Compute';
+      if (activeCatalogTab === 'Async') return item.category === 'Async';
+      if (activeCatalogTab === 'Data') return item.category === 'Data';
+      if (activeCatalogTab === 'AI') return item.category === 'AI / ML';
+      return item.category === activeCatalogTab;
+    });
   }, [activeCatalogTab]);
 
   // Cloudflare R2 Sync and Export Handlers
@@ -4271,13 +4830,14 @@ Can your architecture beat this? Test it in your browser:
               </button>
             </div>
 
-            <div className="grid grid-cols-5 gap-1 glass-subpanel p-1 rounded-xl text-[10px] font-bold">
+            <div className="grid grid-cols-6 gap-1 glass-subpanel p-1 rounded-xl text-[10px] font-bold">
               {[
                 { id: 'ALL', label: 'All' },
                 { id: 'Edge', label: 'Edge' },
                 { id: 'Compute', label: 'Compute' },
                 { id: 'Async', label: 'Queue' },
-                { id: 'Data', label: 'Data' }
+                { id: 'Data', label: 'Data' },
+                { id: 'AI', label: 'AI' }
               ].map((t) => (
                 <button
                   key={t.id}
@@ -4296,7 +4856,10 @@ Can your architecture beat this? Test it in your browser:
           <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0">
             {availableCatalog.map((item) => {
               const Icon = item.icon;
-              const isAllowed = gameMode !== 'CAMPAIGN' || currentLevel.allowedComponents.includes(item.type);
+              const isAllowed =
+                (gameMode !== 'CAMPAIGN' && gameMode !== 'DAILY') ||
+                !currentLevel.allowedComponents ||
+                currentLevel.allowedComponents.includes(item.type);
               const isTutorialHighlight = tutorialStep === 'DEPLOY_CACHE' && item.type === 'CACHE';
               return (
                 <div
@@ -4432,7 +4995,10 @@ Can your architecture beat this? Test it in your browser:
             e.preventDefault();
             const compType = e.dataTransfer.getData('application/archquest-component') || e.dataTransfer.getData('text/plain');
             if (compType && COMPONENT_CATALOG[compType]) {
-              const isAllowed = gameMode !== 'CAMPAIGN' || currentLevel.allowedComponents.includes(compType);
+              const isAllowed =
+                (gameMode !== 'CAMPAIGN' && gameMode !== 'DAILY') ||
+                !currentLevel.allowedComponents ||
+                currentLevel.allowedComponents.includes(compType);
               if (!isAllowed) return;
               const rect = canvasRef.current.getBoundingClientRect();
               const screenX = e.clientX - rect.left;
@@ -4531,6 +5097,33 @@ Can your architecture beat this? Test it in your browser:
               </div>
             </div>
           </div>
+          {/* Active Wire Connection Status Banner */}
+          {connectingFromId && (() => {
+            const fromNode = nodes.find((n) => n.id === connectingFromId);
+            return (
+              <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 pointer-events-auto">
+                <div className="glass-panel px-4 py-2 rounded-full border border-cyan-500/60 shadow-2xl flex items-center gap-3 text-xs bg-slate-900/95 backdrop-blur-md">
+                  <span className="flex h-2.5 w-2.5 relative">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500"></span>
+                  </span>
+                  <span className="text-slate-200">
+                    Wiring from <strong className="text-cyan-400">{fromNode?.name || fromNode?.type || 'Component'}</strong>... Click destination input port or node
+                  </span>
+                  <button
+                    onClick={() => {
+                      sound.playClick();
+                      setConnectingFromId(null);
+                    }}
+                    className="px-2.5 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-mono text-[10px] font-bold border border-slate-700 transition active:scale-95"
+                  >
+                    Cancel (ESC)
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Floating Expand Left Panel Button (When Collapsed) */}
           {leftPanelCollapsed && (
             <button
@@ -5032,23 +5625,38 @@ Can your architecture beat this? Test it in your browser:
                     </div>
 
                     {/* Left Input Port */}
-                    {node.type !== 'SOURCE' && (
-                      <button
-                        data-port-node={node.id}
-                        data-port-type="in"
-                        onClick={(e) => handlePortClick(e, node.id, 'in')}
-                        onTouchEnd={(e) => {
-                          e.stopPropagation();
-                          handlePortClick(e, node.id, 'in');
-                        }}
-                        title="Input Port (Click to finish wire connection)"
-                        className={`w-4 h-4 rounded-full border-2 absolute -left-2 top-10 transition-transform hover:scale-125 z-10 ${
-                          connectingFromId && connectingFromId !== node.id
-                            ? 'bg-amber-400 border-white scale-125 animate-bounce'
-                            : 'bg-slate-800 border-slate-400 hover:border-indigo-400'
-                        }`}
-                      />
-                    )}
+                    {node.type !== 'SOURCE' && (() => {
+                      const fromNode = connectingFromId ? nodes.find((n) => n.id === connectingFromId) : null;
+                      const isConnectingActive = Boolean(connectingFromId && connectingFromId !== node.id);
+                      const isAllowedTarget = fromNode ? isConnectionAllowed(fromNode.type, node.type) : true;
+
+                      let portStyle = 'bg-slate-800 border-slate-400 hover:border-indigo-400 hover:scale-125';
+                      let portTitle = 'Input Port (Click to finish wire connection)';
+
+                      if (isConnectingActive) {
+                        if (isAllowedTarget) {
+                          portStyle = 'bg-emerald-500 border-white ring-4 ring-emerald-500/40 scale-125 animate-pulse';
+                          portTitle = `Valid Architecture: Wire from ${fromNode?.name || fromNode?.type} to ${node.name || node.type}`;
+                        } else {
+                          portStyle = 'bg-rose-950 border-rose-500 ring-2 ring-rose-500/50 scale-100 opacity-70 hover:opacity-100 hover:scale-125 hover:border-rose-400 cursor-pointer';
+                          portTitle = 'Architectural Violation: Click to see why this connection is not allowed in production';
+                        }
+                      }
+
+                      return (
+                        <button
+                          data-port-node={node.id}
+                          data-port-type="in"
+                          onClick={(e) => handlePortClick(e, node.id, 'in')}
+                          onTouchEnd={(e) => {
+                            e.stopPropagation();
+                            handlePortClick(e, node.id, 'in');
+                          }}
+                          title={portTitle}
+                          className={`w-4 h-4 rounded-full border-2 absolute -left-2 top-10 transition-all z-10 ${portStyle}`}
+                        />
+                      );
+                    })()}
 
                     {/* Right Output Port */}
                     <button
@@ -5200,6 +5808,124 @@ Can your architecture beat this? Test it in your browser:
               )}
             </div>
           </div>
+
+          {/* Real-World Architectural Connection Violation Modal */}
+          {connectionViolation && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in"
+              onClick={() => setConnectionViolation(null)}
+            >
+              <div
+                className="glass-panel border-2 border-rose-500/60 shadow-[0_0_60px_rgba(244,63,94,0.35)] bg-slate-900/95 rounded-2xl max-w-lg w-full p-6 text-slate-100 relative overflow-hidden animate-scale-up"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Background Warning Glow */}
+                <div className="absolute -top-24 -right-24 w-56 h-56 bg-rose-600/15 rounded-full blur-3xl pointer-events-none" />
+                <div className="absolute -bottom-24 -left-24 w-56 h-56 bg-amber-600/15 rounded-full blur-3xl pointer-events-none" />
+
+                {/* Header */}
+                <div className="flex items-start justify-between gap-3 mb-4">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-10 h-10 rounded-xl bg-rose-500/20 border border-rose-500/50 flex items-center justify-center text-rose-400 shadow-lg shrink-0">
+                      <ShieldAlert className="w-5 h-5 text-rose-400" />
+                    </div>
+                    <div>
+                      <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-300 font-mono text-[10px] font-bold tracking-wider uppercase">
+                        <AlertTriangle className="w-3 h-3 text-rose-400" />
+                        <span>{connectionViolation.category || 'Architecture Rule Violation'}</span>
+                      </div>
+                      <h3 className="text-base font-black text-white mt-1 leading-tight font-display">
+                        {connectionViolation.title}
+                      </h3>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setConnectionViolation(null)}
+                    className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition border border-slate-700 shrink-0"
+                    title="Close (ESC)"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Visual Pathway Comparison */}
+                <div className="my-3.5 p-3 rounded-xl bg-slate-950/70 border border-slate-800 flex items-center justify-center gap-2 text-xs">
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 font-bold text-slate-200">
+                    <span>{connectionViolation.fromNode?.name || connectionViolation.fromNode?.type}</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-rose-400 font-mono text-xs font-black">
+                    <span>──</span>
+                    <span className="w-5 h-5 rounded-full bg-rose-500/20 border border-rose-500 flex items-center justify-center text-[10px] text-rose-400 font-bold">✕</span>
+                    <span>──▶</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 font-bold text-rose-300">
+                    <span>{connectionViolation.toNode?.name || connectionViolation.toNode?.type}</span>
+                  </div>
+                </div>
+
+                {/* Explanation Box */}
+                <div className="space-y-3 text-xs leading-relaxed">
+                  <div className="p-3.5 rounded-xl bg-rose-950/30 border-l-4 border-rose-500 border-slate-800/80">
+                    <div className="text-[10px] font-black uppercase tracking-wider text-rose-400 mb-1 flex items-center gap-1">
+                      <span>Why This Is Not Possible in Real Cloud Architecture</span>
+                    </div>
+                    <p className="text-slate-300">{connectionViolation.explanation}</p>
+                  </div>
+
+                  {/* Recommendation Box */}
+                  <div className="p-3.5 rounded-xl bg-cyan-950/30 border-l-4 border-cyan-500 border-slate-800/80">
+                    <div className="text-[10px] font-black uppercase tracking-wider text-cyan-400 mb-1 flex items-center gap-1">
+                      <CheckCircle className="w-3 h-3 text-cyan-400" />
+                      <span>Recommended Production Pipeline</span>
+                    </div>
+                    <p className="text-slate-300 font-medium">{connectionViolation.recommendation}</p>
+                  </div>
+
+                  {/* Valid Alternatives */}
+                  {connectionViolation.validTargets && connectionViolation.validTargets.length > 0 && (
+                    <div className="pt-1">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1.5">
+                        Allowed Downstream Targets from {connectionViolation.fromNode?.name || connectionViolation.fromNode?.type}:
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {connectionViolation.validTargets.map((typeKey) => {
+                          const targetSpec = COMPONENT_CATALOG[typeKey];
+                          return (
+                            <span
+                              key={typeKey}
+                              className="px-2 py-0.5 rounded-md bg-slate-800/90 border border-emerald-500/30 text-emerald-300 font-bold text-[10px] flex items-center gap-1"
+                            >
+                              <Check className="w-2.5 h-2.5 text-emerald-400" />
+                              <span>{targetSpec?.name || typeKey}</span>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Action Footer */}
+                <div className="mt-5 flex items-center justify-end gap-2.5 pt-3 border-t border-slate-800">
+                  <button
+                    onClick={() => {
+                      setConnectionViolation(null);
+                      setConnectingFromId(null);
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold transition border border-slate-700"
+                  >
+                    Cancel Wire
+                  </button>
+                  <button
+                    onClick={() => setConnectionViolation(null)}
+                    className="px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-xs shadow-lg shadow-cyan-500/25 active:scale-95 transition flex items-center gap-1.5"
+                  >
+                    <span>Understood, Architect!</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Win / Loss Modal with Character Assets & Star Rating */}
           {postMortemModal && (
