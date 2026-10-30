@@ -174,9 +174,12 @@ async function runAuthFlowTest() {
     console.log('📸 Saved auth_debug_5_signup_form.png');
 
     // Fill Sign Up form & Submit
-    console.log('5b. Filling & Deploying new Architect Account...');
-    await page.type('input[placeholder="e.g. CyberArchitect"]', 'ZeroTrustTitan');
-    await page.type('input[placeholder="architect@domain.com"]', 'titan@zerotrust.dev');
+    const testRand = Date.now().toString().slice(-5);
+    const newHandle = `Titan_${testRand}`;
+    const newEmail = `titan_${testRand}@zerotrust.dev`;
+    console.log(`5b. Filling & Deploying new Architect Account (${newHandle})...`);
+    await page.type('input[placeholder="e.g. CyberArchitect"]', newHandle);
+    await page.type('input[placeholder="architect@domain.com"]', newEmail);
     // Select Security Specialization
     await page.evaluate(() => {
       const secBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Security'));
@@ -197,13 +200,13 @@ async function runAuthFlowTest() {
     });
     await new Promise(r => setTimeout(r, 1200));
 
-    const newRegisteredStatus = await page.evaluate(() => {
+    const newRegisteredStatus = await page.evaluate((targetHandle) => {
       const hud = document.querySelector('header');
-      const name = hud ? hud.textContent.includes('ZeroTrustTitan') : false;
+      const name = hud ? hud.textContent.includes(targetHandle) : false;
       return {
         nameInHud: name
       };
-    });
+    }, newHandle);
     console.log('New Registered Account Status in HUD:', newRegisteredStatus);
     if (!newRegisteredStatus.nameInHud) {
       throw new Error('Failed to register and deploy new Architect Account!');
@@ -221,3 +224,4 @@ runAuthFlowTest().catch(err => {
   console.error('❌ Test Failed:', err);
   process.exit(1);
 });
+

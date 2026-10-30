@@ -6531,7 +6531,7 @@ Can your architecture beat this? Test it in your browser:
                 sound.playClick();
                 setIsModeMenuOpen(!isModeMenuOpen);
               }}
-              className="px-2.5 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-indigo-500/40 text-xs font-bold font-display tracking-wide text-white shadow-md flex items-center gap-2 transition-all active:scale-95 group"
+              className="px-2.5 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-indigo-500/40 text-xs font-bold font-display tracking-wide text-white shadow-md flex items-center gap-2 transition-all active:scale-95 group cursor-pointer"
               title="Click to switch Game Mode (Campaign, Daily, Survival, Sandbox)"
             >
               <span className="text-sm">
@@ -6545,7 +6545,7 @@ Can your architecture beat this? Test it in your browser:
                   {gameMode === 'CAMPAIGN' ? `Lvl ${currentLevel.id}/5` : gameMode === 'DAILY' ? (dailyStreak > 0 ? `🔥${dailyStreak}d` : 'Puzzle') : gameMode === 'SURVIVAL' ? `Wave ${survivalWave}` : 'Uncapped'}
                 </span>
               </div>
-              <ChevronDown className={`w-3.5 h-3.5 text-indigo-400 transition-transform ${isModeMenuOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`w-3.5 h-3.5 text-indigo-400 group-hover:text-cyan-400 transition-transform ${isModeMenuOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {/* Dropdown Menu */}
@@ -6591,25 +6591,6 @@ Can your architecture beat this? Test it in your browser:
               </div>
             )}
           </div>
-
-          {/* Active Level Manager & Career Salary Pill (Campaign Mode) */}
-          {gameMode === 'CAMPAIGN' && LEVEL_MANAGERS[currentLevelIdx] && (
-            <button
-              onClick={() => {
-                sound.playClick();
-                setDesignationModal(true);
-              }}
-              className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-xs shrink-0 cursor-pointer active:scale-95 transition"
-              title={`Designation: ${LEVEL_MANAGERS[currentLevelIdx].currentJobTitle}\nBase Salary: ${LEVEL_MANAGERS[currentLevelIdx].baseSalary}\nManager: ${LEVEL_MANAGERS[currentLevelIdx].name} (${LEVEL_MANAGERS[currentLevelIdx].title})\nClick to inspect Designation & Promotion Requirements`}
-            >
-              <span className="text-sm">{LEVEL_MANAGERS[currentLevelIdx].snackEmoji}</span>
-              <span className="text-amber-300 font-bold font-mono text-[11px]">{LEVEL_MANAGERS[currentLevelIdx].baseSalary.split(' ')[0]}</span>
-              <span className="text-slate-600">•</span>
-              <span className="text-slate-200 font-semibold text-[11px] max-w-[120px] truncate">
-                {LEVEL_MANAGERS[currentLevelIdx].currentJobTitle}
-              </span>
-            </button>
-          )}
         </div>
 
         {/* Live Simulation SLA Metrics HUD */}
@@ -6732,39 +6713,6 @@ Can your architecture beat this? Test it in your browser:
             </button>
           </div>
 
-          {/* Architect Authentication Terminal Button */}
-          <button
-            onClick={() => {
-              sound.playClick();
-              setAuthModal({ isOpen: true, initialTab: currentUser ? 'SIGNIN' : 'SIGNIN' });
-            }}
-            className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 shadow-md active:scale-95 transition shrink-0 ${
-              currentUser
-                ? 'bg-slate-900/90 border-cyan-500/40 text-cyan-300 hover:border-cyan-400'
-                : 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 border-indigo-500/40 text-white'
-            }`}
-            title={currentUser ? `Signed in as ${currentUser.name} (${currentUser.role})` : 'Sign In or Register Architect Profile'}
-          >
-            {currentUser ? (
-              <>
-                {currentUser.avatar ? (
-                  <img src={currentUser.avatar} alt={currentUser.name} className="w-4 h-4 rounded-full object-cover ring-1 ring-cyan-400 shrink-0" />
-                ) : (
-                  <div className="w-4 h-4 rounded-full bg-cyan-500/30 text-cyan-300 flex items-center justify-center text-[10px] font-black ring-1 ring-cyan-400">
-                    {currentUser.name.charAt(0).toUpperCase()}
-                  </div>
-                )}
-                <span className="hidden sm:inline max-w-[90px] truncate font-mono">{currentUser.name}</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              </>
-            ) : (
-              <>
-                <LogIn className="w-3.5 h-3.5 text-cyan-400" />
-                <span className="hidden xs:inline">Sign In</span>
-              </>
-            )}
-          </button>
-
           {/* Continuous Bouncy Spring Utilities Capsule */}
           <div
             className="relative flex items-center justify-end"
@@ -6780,11 +6728,11 @@ Can your architecture beat this? Test it in your browser:
                   : 'rounded-full p-0.5 bg-slate-900/90 border-indigo-500/40 hover:border-cyan-400 hover:scale-110 active:scale-95 shadow-indigo-500/10 cursor-pointer'
               }`}
             >
-              {/* Collapsible Utility Items (Chaos, Leaderboard, Presets, Badges, Cloudflare, Auth) */}
+              {/* Collapsible Utility Items (Chaos, Leaderboard, Presets, Badges, Cloudflare) */}
               <div
                 className={`flex items-center gap-1 transition-all duration-500 ease-spring overflow-hidden ${
                   isUtilitiesExpanded
-                    ? 'max-w-[490px] opacity-100 scale-100 translate-x-0'
+                    ? 'max-w-[420px] opacity-100 scale-100 translate-x-0'
                     : 'max-w-0 opacity-0 scale-75 -translate-x-4 pointer-events-none'
                 }`}
               >
@@ -6794,7 +6742,7 @@ Can your architecture beat this? Test it in your browser:
                     triggerManualChaos();
                     setIsUtilitiesExpanded(false);
                   }}
-                  className="px-2 py-1 rounded-lg text-xs text-rose-300 hover:text-rose-200 hover:bg-rose-950/60 hover:scale-110 active:scale-90 transition-all duration-200 flex items-center gap-1 font-bold whitespace-nowrap"
+                  className="px-2 py-1 rounded-lg text-xs text-rose-300 hover:text-rose-200 hover:bg-rose-950/60 hover:scale-110 active:scale-90 transition-all duration-200 flex items-center gap-1 font-bold whitespace-nowrap cursor-pointer"
                   title="Summon Chaos Monkey to snip an instance and test system failover!"
                 >
                   <img src={chaosMonkeyImg} alt="Chaos" className="w-4 h-4 rounded-full object-cover ring-1 ring-rose-400" />
@@ -6808,7 +6756,7 @@ Can your architecture beat this? Test it in your browser:
                     setShowLeaderboardModal(true);
                     setIsUtilitiesExpanded(false);
                   }}
-                  className="px-2 py-1 rounded-lg text-xs text-amber-300 hover:text-amber-200 hover:bg-amber-950/60 hover:scale-110 active:scale-90 transition-all duration-200 flex items-center gap-1 font-bold whitespace-nowrap"
+                  className="px-2 py-1 rounded-lg text-xs text-amber-300 hover:text-amber-200 hover:bg-amber-950/60 hover:scale-110 active:scale-90 transition-all duration-200 flex items-center gap-1 font-bold whitespace-nowrap cursor-pointer"
                   title="View Daily Incident & Survival Leaderboard"
                 >
                   <Trophy className="w-3.5 h-3.5 text-amber-400" />
@@ -6822,7 +6770,7 @@ Can your architecture beat this? Test it in your browser:
                     setShowPresetsModal(true);
                     setIsUtilitiesExpanded(false);
                   }}
-                  className="px-2 py-1 rounded-lg text-xs text-purple-300 hover:text-purple-200 hover:bg-purple-950/60 hover:scale-110 active:scale-90 transition-all duration-200 flex items-center gap-1 font-bold whitespace-nowrap"
+                  className="px-2 py-1 rounded-lg text-xs text-purple-300 hover:text-purple-200 hover:bg-purple-950/60 hover:scale-110 active:scale-90 transition-all duration-200 flex items-center gap-1 font-bold whitespace-nowrap cursor-pointer"
                   title="Explore iconic architectures (Netflix, Spotify, Uber, Cloudflare)"
                 >
                   <Sparkles className="w-3.5 h-3.5 text-amber-400" />
@@ -6836,7 +6784,7 @@ Can your architecture beat this? Test it in your browser:
                     setShowBadgesModal(true);
                     setIsUtilitiesExpanded(false);
                   }}
-                  className="px-2 py-1 rounded-lg text-xs text-emerald-300 hover:text-emerald-200 hover:bg-emerald-950/60 hover:scale-110 active:scale-90 transition-all duration-200 flex items-center gap-1 font-bold whitespace-nowrap"
+                  className="px-2 py-1 rounded-lg text-xs text-emerald-300 hover:text-emerald-200 hover:bg-emerald-950/60 hover:scale-110 active:scale-90 transition-all duration-200 flex items-center gap-1 font-bold whitespace-nowrap cursor-pointer"
                   title={`View Architect Badges & Streak Rewards (${unlockedBadges.length} unlocked)`}
                 >
                   <Award className="w-3.5 h-3.5 text-emerald-400" />
@@ -6850,29 +6798,11 @@ Can your architecture beat this? Test it in your browser:
                     setShowCloudflareModal(true);
                     setIsUtilitiesExpanded(false);
                   }}
-                  className="px-2 py-1 rounded-lg text-xs text-orange-300 hover:text-orange-200 hover:bg-orange-950/60 hover:scale-110 active:scale-90 transition-all duration-200 flex items-center gap-1 font-bold whitespace-nowrap"
+                  className="px-2 py-1 rounded-lg text-xs text-orange-300 hover:text-orange-200 hover:bg-orange-950/60 hover:scale-110 active:scale-90 transition-all duration-200 flex items-center gap-1 font-bold whitespace-nowrap cursor-pointer"
                   title="Cloudflare R2 Backend Console"
                 >
                   <Cloud className="w-3.5 h-3.5 text-orange-400" />
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                </button>
-
-                {/* 6. Identity / Auth */}
-                <button
-                  onClick={() => {
-                    sound.playClick();
-                    setAuthModal({ isOpen: true, initialTab: currentUser ? 'SIGNIN' : 'SIGNIN' });
-                    setIsUtilitiesExpanded(false);
-                  }}
-                  className="px-2 py-1 rounded-lg text-xs text-cyan-300 hover:text-cyan-200 hover:bg-cyan-950/60 hover:scale-110 active:scale-90 transition-all duration-200 flex items-center gap-1 font-bold whitespace-nowrap"
-                  title="Architect Terminal Identity & Authentication"
-                >
-                  {currentUser?.avatar ? (
-                    <img src={currentUser.avatar} alt={currentUser.name} className="w-3.5 h-3.5 rounded-full object-cover shrink-0" />
-                  ) : (
-                    <User className="w-3.5 h-3.5 text-cyan-400" />
-                  )}
-                  <span className="text-[11px]">{currentUser ? currentUser.name : 'Sign In'}</span>
                 </button>
               </div>
 
