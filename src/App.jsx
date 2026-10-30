@@ -3545,9 +3545,9 @@ function AuthModal({
                   sound.playSelect();
                   onClose();
                 }}
-                className="flex-1 w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-1.5 active:scale-95 transition"
+                className="flex-1 w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-1.5 active:scale-95 transition cursor-pointer"
               >
-                <span>Enter Architecture Arena →</span>
+                <span>Continue to Game Modes &amp; Arena →</span>
               </button>
             </div>
           </div>
@@ -4438,7 +4438,7 @@ export default function App() {
   const [authModal, setAuthModal] = useState(() => {
     if (typeof window !== 'undefined') {
       if (window.location.hash === '#signup' || window.location.hash === '#register') {
-        return { isOpen: true, initialTab: 'SIGNUP' };
+        return { isOpen: true, initialTab: 'SIGNUP', isInitialOnboarding: true };
       }
       if (window.location.hash === '#arena' || window.location.hash === '#play' || window.location.hash === '#game') {
         return null;
@@ -4448,8 +4448,8 @@ export default function App() {
       }
     }
     // Default page is Sign In / Sign Up!
-    return { isOpen: true, initialTab: 'SIGNIN' };
-  }); // { isOpen: boolean, initialTab: 'SIGNIN' | 'SIGNUP' } | null
+    return { isOpen: true, initialTab: 'SIGNIN', isInitialOnboarding: true };
+  }); // { isOpen: boolean, initialTab: 'SIGNIN' | 'SIGNUP', isInitialOnboarding?: boolean } | null
   const [isBadgesShareCopied, setIsBadgesShareCopied] = useState(false);
   const [badgeToast, setBadgeToast] = useState(null); // { badge, timestamp }
   const [leaderboardTab, setLeaderboardTab] = useState('DAILY'); // 'DAILY' | 'SURVIVAL'
@@ -9316,7 +9316,7 @@ Can your architecture beat this? Test it in your browser:
                   onClick={() => {
                     sound.playClick();
                     setShowWelcomeModal(false);
-                    setAuthModal({ isOpen: true, initialTab: currentUser ? 'SIGNIN' : 'SIGNIN' });
+                    setAuthModal({ isOpen: true, initialTab: currentUser ? 'SIGNIN' : 'SIGNIN', isInitialOnboarding: true });
                   }}
                   className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-500/30 to-purple-500/30 hover:from-indigo-500/40 hover:to-purple-500/40 border border-indigo-400/50 text-white font-bold text-xs flex items-center gap-1.5 transition shadow active:scale-95"
                   title="Sign In or Register an Architect Identity"
@@ -11025,13 +11025,18 @@ Can your architecture beat this? Test it in your browser:
         isOpen={Boolean(authModal?.isOpen)}
         initialTab={authModal?.initialTab || 'SIGNIN'}
         onClose={() => {
+          const wasInitial = authModal?.isInitialOnboarding !== false;
           setAuthModal(null);
           if (typeof window !== 'undefined' && (window.location.hash === '#signin' || window.location.hash === '#signup' || window.location.hash === '#auth' || window.location.hash === '#register')) {
             window.history.replaceState(null, '', window.location.pathname + window.location.search);
           }
+          if (wasInitial) {
+            setShowWelcomeModal(true);
+          }
         }}
         currentUser={currentUser}
         onLogin={(user) => {
+          const wasInitial = authModal?.isInitialOnboarding !== false;
           setCurrentUser(user);
           try {
             localStorage.setItem('systemsaviour_auth_user', JSON.stringify(user));
@@ -11041,6 +11046,9 @@ Can your architecture beat this? Test it in your browser:
             message: `🔑 Terminal Authenticated! Welcome, ${user.name}.`
           });
           setTimeout(() => setToastNotification(null), 3500);
+          if (wasInitial) {
+            setShowWelcomeModal(true);
+          }
         }}
         onLogout={() => {
           setCurrentUser(null);

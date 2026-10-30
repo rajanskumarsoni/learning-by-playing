@@ -116,7 +116,7 @@ async function testDefaultPageAuth() {
     await new Promise(r => setTimeout(r, 1000));
 
     const authenticatedState = await page.evaluate(() => {
-      const enterArenaBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Enter Architecture Arena'));
+      const enterArenaBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Enter Architecture Arena') || b.textContent.includes('Game Modes') || b.textContent.includes('Arena'));
       const switchBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Switch / Sign In Other'));
       return {
         hasEnterArenaBtn: Boolean(enterArenaBtn),
