@@ -12,12 +12,11 @@ class SoundEngine {
     this.ambientOsc1 = null;
     this.ambientOsc2 = null;
     this.ambientGain = null;
-    this.isMuted = false;
     this.isAmbientPlaying = false;
+    this._stopDroneTimeout = null;
     this.musicGain = null;
     this.musicFilter = null;
     this.musicInterval = null;
-    this.isSaviourMusicPlaying = true; // Default music is ON!
     this.warriorAudio = null;
     this.warriorSourceNode = null;
     this.analyser = null;
@@ -30,11 +29,20 @@ class SoundEngine {
     this._pendingAutoplay = true;
     this._needsUnmuteOnGesture = false;
 
-    // Reset default to active unmuted sound
-    this.isMuted = false;
+    // Load persisted preferences: Sound defaults to ON (false), Music defaults to ON (true)
+    let savedMuted = false;
+    let savedMusic = true;
     try {
-      localStorage.removeItem('systemsaviour_sound_muted');
+      if (typeof localStorage !== 'undefined') {
+        const m = localStorage.getItem('systemsaviour_sound_muted');
+        if (m !== null) savedMuted = m === 'true';
+        const mus = localStorage.getItem('systemsaviour_music_enabled');
+        if (mus !== null) savedMusic = mus === 'true';
+      }
     } catch (e) {}
+
+    this.isMuted = savedMuted;
+    this.isSaviourMusicPlaying = savedMusic;
   }
 
   ensureContext() {
@@ -65,7 +73,9 @@ class SoundEngine {
     this.ensureContext();
     this.isMuted = !this.isMuted;
     try {
-      localStorage.setItem('systemsaviour_sound_muted', this.isMuted.toString());
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('systemsaviour_sound_muted', this.isMuted.toString());
+      }
     } catch (e) {}
 
     if (this.masterGain && this.ctx) {
@@ -77,9 +87,19 @@ class SoundEngine {
     if (this.warriorAudio) {
       if (this.isMuted) {
         this.warriorAudio.volume = 0;
+        this.warriorAudio.muted = true;
       } else {
-        const activeVol = this.isDucked ? this.duckedGain : this.musicTargetGain;
-        this.warriorAudio.volume = activeVol;
+        this.warriorAudio.muted = false;
+        // Only unmute warrior audio volume if music is enabled by the user!
+        if (this.isSaviourMusicPlaying) {
+          const activeVol = this.isDucked ? this.duckedGain : this.musicTargetGain;
+          this.warriorAudio.volume = activeVol;
+          if (this.warriorAudio.paused) {
+            this.warriorAudio.play().catch(() => {});
+          }
+        } else {
+          this.warriorAudio.volume = 0;
+        }
       }
     }
     return this.isMuted;
@@ -497,6 +517,10 @@ class SoundEngine {
 
   // 14. Gentle Cyber Operations Ambient Drone (Toggleable)
   startAmbientDrone() {
+    if (this._stopDroneTimeout) {
+      clearTimeout(this._stopDroneTimeout);
+      this._stopDroneTimeout = null;
+    }
     if (this.isAmbientPlaying || this.isMuted) return;
     const ctx = this.ensureContext();
     if (!ctx) return;
@@ -531,11 +555,14 @@ class SoundEngine {
 
   stopAmbientDrone() {
     if (!this.isAmbientPlaying) return;
+    if (this._stopDroneTimeout) {
+      clearTimeout(this._stopDroneTimeout);
+    }
     try {
       if (this.ambientGain && this.ctx) {
-        this.ambientGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.2);
+        this.ambientGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.15);
       }
-      setTimeout(() => {
+      this._stopDroneTimeout = setTimeout(() => {
         try {
           if (this.ambientOsc1) this.ambientOsc1.stop();
           if (this.ambientOsc2) this.ambientOsc2.stop();
@@ -544,9 +571,11 @@ class SoundEngine {
         this.ambientOsc2 = null;
         this.ambientGain = null;
         this.isAmbientPlaying = false;
-      }, 300);
+        this._stopDroneTimeout = null;
+      }, 200);
     } catch (e) {
       this.isAmbientPlaying = false;
+      this._stopDroneTimeout = null;
     }
   }
 
@@ -577,7 +606,9 @@ class SoundEngine {
             this.warriorAudio._triedFallback = true;
             this.warriorAudio.src = (import.meta.env?.BASE_URL || '/') + 'warrior_theme.mp3';
             this.warriorAudio.load();
-            this.warriorAudio.play().catch(() => {});
+            if (this.isSaviourMusicPlaying && !this.isMuted) {
+              this.warriorAudio.play().catch(() => {});
+            }
           }
         };
       } catch (e) {
@@ -588,7 +619,7 @@ class SoundEngine {
 
   fadeWarriorVolume(targetVol, durationMs = 260) {
     if (!this.warriorAudio) return;
-    if (this.isMuted) {
+    if (this.isMuted || !this.isSaviourMusicPlaying) {
       this.warriorAudio.volume = 0;
       return;
     }
@@ -603,7 +634,6 @@ class SoundEngine {
     this._fadeInterval = setInterval(() => {
       const elapsed = performance.now() - startTime;
       const progress = Math.min(1, elapsed / durationMs);
-      // Quadratic easing for natural volume curve
       const ease = progress < 0.5 ? 2 * progress * progress : -1 + (4 - 2 * progress) * progress;
       const current = startVol + (targetVol - startVol) * ease;
       if (this.warriorAudio) {
@@ -619,29 +649,34 @@ class SoundEngine {
   startSaviourTheme() {
     this.initWarriorAudio();
     this.isSaviourMusicPlaying = true;
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('systemsaviour_music_enabled', 'true');
+      }
+    } catch (e) {}
 
     if (this.warriorAudio) {
       const activeVolume = this.isMuted ? 0 : (this.isDucked ? this.duckedGain : this.musicTargetGain);
       this.warriorAudio.volume = activeVolume;
       this.warriorAudio.muted = this.isMuted;
 
-      const playPromise = this.warriorAudio.play();
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            this._pendingAutoplay = false;
-            this._needsUnmuteOnGesture = false;
-          })
-          .catch((err) => {
-            // Browser autoplay policy restricted unmuted playback.
-            // Start playing muted immediately so stream is buffered and playing:
-            this._pendingAutoplay = true;
-            this._needsUnmuteOnGesture = true;
-            try {
-              this.warriorAudio.muted = true;
-              this.warriorAudio.play().catch(() => {});
-            } catch (e) {}
-          });
+      if (!this.isMuted) {
+        const playPromise = this.warriorAudio.play();
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              this._pendingAutoplay = false;
+              this._needsUnmuteOnGesture = false;
+            })
+            .catch((err) => {
+              this._pendingAutoplay = true;
+              this._needsUnmuteOnGesture = true;
+              try {
+                this.warriorAudio.muted = true;
+                this.warriorAudio.play().catch(() => {});
+              } catch (e) {}
+            });
+        }
       }
     }
   }
@@ -649,11 +684,11 @@ class SoundEngine {
   unlockAudio() {
     this.ensureContext();
     this.initWarriorAudio();
-    this.isSaviourMusicPlaying = true;
 
-    if (this.warriorAudio) {
-      this.warriorAudio.muted = this.isMuted;
-      this.warriorAudio.volume = this.isMuted ? 0 : (this.isDucked ? this.duckedGain : this.musicTargetGain);
+    // Respect user's explicit music choice: only play music if user hasn't turned it off!
+    if (this.isSaviourMusicPlaying && !this.isMuted && this.warriorAudio) {
+      this.warriorAudio.muted = false;
+      this.warriorAudio.volume = this.isDucked ? this.duckedGain : this.musicTargetGain;
       this._needsUnmuteOnGesture = false;
       this._pendingAutoplay = false;
       this.warriorAudio.play().catch(() => {});
@@ -661,33 +696,39 @@ class SoundEngine {
   }
 
   isMusicActive() {
-    return !!(this.warriorAudio && !this.warriorAudio.paused && !this.warriorAudio.muted);
+    return !!(this.warriorAudio && !this.warriorAudio.paused && !this.warriorAudio.muted && this.warriorAudio.volume > 0);
   }
 
   stopSaviourTheme() {
     this._pendingAutoplay = false;
     this._needsUnmuteOnGesture = false;
-    if (!this.isSaviourMusicPlaying) return;
     this.isSaviourMusicPlaying = false;
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('systemsaviour_music_enabled', 'false');
+      }
+    } catch (e) {}
+
     if (this.warriorAudio) {
-      this.fadeWarriorVolume(0, 240);
+      this.fadeWarriorVolume(0, 200);
       setTimeout(() => {
         try {
           if (!this.isSaviourMusicPlaying && this.warriorAudio) {
             this.warriorAudio.pause();
-            this.warriorAudio.currentTime = 0;
           }
         } catch (e) {}
-      }, 250);
+      }, 210);
     }
   }
 
   toggleSaviourTheme() {
-    if (this.isMusicActive()) {
+    this.ensureContext();
+    this.initWarriorAudio();
+    if (this.isSaviourMusicPlaying) {
       this.stopSaviourTheme();
       return false;
     } else {
-      this.unlockAudio();
+      this.startSaviourTheme();
       return true;
     }
   }
@@ -756,6 +797,10 @@ class SoundEngine {
       playbackRate: rate.toFixed(2),
       intensity
     };
+  }
+
+  isAudible() {
+    return !this.isMuted && (this.isMusicActive() || this.isAmbientPlaying);
   }
 
   getVisualizerData() {

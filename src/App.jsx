@@ -2267,7 +2267,7 @@ function AudioVisualizerWidget({ soundEngine, isMuted, isPlaying, className = ''
     return 'bg-gradient-to-t from-indigo-500 via-cyan-400 to-emerald-300 shadow-[0_0_6px_rgba(56,189,248,0.4)]';
   };
 
-  const isSilenced = isMuted || !isPlaying;
+  const isSilenced = isMuted || (!isPlaying && !soundEngine?.isAudible?.());
 
   return (
     <div
@@ -4509,7 +4509,7 @@ export default function App() {
 
   // Intro Audio Tour & Saviour Background Music State
   const [audioTourState, setAudioTourState] = useState({ isPlaying: false, currentStepIdx: 0 });
-  const [isSaviourMusicPlaying, setIsSaviourMusicPlaying] = useState(true);
+  const [isSaviourMusicPlaying, setIsSaviourMusicPlaying] = useState(() => sound.isSaviourMusicPlaying);
   const [isAudioActive, setIsAudioActive] = useState(() => sound.isMusicActive());
 
   useEffect(() => {
@@ -4522,36 +4522,45 @@ export default function App() {
     return () => unsub();
   }, []);
 
-  // Default Background Warrior Music ON: Autostart immediately & ensure on first user interaction
+  // Background Warrior Music & Web Audio: Autostart if enabled & unlock on first user gesture
   useEffect(() => {
-    // Attempt immediate playback upon page load
+    // Attempt playback upon page load if enabled by player preferences
     sound.ensureContext();
-    sound.startSaviourTheme();
+    if (sound.isSaviourMusicPlaying && !sound.isMuted) {
+      sound.startSaviourTheme();
+    }
 
     const syncAudioState = () => {
       setIsAudioActive(sound.isMusicActive());
+      setIsSaviourMusicPlaying(sound.isSaviourMusicPlaying);
     };
 
-    const handleUserGesture = () => {
+    const handleFirstUserGesture = () => {
+      // Resume AudioContext and start warrior audio if enabled
       sound.unlockAudio();
       syncAudioState();
+
+      // Crucial: remove listeners once audio context is unlocked by first gesture so subsequent clicks don't re-trigger
+      window.removeEventListener('click', handleFirstUserGesture, { capture: true });
+      window.removeEventListener('keydown', handleFirstUserGesture, { capture: true });
+      window.removeEventListener('touchstart', handleFirstUserGesture, { capture: true });
+      window.removeEventListener('pointerdown', handleFirstUserGesture, { capture: true });
     };
 
-    // Use capture phase so no child component can swallow or stop propagation of the unlock
-    window.addEventListener('click', handleUserGesture, { capture: true });
-    window.addEventListener('keydown', handleUserGesture, { capture: true });
-    window.addEventListener('touchstart', handleUserGesture, { capture: true });
-    window.addEventListener('pointerdown', handleUserGesture, { capture: true });
+    window.addEventListener('click', handleFirstUserGesture, { capture: true });
+    window.addEventListener('keydown', handleFirstUserGesture, { capture: true });
+    window.addEventListener('touchstart', handleFirstUserGesture, { capture: true });
+    window.addEventListener('pointerdown', handleFirstUserGesture, { capture: true });
 
-    // Polling sync to detect when audio begins playing or pauses
+    // Periodic sync to update animated HUD indicators
     const syncTimer = setInterval(syncAudioState, 350);
 
     return () => {
       clearInterval(syncTimer);
-      window.removeEventListener('click', handleUserGesture, { capture: true });
-      window.removeEventListener('keydown', handleUserGesture, { capture: true });
-      window.removeEventListener('touchstart', handleUserGesture, { capture: true });
-      window.removeEventListener('pointerdown', handleUserGesture, { capture: true });
+      window.removeEventListener('click', handleFirstUserGesture, { capture: true });
+      window.removeEventListener('keydown', handleFirstUserGesture, { capture: true });
+      window.removeEventListener('touchstart', handleFirstUserGesture, { capture: true });
+      window.removeEventListener('pointerdown', handleFirstUserGesture, { capture: true });
     };
   }, []);
 
@@ -6684,32 +6693,41 @@ Can your architecture beat this? Test it in your browser:
               className="hidden lg:flex"
             />
             <button
+              data-testid="hud-sound-toggle-btn"
               onClick={toggleSound}
-              className={`px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition ${
+              className={`px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition cursor-pointer ${
                 isSoundMuted ? 'text-slate-500 hover:text-slate-300' : 'text-indigo-300 hover:text-white bg-indigo-600/30'
               }`}
               title={isSoundMuted ? 'Game Audio Muted — Click to Enable' : 'Game Audio Active — Click to Mute'}
             >
               {isSoundMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />}
-              <span className="hidden 2xl:inline text-[10px]">{isSoundMuted ? 'Muted' : 'Sound'}</span>
+              <span className="hidden sm:inline text-[10px]">{isSoundMuted ? 'Muted' : 'Sound'}</span>
             </button>
             <button
+              data-testid="hud-music-theme-btn"
               onClick={() => {
                 sound.playClick();
-                sound.ensureContext();
                 const next = sound.toggleSaviourTheme();
                 setIsSaviourMusicPlaying(next);
                 setIsAudioActive(sound.isMusicActive());
               }}
-              className={`px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition ${
-                isAudioActive && !isSoundMuted
+              className={`px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition cursor-pointer ${
+                isSaviourMusicPlaying && !isSoundMuted
                   ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm shadow-amber-500/20'
                   : 'text-slate-500 hover:text-slate-300'
               }`}
-              title="Warrior Battle Music Soundtrack (Click to Toggle)"
+              title={
+                isSoundMuted
+                  ? 'Warrior Battle Music Paused (Master Audio Muted)'
+                  : isSaviourMusicPlaying
+                  ? 'Warrior Battle Music Active (Click to Turn Off)'
+                  : 'Warrior Battle Music Off (Click to Turn On)'
+              }
             >
-              <Music className={`w-3.5 h-3.5 ${isAudioActive && !isSoundMuted ? 'animate-bounce text-amber-400' : ''}`} />
-              <span className="hidden 2xl:inline text-[10px]">Theme</span>
+              <Music className={`w-3.5 h-3.5 ${isSaviourMusicPlaying && !isSoundMuted ? 'animate-bounce text-amber-400' : ''}`} />
+              <span className="hidden sm:inline text-[10px]">
+                {isSaviourMusicPlaying ? (isSoundMuted ? 'Theme (Muted)' : 'Theme') : 'Theme (Off)'}
+              </span>
             </button>
           </div>
 
@@ -9278,20 +9296,19 @@ Can your architecture beat this? Test it in your browser:
                 <button
                   onClick={() => {
                     sound.playClick();
-                    sound.ensureContext();
                     const nextPlaying = sound.toggleSaviourTheme();
                     setIsSaviourMusicPlaying(nextPlaying);
                     setIsAudioActive(sound.isMusicActive());
                   }}
-                  className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 border transition backdrop-blur-sm ${
-                    isAudioActive
+                  className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 border transition backdrop-blur-sm cursor-pointer ${
+                    isSaviourMusicPlaying && !isSoundMuted
                       ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 shadow-md shadow-amber-500/20'
                       : 'bg-slate-900/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
                   }`}
-                  title="Toggle Epic Warrior Battle Theme (High 75% volume, audibly ducked to 30% while Ada narrates)"
+                  title="Toggle Epic Warrior Battle Theme"
                 >
-                  <Music className={`w-3.5 h-3.5 ${isAudioActive ? 'animate-bounce text-amber-400' : ''}`} />
-                  <span>Warrior Theme: {isAudioActive ? 'ON (75%)' : 'OFF'}</span>
+                  <Music className={`w-3.5 h-3.5 ${isSaviourMusicPlaying && !isSoundMuted ? 'animate-bounce text-amber-400' : ''}`} />
+                  <span>Warrior Theme: {isSaviourMusicPlaying ? (isSoundMuted ? 'MUTED' : 'ON (75%)') : 'OFF'}</span>
                 </button>
 
                 {/* Sign In / Architect Identity Button */}
