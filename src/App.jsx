@@ -6274,7 +6274,7 @@ Can your architecture beat this? Test it in your browser:
       {/* =================================================================== */}
       {/* 1. MASTER GAME HUD (STATUS, TELEMETRY, AUDIO & SYSTEM UTILITIES)    */}
       {/* =================================================================== */}
-      <header className="shrink-0 glass-header px-3 sm:px-4 py-2 flex flex-nowrap items-center justify-between gap-2 z-30 shadow-xl overflow-visible">
+      <header className="shrink-0 glass-header px-3 sm:px-4 py-2 flex flex-nowrap items-center justify-between gap-2 z-50 shadow-xl overflow-visible">
         {/* Brand Lockup & Mode Selector */}
         <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
           {/* User Profile Button with Emerging Profile Pane */}
@@ -6333,7 +6333,7 @@ Can your architecture beat this? Test it in your browser:
 
           {/* Emerging Profile Pane Component */}
           {isProfilePaneOpen && (
-            <div id="emerging-profile-pane" data-testid="emerging-profile-pane" className="absolute top-full left-0 mt-2.5 w-80 sm:w-96 bg-slate-950/98 backdrop-blur-2xl border-2 border-indigo-500/50 rounded-3xl p-4 sm:p-5 shadow-[0_12px_50px_rgba(0,0,0,0.85)] z-50 animate-in fade-in zoom-in-95 duration-150 text-slate-100 space-y-3.5 ring-1 ring-cyan-500/20">
+            <div id="emerging-profile-pane" data-testid="emerging-profile-pane" className="absolute top-full left-0 mt-2.5 w-80 sm:w-96 bg-[#090d16] border-2 border-indigo-500/70 rounded-3xl p-4 sm:p-5 shadow-[0_25px_70px_rgba(0,0,0,0.95)] z-[100] animate-in fade-in zoom-in-95 duration-150 text-slate-100 space-y-3.5 ring-1 ring-cyan-500/30">
               {/* Header: Photo Avatar + Full Name + Handle + Status */}
               <div className="flex items-start gap-3.5 border-b border-slate-800/80 pb-3.5">
                 <div className="relative shrink-0">
