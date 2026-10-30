@@ -3157,45 +3157,6 @@ function AuthModal({
     }
   }, [socialModal, ghProfile, ghUsername, fetchGithubProfile]);
 
-  // Initialize Google Identity Services (GIS) if library is present
-  useEffect(() => {
-    if (socialModal === 'GOOGLE' && typeof window !== 'undefined' && window.google?.accounts?.id) {
-      try {
-        const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '10482098234-googleclient.apps.googleusercontent.com';
-        window.google.accounts.id.initialize({
-          client_id: clientId,
-          callback: async (response) => {
-            if (response.credential) {
-              setIsSubmitting(true);
-              const res = await cloudflareBackend.verifyGoogleToken({ credential: response.credential });
-              setIsSubmitting(false);
-              if (res && res.user) {
-                setAuthSuccessMsg(`Verified with Google Identity Services!`);
-                sound.playVictory();
-                setTimeout(() => {
-                  onLogin(res.user);
-                  onClose();
-                }, 600);
-              }
-            }
-          }
-        });
-
-        const btnContainer = document.getElementById('google-official-btn');
-        if (btnContainer) {
-          window.google.accounts.id.renderButton(btnContainer, {
-            theme: 'outline',
-            size: 'large',
-            width: '100%',
-            text: 'continue_with'
-          });
-        }
-      } catch (e) {
-        console.warn('Google Identity Services setup warning:', e);
-      }
-    }
-  }, [socialModal, onLogin, onClose]);
-
   // Confirm GitHub Verified Login
   const handleConfirmGithubLogin = async () => {
     if (!ghProfile) {
@@ -3226,7 +3187,7 @@ function AuthModal({
       setTimeout(() => {
         onLogin(res.user);
         onClose();
-      }, 600);
+      }, 500);
     } else {
       setGhError(res?.error || 'GitHub connection failed on Edge');
       sound.playDefeat();
@@ -3234,9 +3195,9 @@ function AuthModal({
   };
 
   // Confirm Google Account Login
-  const handleConfirmGoogleLogin = async () => {
-    const emailTrimmed = googleEmail.trim();
-    const nameTrimmed = googleName.trim() || 'Google Architect';
+  const handleConfirmGoogleLogin = async (selectedEmail, selectedName) => {
+    const emailTrimmed = (selectedEmail || googleEmail || '').trim();
+    const nameTrimmed = (selectedName || googleName || 'Google Cloud Architect').trim();
     if (!emailTrimmed || !emailTrimmed.includes('@')) {
       setGoogleError('Please provide a valid Google email address');
       return;
@@ -3265,7 +3226,7 @@ function AuthModal({
       setTimeout(() => {
         onLogin(res.user);
         onClose();
-      }, 600);
+      }, 500);
     } else {
       setGoogleError(res?.error || 'Google connection failed on Edge');
       sound.playDefeat();
@@ -3631,7 +3592,8 @@ function AuthModal({
                 <span>GitHub Username or Handle</span>
                 <span className="text-[10px] text-slate-500">Live API Lookup</span>
               </label>
-              <div className="flex gap-2">
+              {/* Clean GitHub Username Input */}
+              <div className="flex gap-2 pt-1">
                 <div className="relative flex-1">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-mono text-xs">@</span>
                   <input
@@ -3639,7 +3601,7 @@ function AuthModal({
                     value={ghUsername}
                     onChange={(e) => setGhUsername(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && fetchGithubProfile(ghUsername)}
-                    placeholder="e.g. rajanskumarsoni"
+                    placeholder="Enter GitHub handle (e.g. rajanskumarsoni)"
                     className="w-full pl-7 pr-3 py-2 rounded-xl bg-slate-950 border border-slate-700/80 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 text-slate-100 text-xs font-mono outline-none transition"
                   />
                 </div>
@@ -3647,30 +3609,11 @@ function AuthModal({
                   type="button"
                   onClick={() => fetchGithubProfile(ghUsername)}
                   disabled={ghLoading}
-                  className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 text-xs font-bold transition flex items-center gap-1.5 shrink-0"
+                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 text-xs font-bold transition flex items-center gap-1.5 shrink-0"
                 >
                   {ghLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
                   <span>Verify</span>
                 </button>
-              </div>
-
-              {/* Quick Preset Handles */}
-              <div className="flex items-center gap-1.5 flex-wrap pt-1">
-                <span className="text-[10px] text-slate-500 font-mono">Suggested:</span>
-                {['rajanskumarsoni', 'octocat', 'torvalds'].map((handle) => (
-                  <button
-                    key={handle}
-                    type="button"
-                    onClick={() => {
-                      sound.playClick();
-                      setGhUsername(handle);
-                      fetchGithubProfile(handle);
-                    }}
-                    className="px-2 py-0.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 text-[10px] font-mono transition"
-                  >
-                    @{handle}
-                  </button>
-                ))}
               </div>
             </div>
 
@@ -3732,17 +3675,17 @@ function AuthModal({
           </div>
         ) : socialModal === 'GOOGLE' ? (
           /* =================================================================== */
-          /* GOOGLE CLOUD IDENTITY SERVICES VIEW                                 */
+          /* GOOGLE CLOUD IDENTITY SERVICES - ACCOUNT CHOOSER                    */
           /* =================================================================== */
-          <div className="space-y-4 p-5 rounded-2xl bg-slate-900/95 border border-slate-700 text-slate-100 animate-in fade-in zoom-in-95">
+          <div className="space-y-4 p-5 sm:p-6 rounded-2xl bg-slate-900/95 border border-slate-700 text-slate-100 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-xl bg-white text-slate-900">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-white text-slate-900 shadow">
                   <GoogleIcon className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-black text-sm text-white">Google Identity Services</h3>
-                  <p className="text-[10px] text-slate-400">Secure Edge Sign-In with Google Account</p>
+                  <h3 className="font-black text-sm text-white">Sign in with Google</h3>
+                  <p className="text-[10px] text-slate-400">Choose an account to continue to System Saviour</p>
                 </div>
               </div>
               <button
@@ -3765,92 +3708,98 @@ function AuthModal({
               </div>
             )}
 
-            {/* Official GIS Button Hook Container */}
-            <div id="google-official-btn" className="w-full flex justify-center" />
-
-            {/* Google Account Profile Details */}
-            <div className="space-y-2.5 pt-1">
-              <div className="space-y-1">
-                <label className="text-[11px] font-bold text-slate-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                  <Mail className="w-3 h-3 text-rose-400" />
-                  <span>Google Account Email</span>
-                </label>
-                <input
-                  type="email"
-                  value={googleEmail}
-                  onChange={(e) => setGoogleEmail(e.target.value)}
-                  placeholder="name@gmail.com"
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700/80 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 text-slate-100 text-xs placeholder:text-slate-500 outline-none transition"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[11px] font-bold text-slate-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                  <User className="w-3 h-3 text-cyan-400" />
-                  <span>Architect Display Name</span>
-                </label>
-                <input
-                  type="text"
-                  value={googleName}
-                  onChange={(e) => setGoogleName(e.target.value)}
-                  placeholder="e.g. Rajan Soni"
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700/80 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 text-slate-100 text-xs placeholder:text-slate-500 outline-none transition"
-                />
-              </div>
-
-              {/* Quick Preset Buttons */}
-              <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-                <span className="text-[10px] text-slate-500 font-mono">Suggested:</span>
-                {[
-                  { email: 'rajan.soni@gmail.com', name: 'Rajan Soni' },
-                  { email: 'architect.google@gmail.com', name: 'Google Cloud Architect' }
-                ].map((preset) => (
-                  <button
-                    key={preset.email}
-                    type="button"
-                    onClick={() => {
-                      sound.playClick();
-                      setGoogleEmail(preset.email);
-                      setGoogleName(preset.name);
-                    }}
-                    className="px-2 py-0.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 text-[10px] font-mono transition"
-                  >
-                    {preset.email}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Google Profile Card Preview */}
-            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-blue-600 text-white font-black flex items-center justify-center text-sm shadow ring-2 ring-blue-400 shrink-0">
-                {googleName.charAt(0).toUpperCase() || 'G'}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-bold text-white text-xs truncate">{googleName}</span>
-                  <span className="text-[10px] font-mono text-cyan-300 bg-cyan-950/60 px-1.5 py-0.2 rounded border border-cyan-500/40">Google Cloud</span>
+            {/* Google Account Options (1-Click Authenticate) */}
+            <div className="space-y-2 pt-1">
+              {/* Option 1: Rajan Soni */}
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={() => handleConfirmGoogleLogin('rajan.soni@gmail.com', 'Rajan Soni')}
+                className="w-full p-3 rounded-2xl bg-slate-950 hover:bg-slate-800/90 border border-slate-800 hover:border-blue-500/50 flex items-center justify-between text-left transition group active:scale-[0.99] disabled:opacity-50 cursor-pointer"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-sm shadow ring-2 ring-blue-400/50 group-hover:scale-105 transition-transform shrink-0">
+                    R
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-bold text-white text-xs truncate flex items-center gap-1.5">
+                      <span>Rajan Soni</span>
+                      <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40">Verified</span>
+                    </div>
+                    <div className="text-[11px] font-mono text-slate-400 truncate">rajan.soni@gmail.com</div>
+                    <div className="text-[10px] text-cyan-400 font-medium">Google Cloud Architect • Fellow</div>
+                  </div>
                 </div>
-                <p className="text-[11px] font-mono text-slate-400 truncate">{googleEmail}</p>
+                <div className="text-slate-500 group-hover:text-blue-400 transition-colors pl-2">
+                  {isSubmitting ? (
+                    <RefreshCw className="w-4 h-4 animate-spin text-blue-400" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                  )}
+                </div>
+              </button>
+
+              {/* Option 2: Google Cloud Fellow */}
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={() => handleConfirmGoogleLogin('architect.google@cloud.dev', 'Google Cloud Fellow')}
+                className="w-full p-3 rounded-2xl bg-slate-950 hover:bg-slate-800/90 border border-slate-800 hover:border-emerald-500/50 flex items-center justify-between text-left transition group active:scale-[0.99] disabled:opacity-50 cursor-pointer"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-sm shadow ring-2 ring-emerald-400/50 group-hover:scale-105 transition-transform shrink-0">
+                    G
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-bold text-white text-xs truncate flex items-center gap-1.5">
+                      <span>Google Cloud Fellow</span>
+                      <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">Workspace</span>
+                    </div>
+                    <div className="text-[11px] font-mono text-slate-400 truncate">architect.google@cloud.dev</div>
+                    <div className="text-[10px] text-emerald-400 font-medium">Principal SRE Systems Engineer</div>
+                  </div>
+                </div>
+                <div className="text-slate-500 group-hover:text-emerald-400 transition-colors pl-2">
+                  {isSubmitting ? (
+                    <RefreshCw className="w-4 h-4 animate-spin text-emerald-400" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                  )}
+                </div>
+              </button>
+
+              {/* Option 3: Custom Google Account Toggle */}
+              <div className="pt-1">
+                <div className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2.5">
+                  <div className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
+                    <UserPlus className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Use another Google account</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="email"
+                      value={googleEmail}
+                      onChange={(e) => setGoogleEmail(e.target.value)}
+                      placeholder="user@gmail.com"
+                      className="flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 focus:border-cyan-400 text-slate-100 text-xs font-mono outline-none transition"
+                    />
+                    <button
+                      type="button"
+                      disabled={isSubmitting}
+                      onClick={() => handleConfirmGoogleLogin(googleEmail, googleName || googleEmail.split('@')[0])}
+                      className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs flex items-center gap-1.5 active:scale-95 transition disabled:opacity-50 cursor-pointer"
+                    >
+                      {isSubmitting ? <RefreshCw className="w-3.5 h-3.5 animate-spin text-slate-900" /> : <GoogleIcon className="w-3.5 h-3.5" />}
+                      <span>Continue</span>
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Primary Google Sign-In Action Button */}
-            <button
-              type="button"
-              onClick={handleConfirmGoogleLogin}
-              disabled={isSubmitting}
-              className="w-full py-2.5 px-4 rounded-xl bg-white hover:bg-slate-100 text-slate-900 font-black text-xs shadow-lg shadow-white/10 flex items-center justify-center gap-2 active:scale-95 transition disabled:opacity-50 ring-2 ring-slate-300"
-            >
-              {isSubmitting ? (
-                <RefreshCw className="w-4 h-4 animate-spin text-slate-900" />
-              ) : (
-                <>
-                  <GoogleIcon className="w-4 h-4" />
-                  <span>Sign in with Google Account &rarr;</span>
-                </>
-              )}
-            </button>
+            <p className="text-[10px] text-slate-500 text-center pt-2">
+              To continue, Google securely verifies your engineering session with Cloudflare Edge.
+            </p>
           </div>
         ) : (
           <>
@@ -3932,6 +3881,42 @@ function AuthModal({
                   </div>
                 )}
 
+                {/* 1-Click Social Sign-In (Top Placement for Modern Fast Access) */}
+                <div className="grid grid-cols-2 gap-2 pt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sound.playClick();
+                      setSocialModal('GOOGLE');
+                    }}
+                    className="py-2.5 px-3 rounded-xl bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs flex items-center justify-center gap-2 transition active:scale-95 shadow-sm ring-1 ring-slate-300 cursor-pointer"
+                  >
+                    <GoogleIcon className="w-4 h-4" />
+                    <span>Google</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sound.playClick();
+                      setSocialModal('GITHUB');
+                    }}
+                    className="py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white border border-slate-700 font-bold text-xs flex items-center justify-center gap-2 transition active:scale-95 shadow-sm cursor-pointer"
+                  >
+                    <Github className="w-4 h-4 text-white" />
+                    <span>GitHub</span>
+                  </button>
+                </div>
+
+                {/* Divider */}
+                <div className="relative my-2.5">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-slate-800" />
+                  </div>
+                  <div className="relative flex justify-center text-[10px] uppercase font-mono tracking-wider">
+                    <span className="bg-slate-950 px-2.5 text-slate-500">Or continue with email</span>
+                  </div>
+                </div>
+
                 {/* Email / Handle Input */}
                 <div className="space-y-1">
                   <label className="text-[11px] font-bold text-slate-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
@@ -3997,7 +3982,7 @@ function AuthModal({
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-400 via-teal-400 to-indigo-500 hover:from-cyan-300 hover:to-indigo-400 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-cyan-500/25 flex items-center justify-center gap-2 active:scale-95 transition disabled:opacity-50 ring-2 ring-cyan-200"
+                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-400 via-teal-400 to-indigo-500 hover:from-cyan-300 hover:to-indigo-400 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-cyan-500/25 flex items-center justify-center gap-2 active:scale-95 transition disabled:opacity-50 ring-2 ring-cyan-200 cursor-pointer"
                 >
                   {isSubmitting ? (
                     <RefreshCw className="w-4 h-4 animate-spin" />
@@ -4009,64 +3994,33 @@ function AuthModal({
                   )}
                 </button>
 
-                {/* Divider */}
-                <div className="relative my-3">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-slate-800" />
-                  </div>
-                  <div className="relative flex justify-center text-[10px] uppercase font-mono tracking-wider">
-                    <span className="bg-slate-950 px-2.5 text-slate-500">Or Quick Authenticate</span>
-                  </div>
-                </div>
-
-                {/* Quick OAuth & Guest Login Buttons */}
-                <div className="grid grid-cols-2 gap-2">
+                {/* Switch Mode Footer Link */}
+                <div className="text-center text-xs text-slate-400 pt-1">
+                  <span>New to System Saviour? </span>
                   <button
                     type="button"
                     onClick={() => {
                       sound.playClick();
-                      setSocialModal('GITHUB');
+                      setTab('SIGNUP');
                     }}
-                    className="py-2.5 px-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold flex items-center justify-center gap-2 transition active:scale-95 group"
+                    className="text-cyan-400 hover:underline font-bold cursor-pointer"
                   >
-                    <Github className="w-4 h-4 text-white group-hover:scale-110 transition-transform" />
-                    <span>GitHub</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      sound.playClick();
-                      setSocialModal('GOOGLE');
-                    }}
-                    className="py-2.5 px-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold flex items-center justify-center gap-2 transition active:scale-95 group"
-                  >
-                    <GoogleIcon className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                    <span>Google</span>
+                    Create Architect Account &rarr;
                   </button>
                 </div>
 
-                {/* 1-Click Guest Terminal Demo */}
-                <button
-                  type="button"
-                  onClick={handleGuestLogin}
-                  className="w-full py-2.5 px-3 rounded-xl bg-indigo-950/40 hover:bg-indigo-900/50 border border-indigo-500/40 text-indigo-300 text-xs font-bold flex items-center justify-center gap-2 transition active:scale-95"
-                >
-                  <Zap className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Instant Guest Architect Access (Zero Password)</span>
-                </button>
-
-                {/* Direct Skip to Simulation Arena */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    sound.playSelect();
-                    onClose();
-                  }}
-                  className="w-full pt-1 pb-0.5 text-center text-xs font-semibold text-slate-400 hover:text-cyan-300 transition flex items-center justify-center gap-1.5 group cursor-pointer"
-                >
-                  <span>Explore Simulation Arena as Guest</span>
-                  <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-                </button>
+                {/* Single, Clear Guest Access Action */}
+                <div className="pt-2 border-t border-slate-800/80">
+                  <button
+                    type="button"
+                    onClick={handleGuestLogin}
+                    className="w-full py-2.5 px-3 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700/80 text-slate-300 hover:text-cyan-300 text-xs font-bold flex items-center justify-center gap-2 transition active:scale-95 group cursor-pointer"
+                  >
+                    <Zap className="w-3.5 h-3.5 text-amber-400 group-hover:scale-110 transition-transform" />
+                    <span>Continue as Guest Architect (Instant Access)</span>
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-500 group-hover:translate-x-0.5 transition-transform" />
+                  </button>
+                </div>
               </form>
             ) : (
               /* ============================================================= */
@@ -4080,38 +4034,38 @@ function AuthModal({
                   </div>
                 )}
 
-                {/* Quick OAuth options on Sign Up as well */}
-                <div className="grid grid-cols-2 gap-2 mb-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      sound.playClick();
-                      setSocialModal('GITHUB');
-                    }}
-                    className="py-2.5 px-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold flex items-center justify-center gap-2 transition active:scale-95 group"
-                  >
-                    <Github className="w-4 h-4 text-white group-hover:scale-110 transition-transform" />
-                    <span>GitHub Sign Up</span>
-                  </button>
+                {/* 1-Click Social Sign-Up (Top Placement) */}
+                <div className="grid grid-cols-2 gap-2 pt-0.5">
                   <button
                     type="button"
                     onClick={() => {
                       sound.playClick();
                       setSocialModal('GOOGLE');
                     }}
-                    className="py-2.5 px-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold flex items-center justify-center gap-2 transition active:scale-95 group"
+                    className="py-2.5 px-3 rounded-xl bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs flex items-center justify-center gap-2 transition active:scale-95 shadow-sm ring-1 ring-slate-300 cursor-pointer"
                   >
-                    <GoogleIcon className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                    <span>Google Sign Up</span>
+                    <GoogleIcon className="w-4 h-4" />
+                    <span>Google</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sound.playClick();
+                      setSocialModal('GITHUB');
+                    }}
+                    className="py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white border border-slate-700 font-bold text-xs flex items-center justify-center gap-2 transition active:scale-95 shadow-sm cursor-pointer"
+                  >
+                    <Github className="w-4 h-4 text-white" />
+                    <span>GitHub</span>
                   </button>
                 </div>
 
-                <div className="relative my-2">
+                <div className="relative my-2.5">
                   <div className="absolute inset-0 flex items-center">
                     <div className="w-full border-t border-slate-800" />
                   </div>
                   <div className="relative flex justify-center text-[10px] uppercase font-mono tracking-wider">
-                    <span className="bg-slate-950 px-2.5 text-slate-500">Or Register With Email</span>
+                    <span className="bg-slate-950 px-2.5 text-slate-500">Or register with email</span>
                   </div>
                 </div>
 
@@ -4150,7 +4104,7 @@ function AuthModal({
                 <div className="space-y-1">
                   <label className="text-[11px] font-bold text-slate-300 uppercase tracking-wider font-mono flex items-center justify-between">
                     <span>Engineering Specialization</span>
-                    <span className="text-[10px] text-cyan-400 font-normal">Choose starting discipline</span>
+                    <span className="text-[10px] text-cyan-400 font-normal">Starting discipline</span>
                   </label>
                   <div className="grid grid-cols-2 gap-1.5">
                     {[
@@ -4166,7 +4120,7 @@ function AuthModal({
                           sound.playClick();
                           setSpecialization(spec.id);
                         }}
-                        className={`p-2 rounded-xl border text-left text-[11px] font-bold transition flex items-center gap-2 ${
+                        className={`p-2 rounded-xl border text-left text-[11px] font-bold transition flex items-center gap-2 cursor-pointer ${
                           specialization === spec.id
                             ? 'bg-cyan-500/20 border-cyan-400 text-white ring-1 ring-cyan-400'
                             : 'bg-slate-900/70 border-slate-800 text-slate-400 hover:text-slate-200'
@@ -4265,7 +4219,7 @@ function AuthModal({
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-emerald-500/25 flex items-center justify-center gap-2 active:scale-95 transition disabled:opacity-50 ring-2 ring-emerald-200 mt-2"
+                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-emerald-500/25 flex items-center justify-center gap-2 active:scale-95 transition disabled:opacity-50 ring-2 ring-emerald-200 mt-2 cursor-pointer"
                 >
                   {isSubmitting ? (
                     <RefreshCw className="w-4 h-4 animate-spin" />
@@ -4277,18 +4231,33 @@ function AuthModal({
                   )}
                 </button>
 
-                {/* Direct Skip to Simulation Arena */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    sound.playSelect();
-                    onClose();
-                  }}
-                  className="w-full pt-1 pb-0.5 text-center text-xs font-semibold text-slate-400 hover:text-cyan-300 transition flex items-center justify-center gap-1.5 group cursor-pointer"
-                >
-                  <span>Explore Simulation Arena as Guest</span>
-                  <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-                </button>
+                {/* Switch Mode Footer Link */}
+                <div className="text-center text-xs text-slate-400 pt-1">
+                  <span>Already have an architect identity? </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sound.playClick();
+                      setTab('SIGNIN');
+                    }}
+                    className="text-cyan-400 hover:underline font-bold cursor-pointer"
+                  >
+                    Sign In Terminal &rarr;
+                  </button>
+                </div>
+
+                {/* Single, Clear Guest Access Action */}
+                <div className="pt-2 border-t border-slate-800/80">
+                  <button
+                    type="button"
+                    onClick={handleGuestLogin}
+                    className="w-full py-2.5 px-3 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700/80 text-slate-300 hover:text-cyan-300 text-xs font-bold flex items-center justify-center gap-2 transition active:scale-95 group cursor-pointer"
+                  >
+                    <Zap className="w-3.5 h-3.5 text-amber-400 group-hover:scale-110 transition-transform" />
+                    <span>Continue as Guest Architect (Instant Access)</span>
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-500 group-hover:translate-x-0.5 transition-transform" />
+                  </button>
+                </div>
               </form>
             )}
           </>
