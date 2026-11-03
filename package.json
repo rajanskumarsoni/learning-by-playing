@@ -20,6 +20,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "backend": "cd backend && npx wrangler dev --port 8787",
+    "db:migrate": "cd backend && npx --yes wrangler d1 execute systemsaviour_db --local --file=./schema.sql",
+    "db:seed": "cd backend && npx --yes wrangler d1 execute systemsaviour_db --local --file=./seed.sql",
     "seed": "node scripts/seed_cloudflare_data.mjs",
     "sync:cloudflare": "node scripts/sync_all_to_cloudflare.mjs",
     "deploy:backend": "cd backend && npx wrangler deploy"

@@ -23,6 +23,38 @@ import managerHiroshiImg from './assets/manager_hiroshi.png';
 import { sound } from './audioEngine.js';
 import { introAudioTour, INTRO_TOUR_STEPS } from './introAudioTour.js';
 import { cloudflareBackend } from './services/cloudflareBackend.js';
+import {
+  CLOUD_CONNECTION_RULES,
+  isConnectionAllowed,
+  validateCloudConnection,
+  ICONIC_PRESETS,
+  STREAK_REWARDS,
+  ARCHITECT_BADGES,
+  LEVEL_MANAGERS as BASE_LEVEL_MANAGERS,
+  evaluateUnlockedBadges
+} from '../backend/gameEngine.js';
+
+export {
+  CLOUD_CONNECTION_RULES,
+  isConnectionAllowed,
+  validateCloudConnection,
+  ICONIC_PRESETS,
+  STREAK_REWARDS,
+  ARCHITECT_BADGES
+};
+
+const MANAGER_AVATARS = {
+  angry_manager: angryManagerImg,
+  manager_daiki: managerDaikiImg,
+  manager_ryoko: managerRyokoImg,
+  manager_viktor: managerViktorImg,
+  manager_hiroshi: managerHiroshiImg,
+};
+
+export const LEVEL_MANAGERS = BASE_LEVEL_MANAGERS.map(m => ({
+  ...m,
+  avatar: MANAGER_AVATARS[m.avatarKey] || angryManagerImg
+}));
 
 // ============================================================================
 // 1. TRAFFIC TYPES (6 REALISTIC CLOUD TRAFFIC FLOWS)
@@ -341,476 +373,6 @@ const COMPONENT_CATALOG = {
 };
 
 // ============================================================================
-// 2.5. REAL-WORLD CLOUD ARCHITECTURE CONNECTION RULES & VALIDATION MATRIX
-// ============================================================================
-export const CLOUD_CONNECTION_RULES = {
-  SOURCE: {
-    allowed: ['WAF', 'CDN', 'LB', 'WEB'],
-    rules: {
-      SQL: {
-        title: 'Direct Database Ingress Violation',
-        category: 'Perimeter Security Rule',
-        explanation: 'Relational databases (PostgreSQL/MySQL) reside strictly in isolated private VPC subnets. Exposing port 5432 directly to public Internet Ingress bypasses authentication, rate limiting, and connection pooling, risking massive DDoS attacks and immediate data exfiltration.',
-        recommendation: 'Route traffic through a Load Balancer and API / Web Server first: Ingress ➔ Load Balancer ➔ Web Server ➔ PostgreSQL Database.'
-      },
-      CACHE: {
-        title: 'Direct In-Memory Cache Ingress Violation',
-        category: 'Perimeter Security Rule',
-        explanation: 'Redis lacks robust HTTP perimeter protection and is designed strictly as an internal low-latency key-value store. Public clients cannot speak the Redis RESP protocol directly.',
-        recommendation: 'Route traffic through an API / Web Server or Cloud CDN Edge before querying Redis.'
-      },
-      QUEUE: {
-        title: 'Unauthenticated Event Ingress Violation',
-        category: 'Perimeter Architecture Rule',
-        explanation: 'Kafka broker ports should never face public client traffic directly. Unauthenticated internet traffic could flood partition commit logs, exhaust broker disk I/O, and compromise message schemas.',
-        recommendation: 'Terminate incoming HTTP requests at an API / Web Server, which parses, validates, and publishes verified events to Kafka.'
-      },
-      WORKER: {
-        title: 'Bypassed Orchestration Violation',
-        category: 'Async Workflow Rule',
-        explanation: 'Async Worker Pools do not run public HTTP listeners. Workers pull jobs asynchronously from message queues or task schedulers in the background.',
-        recommendation: 'Route Ingress ➔ Web Server ➔ Kafka Queue ➔ Async Worker Pool.'
-      },
-      SEARCH: {
-        title: 'Exposed Internal Search Cluster',
-        category: 'Perimeter Security Rule',
-        explanation: 'Elasticsearch clusters in internal VPCs must not accept raw unauthenticated HTTP requests. Wildcard search scans would quickly cause JVM heap exhaustion and cluster outages.',
-        recommendation: 'Route queries through an API / Web Server to sanitize search parameters before querying Elasticsearch.'
-      },
-      STORAGE: {
-        title: 'Direct Object Storage Ingress',
-        category: 'Cloud Storage Rule',
-        explanation: 'Raw public client requests should not hit private S3 buckets directly without caching or authentication.',
-        recommendation: 'Deliver media via Cloud CDN Edge (for cached reads) or issue presigned URLs via an API / Web Server (for uploads).'
-      },
-      VECTOR_AI: {
-        title: 'Unauthenticated GPU Cluster Exposure',
-        category: 'Cost & Perimeter Rule',
-        explanation: 'GPU LLM inference and Vector DB nodes are high-cost resources. Exposing them to raw public ingress invites immediate Denial of Wallet attacks.',
-        recommendation: 'Shield GPU clusters behind an API / Web Server to enforce rate limits, user auth, and prompt validation.'
-      },
-      SOURCE: {
-        title: 'Self-Connection Loop',
-        category: 'Topology Rule',
-        explanation: 'Internet Ingress is the root traffic origin and cannot route packets into itself.',
-        recommendation: 'Connect Ingress downstream to WAF, CDN, Load Balancer, or Web Server.'
-      }
-    }
-  },
-
-  WAF: {
-    allowed: ['CDN', 'LB', 'WEB', 'CACHE'],
-    rules: {
-      SOURCE: {
-        title: 'Reverse Traffic Inversion',
-        category: 'Dataflow Direction Rule',
-        explanation: 'Traffic flows from the Internet into your cloud perimeter, not backwards into client ingress.',
-        recommendation: 'Direct scrubbed traffic forward to a Load Balancer, Cloud CDN, or Web Server.'
-      },
-      WAF: {
-        title: 'Redundant Perimeter Scrubbing',
-        category: 'Optimization Rule',
-        explanation: 'Chaining multiple WAF instances in series multiplies TLS termination latency without improving security posture.',
-        recommendation: 'Direct scrubbed traffic downstream to a Load Balancer or Web Server.'
-      },
-      SQL: {
-        title: 'Protocol Incompatibility: WAF to Database',
-        category: 'Protocol Mismatch Rule',
-        explanation: 'WAFs inspect Layer 7 HTTP/HTTPS traffic. They do not speak PostgreSQL wire protocols or parse SQL query statements.',
-        recommendation: 'Connect WAF ➔ Load Balancer ➔ API / Web Server ➔ PostgreSQL Database.'
-      },
-      QUEUE: {
-        title: 'Missing Event Serialization',
-        category: 'Dataflow Rule',
-        explanation: 'WAF proxies inspect and scrub HTTP headers/payloads; they cannot serialize messages into Kafka topic partitions.',
-        recommendation: 'Route clean traffic to an API / Web Server, which serializes and dispatches events to Kafka.'
-      },
-      WORKER: {
-        title: 'Worker Ingestion Mismatch',
-        category: 'Async Architecture Rule',
-        explanation: 'Async workers consume queue messages; they do not terminate HTTP connections from perimeter firewalls.',
-        recommendation: 'Route through Web Server ➔ Kafka Queue ➔ Worker Pool.'
-      },
-      SEARCH: {
-        title: 'Missing Query Parsing',
-        category: 'Protocol Mismatch Rule',
-        explanation: 'WAF does not generate Elasticsearch Query DSL from raw HTTP requests.',
-        recommendation: 'Route through an API / Web Server.'
-      },
-      STORAGE: {
-        title: 'Storage Routing Mismatch',
-        category: 'Architecture Rule',
-        explanation: 'WAF filters ingress traffic; it does not host an S3 object store.',
-        recommendation: 'Route to Cloud CDN or an API / Web Server.'
-      },
-      VECTOR_AI: {
-        title: 'Missing Inference Gateway',
-        category: 'Compute Gateway Rule',
-        explanation: 'WAF cannot generate vector embeddings or format JSON chat payloads for LLM inference engines.',
-        recommendation: 'Route through an API / Web Server.'
-      }
-    }
-  },
-
-  CDN: {
-    allowed: ['LB', 'WEB', 'STORAGE', 'WAF', 'CACHE'],
-    rules: {
-      SOURCE: {
-        title: 'Reverse Traffic Inversion',
-        category: 'Dataflow Direction Rule',
-        explanation: 'Edge CDNs receive traffic from Ingress and forward origin cache misses inward, not back out to client ingress.',
-        recommendation: 'Connect CDN downstream to an origin Load Balancer, Web Server, or S3 Storage bucket.'
-      },
-      CDN: {
-        title: 'Edge CDN Loop Detected',
-        category: 'Edge Topology Rule',
-        explanation: 'Chaining edge CDNs to each other causes cache fragmentation, stale invalidations, and routing loops.',
-        recommendation: 'Route cache misses directly to an origin Load Balancer or Web Server.'
-      },
-      SQL: {
-        title: 'Protocol Incompatibility: CDN to Database',
-        category: 'Protocol Mismatch Rule',
-        explanation: 'CDNs cache and proxy HTTP content. They cannot connect over TCP sockets to PostgreSQL or execute relational queries.',
-        recommendation: 'Connect CDN ➔ Load Balancer ➔ API / Web Server ➔ PostgreSQL Database.'
-      },
-      QUEUE: {
-        title: 'Edge Proxy to Queue Mismatch',
-        category: 'Async Architecture Rule',
-        explanation: 'CDNs do not publish messages to Kafka message queues directly.',
-        recommendation: 'Forward dynamic traffic to an API / Web Server first.'
-      },
-      WORKER: {
-        title: 'Worker Decoupling Violation',
-        category: 'Async Workflow Rule',
-        explanation: 'CDN edge POPs do not invoke background compute workers directly.',
-        recommendation: 'Route through Web Server ➔ Kafka Queue ➔ Async Workers.'
-      },
-      VECTOR_AI: {
-        title: 'Missing Compute Orchestrator',
-        category: 'Compute Rule',
-        explanation: 'CDNs cannot run matrix math or vector indexing directly without an application server.',
-        recommendation: 'Route dynamic AI queries through an API / Web Server.'
-      }
-    }
-  },
-
-  LB: {
-    allowed: ['WEB', 'WAF', 'CDN', 'SEARCH', 'STORAGE', 'VECTOR_AI'],
-    rules: {
-      SOURCE: {
-        title: 'Reverse Traffic Inversion',
-        category: 'Dataflow Direction Rule',
-        explanation: 'Load balancers distribute ingress traffic inward; they cannot send traffic back out to internet ingress.',
-        recommendation: 'Connect Load Balancer to downstream API / Web Servers.'
-      },
-      LB: {
-        title: 'Redundant Load Balancer Chaining',
-        category: 'Network Optimization Rule',
-        explanation: 'Chaining public application load balancers together introduces double-hop proxy latency without scaling backend capacity.',
-        recommendation: 'Wire a single Load Balancer to multiple parallel Web Servers.'
-      },
-      SQL: {
-        title: 'Missing Application Layer & Connection Pool',
-        category: 'Protocol Mismatch Rule',
-        explanation: 'HTTP Load Balancers route REST/HTTP packets, not SQL query connections. Relational databases require connection poolers and ORM logic.',
-        recommendation: 'Wire Load Balancer to API / Web Servers, and connect Web Servers to PostgreSQL.'
-      },
-      CACHE: {
-        title: 'Binary Protocol Mismatch: LB to Redis',
-        category: 'Protocol Mismatch Rule',
-        explanation: 'Standard HTTP load balancers cannot translate incoming REST requests into Redis key-value binary commands.',
-        recommendation: 'Wire Load Balancer to Web Servers, which query Redis via an in-memory client.'
-      },
-      QUEUE: {
-        title: 'Missing Message Producer',
-        category: 'Event Architecture Rule',
-        explanation: 'Load balancers forward HTTP streams; they do not serialize payloads into structured Kafka partition messages.',
-        recommendation: 'Route traffic through an API / Web Server that formats and produces Kafka records.'
-      },
-      WORKER: {
-        title: 'Direct Worker Invocation Antipattern',
-        category: 'Coupling Antipattern Rule',
-        explanation: 'Async workers process tasks from queues in the background; they do not accept incoming HTTP traffic from public load balancers.',
-        recommendation: 'Connect Load Balancer ➔ Web Server ➔ Kafka Queue ➔ Async Workers.'
-      }
-    }
-  },
-
-  WEB: {
-    allowed: ['CACHE', 'SQL', 'QUEUE', 'SEARCH', 'STORAGE', 'VECTOR_AI', 'LB', 'WEB'],
-    rules: {
-      SOURCE: {
-        title: 'Reverse Traffic Inversion',
-        category: 'Dataflow Direction Rule',
-        explanation: 'Backend compute servers cannot route client requests backward into public internet ingress.',
-        recommendation: 'Direct data requests downstream to Caches, Databases, Queues, or Search clusters.'
-      },
-      WAF: {
-        title: 'Directional Inversion: Web to Perimeter WAF',
-        category: 'Perimeter Rule',
-        explanation: 'WAF is an ingress perimeter security filter. Application web servers do not route outgoing database/API traffic back to the perimeter.',
-        recommendation: 'Place WAF upstream of Web Servers (Ingress ➔ WAF ➔ Web).'
-      },
-      CDN: {
-        title: 'Directional Inversion: Web to Edge CDN',
-        category: 'Edge Caching Rule',
-        explanation: 'Edge CDNs sit in front of web servers to cache content before it reaches origin compute. Web servers do not push queries into a CDN.',
-        recommendation: 'Place Cloud CDN between Internet Ingress and your Load Balancer / Web Servers.'
-      },
-      WORKER: {
-        title: 'Tight Coupling Antipattern: Web to Worker',
-        category: 'Decoupling Architecture Rule',
-        explanation: 'Connecting Web Servers directly to Worker Pools introduces synchronous thread blocking and cascading failures under heavy load. In cloud systems, web servers must decouple background jobs via an asynchronous message buffer.',
-        recommendation: 'Connect Web Server ➔ Kafka Message Queue ➔ Async Worker Pool to buffer write bursts cleanly!'
-      }
-    }
-  },
-
-  CACHE: {
-    allowed: ['SQL', 'WEB', 'SEARCH', 'VECTOR_AI'],
-    rules: {
-      SOURCE: { title: 'Reverse Flow', category: 'Dataflow Rule', explanation: 'Internal caches cannot route back to external internet ingress.', recommendation: 'Connect Cache to PostgreSQL as a cache-aside fallback.' },
-      WAF: { title: 'Directional Inversion', category: 'Dataflow Rule', explanation: 'Caches do not route to ingress perimeter firewalls.', recommendation: 'Connect Cache to PostgreSQL.' },
-      CDN: { title: 'Tier Inversion', category: 'Dataflow Rule', explanation: 'Origin caches do not route upstream to edge CDNs.', recommendation: 'Connect Cache to PostgreSQL.' },
-      LB: { title: 'Directional Inversion', category: 'Dataflow Rule', explanation: 'Internal caches do not route backwards to load balancers.', recommendation: 'Connect Cache to PostgreSQL.' },
-      CACHE: { title: 'Redundant Cache Tiering', category: 'Optimization Rule', explanation: 'Chaining Redis to Redis directly causes dual-write anomalies and cache invalidation drift.', recommendation: 'Use a single configured Redis cluster with LRU eviction.' },
-      QUEUE: { title: 'Protocol Mismatch', category: 'Dataflow Rule', explanation: 'Redis key-value stores do not produce streaming messages to Kafka.', recommendation: 'Have Web Servers publish to Kafka.' },
-      WORKER: { title: 'Consumer Mismatch', category: 'Async Rule', explanation: 'Workers consume tasks from persistent commit logs, not ephemeral cache keys.', recommendation: 'Connect Kafka Queue ➔ Worker Pool.' },
-      STORAGE: { title: 'Storage Pipeline Mismatch', category: 'Dataflow Rule', explanation: 'Redis does not archive directly to S3 without worker compute.', recommendation: 'Use an Async Worker to archive data to S3.' }
-    }
-  },
-
-  QUEUE: {
-    allowed: ['WORKER', 'SQL', 'SEARCH', 'STORAGE'],
-    rules: {
-      SOURCE: { title: 'Async Inversion', category: 'Dataflow Rule', explanation: 'Kafka brokers cannot send HTTP response packets to public ingress.', recommendation: 'Connect Kafka ➔ Async Worker Pool.' },
-      WAF: { title: 'Directional Inversion', category: 'Dataflow Rule', explanation: 'Message queues do not route to perimeter firewalls.', recommendation: 'Connect Kafka ➔ Async Worker Pool.' },
-      CDN: { title: 'Directional Inversion', category: 'Dataflow Rule', explanation: 'Message queues do not route to edge CDNs.', recommendation: 'Connect Kafka ➔ Async Worker Pool.' },
-      LB: { title: 'Async Inversion', category: 'Dataflow Rule', explanation: 'Kafka cannot push asynchronous messages to synchronous HTTP load balancers.', recommendation: 'Connect Kafka ➔ Async Worker Pool.' },
-      WEB: {
-        title: 'Push vs. Pull Antipattern: Queue to Web Server',
-        category: 'Async Workflow Rule',
-        explanation: 'Kafka brokers do not push unsolicited messages back to synchronous stateless web servers. Web servers handle client request-response cycles, not async batch jobs.',
-        recommendation: 'Connect Kafka ➔ Async Worker Pool, which polls and processes queue partitions.'
-      },
-      CACHE: { title: 'Invalid Cache Mutation', category: 'Dataflow Rule', explanation: 'Queues do not write directly to in-memory key-value caches without compute.', recommendation: 'Connect Kafka ➔ Worker, and have the Worker update Redis.' },
-      QUEUE: { title: 'Redundant Queue Chaining', category: 'Optimization Rule', explanation: 'Chaining Kafka brokers directly to other Kafka brokers creates message lag and duplicate offsets.', recommendation: 'Connect Kafka ➔ Async Worker Pool.' }
-    }
-  },
-
-  WORKER: {
-    allowed: ['SQL', 'STORAGE', 'SEARCH', 'CACHE', 'VECTOR_AI', 'QUEUE'],
-    rules: {
-      SOURCE: { title: 'Reverse Flow', category: 'Dataflow Rule', explanation: 'Background worker pools cannot route packets back to public client ingress.', recommendation: 'Connect Worker to PostgreSQL or S3 Storage to persist job output.' },
-      WAF: { title: 'Directional Inversion', category: 'Dataflow Rule', explanation: 'Workers do not route to perimeter firewalls.', recommendation: 'Connect Worker to PostgreSQL.' },
-      CDN: { title: 'Directional Inversion', category: 'Dataflow Rule', explanation: 'Workers do not push directly to edge CDNs.', recommendation: 'Connect Worker to S3 Storage, then deliver via CDN.' },
-      LB: { title: 'Directional Inversion', category: 'Dataflow Rule', explanation: 'Workers do not send traffic to ingress load balancers.', recommendation: 'Connect Worker to PostgreSQL.' },
-      WEB: {
-        title: 'Architectural Inversion: Worker to Web Server',
-        category: 'Decoupling Rule',
-        explanation: 'Background worker pools execute asynchronous tasks; they do not call frontend web servers. Workers write their completed status and output directly to databases, caches, or object stores.',
-        recommendation: 'Connect Worker ➔ PostgreSQL Database or S3 Object Storage.'
-      },
-      WORKER: {
-        title: 'Worker-to-Worker Tight Coupling',
-        category: 'Decoupling Rule',
-        explanation: 'Directly chaining worker pools creates brittle synchronous coupling between background jobs.',
-        recommendation: 'Decouple multi-stage worker pipelines using a Kafka Message Queue (Worker ➔ Kafka ➔ Next Worker).'
-      }
-    }
-  },
-
-  SQL: {
-    allowed: ['SQL', 'CACHE', 'SEARCH', 'STORAGE'],
-    rules: {
-      SOURCE: { title: 'Security Boundary Violation', category: 'Data Security Rule', explanation: 'Private databases must never route directly to public internet ingress.', recommendation: 'Traffic flows from Web Server ➔ PostgreSQL.' },
-      WAF: { title: 'Security Inversion', category: 'Data Security Rule', explanation: 'Databases do not send packets to perimeter firewalls.', recommendation: 'Databases are terminal data tiers.' },
-      CDN: { title: 'Security Inversion', category: 'Data Security Rule', explanation: 'Databases cannot connect directly to edge CDNs.', recommendation: 'Deliver cached reads via Web Server ➔ CDN.' },
-      LB: { title: 'Security Inversion', category: 'Dataflow Rule', explanation: 'Databases do not route to application load balancers.', recommendation: 'Connect Web Server ➔ Database.' },
-      WEB: {
-        title: 'Dataflow Inversion: Database to Web Server',
-        category: 'Dataflow Direction Rule',
-        explanation: 'Traffic flows from Web Servers querying the Database, not from the Database pushing unsolicited traffic into Web Servers.',
-        recommendation: 'Connect Web Server ➔ PostgreSQL Database.'
-      },
-      QUEUE: { title: 'Missing CDC Connector', category: 'Architecture Rule', explanation: 'Relational databases do not write to message queues without an application worker or Change Data Capture (CDC) agent.', recommendation: 'Use Web Servers or Workers to publish events.' },
-      WORKER: { title: 'Push Inversion', category: 'Async Rule', explanation: 'Databases do not push jobs into worker pools.', recommendation: 'Workers query the database or consume from queues.' },
-      VECTOR_AI: { title: 'Missing ML Orchestrator', category: 'Compute Rule', explanation: 'Relational databases cannot drive GPU inference without application compute.', recommendation: 'Connect Web Server ➔ Vector DB + GPU Node.' }
-    }
-  },
-
-  SEARCH: {
-    allowed: ['STORAGE'],
-    rules: {
-      SOURCE: { title: 'Security Boundary', category: 'Perimeter Rule', explanation: 'Elasticsearch clusters must be protected behind an API / Web Server.', recommendation: 'Connect Web Server ➔ Elasticsearch.' },
-      WAF: { title: 'Directional Inversion', category: 'Dataflow Rule', explanation: 'Search indexes do not route to perimeter firewalls.', recommendation: 'Query search via Web Server.' },
-      CDN: { title: 'Directional Inversion', category: 'Dataflow Rule', explanation: 'Search clusters do not route to edge CDNs directly.', recommendation: 'Query search via Web Server.' },
-      LB: { title: 'Directional Inversion', category: 'Dataflow Rule', explanation: 'Search clusters do not route backwards to load balancers.', recommendation: 'Connect Load Balancer ➔ Web Server ➔ Search.' },
-      WEB: { title: 'Terminal Query Sink', category: 'Dataflow Rule', explanation: 'Elasticsearch is a query termination index. It returns results to calling web servers, but does not initiate connections into web servers.', recommendation: 'Connect Web Server ➔ Elasticsearch.' },
-      SQL: { title: 'Terminal Sink', category: 'Architecture Rule', explanation: 'Search indexes do not query relational databases directly.', recommendation: 'Sync data via Web Servers or Async Workers.' },
-      CACHE: { title: 'Terminal Sink', category: 'Architecture Rule', explanation: 'Search clusters do not manage Redis caches.', recommendation: 'Cache search results at the Web Server layer.' },
-      QUEUE: { title: 'Terminal Sink', category: 'Architecture Rule', explanation: 'Search clusters do not produce events to Kafka.', recommendation: 'Have Web Servers or Workers produce events.' },
-      WORKER: { title: 'Terminal Sink', category: 'Architecture Rule', explanation: 'Search clusters do not dispatch tasks to worker pools.', recommendation: 'Use message queues to orchestrate workers.' },
-      VECTOR_AI: { title: 'Index Mismatch', category: 'Compute Rule', explanation: 'Text search clusters do not run vector LLM inference directly.', recommendation: 'Connect Web Server to Vector DB + GPU Node.' },
-      SEARCH: { title: 'Redundant Index Layering', category: 'Optimization Rule', explanation: 'Chaining search clusters directly together is not a standard cloud pattern.', recommendation: 'Scale Elasticsearch shards within a single cluster.' }
-    }
-  },
-
-  STORAGE: {
-    allowed: ['CDN', 'WORKER'],
-    rules: {
-      SOURCE: { title: 'Security Boundary', category: 'Perimeter Rule', explanation: 'Private S3 buckets cannot connect directly to internet ingress.', recommendation: 'Route public downloads via Cloud CDN.' },
-      WAF: { title: 'Directional Inversion', category: 'Dataflow Rule', explanation: 'Object stores do not route to perimeter firewalls.', recommendation: 'Route uploads via Web Server.' },
-      LB: { title: 'Directional Inversion', category: 'Dataflow Rule', explanation: 'Object storage does not route to load balancers.', recommendation: 'Connect Web Server to S3 Storage.' },
-      WEB: { title: 'Static Blob Sink', category: 'Dataflow Rule', explanation: 'S3 stores blobs; it does not initiate connections into web servers.', recommendation: 'Connect Web Server ➔ S3 Storage.' },
-      SQL: { title: 'Static Blob Sink', category: 'Dataflow Rule', explanation: 'Object storage cannot query relational SQL databases.', recommendation: 'Use an Async Worker to transfer data between S3 and SQL.' },
-      CACHE: { title: 'Static Blob Sink', category: 'Dataflow Rule', explanation: 'S3 does not write directly into in-memory Redis caches.', recommendation: 'Cache media URLs in Redis via Web Servers.' },
-      QUEUE: { title: 'Missing Event Driver', category: 'Dataflow Rule', explanation: 'S3 buckets do not publish directly to Kafka without S3 event notifications and workers.', recommendation: 'Connect S3 ➔ Async Worker.' },
-      SEARCH: { title: 'Static Blob Sink', category: 'Dataflow Rule', explanation: 'S3 does not index itself into Elasticsearch.', recommendation: 'Use an Async Worker to parse and index S3 documents.' },
-      STORAGE: { title: 'Redundant Storage Chaining', category: 'Optimization Rule', explanation: 'Direct bucket-to-bucket chaining is not a standard dataflow.', recommendation: 'Enable Multi-AZ replication in the storage node configuration.' },
-      VECTOR_AI: { title: 'Missing Feature Extractor', category: 'Compute Rule', explanation: 'S3 cannot generate vector embeddings without compute.', recommendation: 'Connect Worker or Web Server ➔ Vector DB + GPU Node.' }
-    }
-  },
-
-  VECTOR_AI: {
-    allowed: ['SQL', 'STORAGE', 'CACHE'],
-    rules: {
-      SOURCE: { title: 'Perimeter Security Violation', category: 'Perimeter Rule', explanation: 'GPU clusters and Vector databases must be shielded behind an API / Web Server to prevent Denial of Wallet attacks.', recommendation: 'Connect Web Server ➔ Vector DB + GPU Node.' },
-      WAF: { title: 'Directional Inversion', category: 'Dataflow Rule', explanation: 'Vector DBs do not route to perimeter firewalls.', recommendation: 'Route queries via Web Server.' },
-      CDN: { title: 'Directional Inversion', category: 'Dataflow Rule', explanation: 'GPU clusters do not route to edge CDNs.', recommendation: 'Connect Web Server ➔ Vector DB + GPU Node.' },
-      LB: { title: 'Directional Inversion', category: 'Dataflow Rule', explanation: 'GPU nodes do not route backwards to load balancers.', recommendation: 'Route through Load Balancer ➔ Web Server ➔ Vector DB.' },
-      WEB: { title: 'Terminal Compute Sink', category: 'Dataflow Rule', explanation: 'Vector DB & GPU nodes return inference tokens to calling web servers, but do not initiate requests into web servers.', recommendation: 'Connect Web Server ➔ Vector DB + GPU Node.' },
-      QUEUE: { title: 'Terminal Compute Sink', category: 'Dataflow Rule', explanation: 'Vector DBs do not publish to message queues natively.', recommendation: 'Use Web Servers or Workers to publish AI results.' },
-      WORKER: { title: 'Terminal Compute Sink', category: 'Dataflow Rule', explanation: 'GPU nodes do not dispatch jobs to worker pools.', recommendation: 'Have Workers call Vector DB for batch embedding.' },
-      SEARCH: { title: 'Architecture Mismatch', category: 'Architecture Rule', explanation: 'Vector search and Elasticsearch are separate search paradigms.', recommendation: 'Orchestrate hybrid search via an API / Web Server.' },
-      VECTOR_AI: { title: 'Redundant Vector Node Chaining', category: 'Optimization Rule', explanation: 'Chaining GPU nodes directly together is not a valid pattern.', recommendation: 'Scale GPU batching options in node configuration.' }
-    }
-  }
-};
-
-export function isConnectionAllowed(fromType, toType) {
-  if (!fromType || !toType) return false;
-  const rule = CLOUD_CONNECTION_RULES[fromType];
-  if (!rule) return true;
-  return rule.allowed.includes(toType);
-}
-
-export function validateCloudConnection(fromType, toType, nodes = [], edges = [], fromId = null, toId = null, options = {}) {
-  const isNewConnection = typeof options === 'boolean' ? options : (options.isNewConnection !== false);
-  const currentEdgeId = options.currentEdgeId || null;
-
-  if (!fromType || !toType) {
-    return {
-      allowed: false,
-      violation: {
-        title: 'Unknown Component Tier',
-        category: 'Validation Error',
-        explanation: 'One or both components could not be identified in the architecture catalog.',
-        recommendation: 'Select valid components from the cloud components catalog.',
-        validTargets: []
-      }
-    };
-  }
-
-  // 1. Self-Connection Loop
-  if (fromId && toId && fromId === toId) {
-    return {
-      allowed: false,
-      violation: {
-        title: 'Self-Connection Loop Violation',
-        category: 'Topology Constraint',
-        explanation: 'A component cannot route traffic into its own input port. In distributed systems, this creates an instantaneous recursive packet cycle that causes buffer overflow.',
-        recommendation: 'Connect this component downstream to a distinct service tier in your pipeline (e.g. Ingress ➔ Load Balancer, or Web Server ➔ Database).',
-        validTargets: CLOUD_CONNECTION_RULES[fromType]?.allowed || []
-      }
-    };
-  }
-
-  // 2. Duplicate Wire (Only check when proposing a new connection, or check if more than 1 duplicate edge exists)
-  if (fromId && toId) {
-    const existingMatches = edges.filter((e) => e.from === fromId && e.to === toId && (!currentEdgeId || e.id !== currentEdgeId));
-    if (isNewConnection ? existingMatches.length > 0 : existingMatches.length > 1) {
-      return {
-        allowed: false,
-        violation: {
-          title: 'Duplicate Wire Detected',
-          category: 'Redundant Wiring',
-          explanation: 'A communication wire already connects these two components. Adding duplicate wires between the exact same pair of nodes causes packet duplication.',
-          recommendation: 'Configure concurrency or replicas on the existing component rather than adding parallel duplicate wires between the same nodes.',
-          validTargets: CLOUD_CONNECTION_RULES[fromType]?.allowed || []
-        }
-      };
-    }
-  }
-
-  // 3. Matrix Rule Lookup
-  const sourceRules = CLOUD_CONNECTION_RULES[fromType];
-  if (!sourceRules) {
-    return { allowed: true };
-  }
-
-  const isAllowed = sourceRules.allowed.includes(toType);
-  if (!isAllowed) {
-    const specificRule = sourceRules.rules?.[toType] || {
-      title: `Architectural Constraint: ${fromType} to ${toType}`,
-      category: 'Cloud Engineering Rule',
-      explanation: `In standard cloud architectures, ${COMPONENT_CATALOG[fromType]?.name || fromType} cannot route directly into ${COMPONENT_CATALOG[toType]?.name || toType}. Distributed systems require proper separation of concerns between perimeter, compute, and data tiers.`,
-      recommendation: `Insert an appropriate intermediate tier (such as an API / Web Server or Load Balancer) between ${COMPONENT_CATALOG[fromType]?.name || fromType} and ${COMPONENT_CATALOG[toType]?.name || toType}.`
-    };
-
-    return {
-      allowed: false,
-      violation: {
-        ...specificRule,
-        validTargets: sourceRules.allowed || []
-      }
-    };
-  }
-
-  // 4. Circular Path Detection (Cycle Check)
-  if (fromId && toId) {
-    const visited = new Set();
-    const queue = [toId];
-    let hasCycle = false;
-
-    // Filter out current edge when checking for cycles in existing networks
-    const activeEdges = currentEdgeId
-      ? edges.filter((e) => e.id !== currentEdgeId)
-      : (isNewConnection ? edges : edges.filter((e) => !(e.from === fromId && e.to === toId)));
-
-    while (queue.length > 0) {
-      const curr = queue.shift();
-      if (curr === fromId) {
-        hasCycle = true;
-        break;
-      }
-      visited.add(curr);
-      const outgoing = activeEdges.filter((e) => e.from === curr).map((e) => e.to);
-      for (const nextNode of outgoing) {
-        if (!visited.has(nextNode)) {
-          queue.push(nextNode);
-        }
-      }
-    }
-
-    if (hasCycle) {
-      return {
-        allowed: false,
-        violation: {
-          title: 'Infinite Circular Loop Detected',
-          category: 'Topology Constraint',
-          explanation: 'Connecting this node creates an infinite directed cycle in your network graph. Packets would loop endlessly between tiers, causing buffer overflow and exponential latency amplification.',
-          recommendation: 'Cloud architectures must follow a Directed Acyclic Graph (DAG) for primary request pipelines. Remove the opposing wire before connecting in this direction.',
-          validTargets: sourceRules.allowed || []
-        }
-      };
-    }
-  }
-
-  return { allowed: true };
-}
-
-// ============================================================================
 // 3. CAMPAIGN SCENARIOS & GAME MODES
 // ============================================================================
 const CAMPAIGN_LEVELS = [
@@ -959,249 +521,6 @@ const CAMPAIGN_LEVELS = [
       'Have at least 2 (ideally 3) Web Servers behind the Load Balancer so when Chaos Monkey strikes, traffic auto-heals.',
       'Enable TensorRT + FP8 Batching on your GPU Node and Semantic Cache on Redis.'
     ]
-  }
-];
-
-// ============================================================================
-// 3.5. ICONIC REAL-WORLD ARCHITECTURE PRESETS (NETFLIX, SPOTIFY, UBER, CLOUDFLARE)
-// ============================================================================
-export const ICONIC_PRESETS = [
-  {
-    id: 'netflix',
-    name: 'Netflix Open Connect & Microservices',
-    company: 'Netflix',
-    badge: '250M+ Subscribers',
-    emoji: '🎬',
-    color: 'from-red-600/30 to-rose-900/40',
-    borderColor: 'border-red-500/50',
-    tagline: 'Edge CDN caches 95% of video chunks while microservices handle millions of stream sessions via EVCache & Kafka telemetry.',
-    targetRps: 32000,
-    keyFeatures: ['Edge CDN Cache', 'Dual Web Services', 'EVCache (Redis)', 'Kafka Event Queue', 'Transcoder Workers'],
-    nodes: [
-      { id: 'src', type: 'SOURCE', x: 60, y: 220, config: {} },
-      { id: 'cdn-1', type: 'CDN', x: 260, y: 120, config: { hitRatio: 1 } },
-      { id: 'waf-1', type: 'WAF', x: 260, y: 320, config: { mode: 1 } },
-      { id: 'lb-1', type: 'LB', x: 470, y: 220, config: { algorithm: 1 } },
-      { id: 'web-1', type: 'WEB', x: 680, y: 120, config: { tier: 1 } },
-      { id: 'web-2', type: 'WEB', x: 680, y: 320, config: { tier: 1 } },
-      { id: 'cache-1', type: 'CACHE', x: 900, y: 120, config: { eviction: 1 } },
-      { id: 'kafka-1', type: 'QUEUE', x: 900, y: 320, config: { partitions: 1 } },
-      { id: 'sql-1', type: 'SQL', x: 1120, y: 120, config: { scaling: 1 } },
-      { id: 'worker-1', type: 'WORKER', x: 1120, y: 320, config: { tier: 1 } }
-    ],
-    edges: [
-      { id: 'e1', from: 'src', to: 'cdn-1' },
-      { id: 'e2', from: 'src', to: 'waf-1' },
-      { id: 'e3', from: 'cdn-1', to: 'lb-1' },
-      { id: 'e4', from: 'waf-1', to: 'lb-1' },
-      { id: 'e5', from: 'lb-1', to: 'web-1' },
-      { id: 'e6', from: 'lb-1', to: 'web-2' },
-      { id: 'e7', from: 'web-1', to: 'cache-1' },
-      { id: 'e8', from: 'web-2', to: 'cache-1' },
-      { id: 'e9', from: 'cache-1', to: 'sql-1' },
-      { id: 'e10', from: 'web-1', to: 'kafka-1' },
-      { id: 'e11', from: 'web-2', to: 'kafka-1' },
-      { id: 'e12', from: 'kafka-1', to: 'worker-1' },
-      { id: 'e13', from: 'worker-1', to: 'sql-1' }
-    ]
-  },
-  {
-    id: 'spotify',
-    name: 'Spotify AI Audio & Discover Weekly',
-    company: 'Spotify',
-    badge: '100M+ Songs & AI RAG',
-    emoji: '🎵',
-    color: 'from-emerald-600/30 to-green-900/40',
-    borderColor: 'border-emerald-500/50',
-    tagline: 'High-speed audio CDN with real-time Vector DB + GPU LLM recommendations and persistent song metadata store.',
-    targetRps: 28000,
-    keyFeatures: ['Audio CDN Chunks', 'Vector Embeddings', 'GPU Inference Cluster', 'Redis Cache', 'Postgres Metadata'],
-    nodes: [
-      { id: 'src', type: 'SOURCE', x: 60, y: 220, config: {} },
-      { id: 'cdn-1', type: 'CDN', x: 260, y: 120, config: { hitRatio: 1 } },
-      { id: 'lb-1', type: 'LB', x: 260, y: 320, config: { algorithm: 1 } },
-      { id: 'web-1', type: 'WEB', x: 480, y: 220, config: { tier: 1 } },
-      { id: 'cache-1', type: 'CACHE', x: 700, y: 120, config: { eviction: 1 } },
-      { id: 'sql-1', type: 'SQL', x: 920, y: 120, config: { scaling: 1 } },
-      { id: 'vector-1', type: 'VECTOR_AI', x: 700, y: 320, config: { batching: 1 } }
-    ],
-    edges: [
-      { id: 'e1', from: 'src', to: 'cdn-1' },
-      { id: 'e2', from: 'src', to: 'lb-1' },
-      { id: 'e3', from: 'lb-1', to: 'web-1' },
-      { id: 'e4', from: 'web-1', to: 'cache-1' },
-      { id: 'e5', from: 'cache-1', to: 'sql-1' },
-      { id: 'e6', from: 'web-1', to: 'vector-1' },
-      { id: 'e7', from: 'vector-1', to: 'sql-1' }
-    ]
-  },
-  {
-    id: 'uber',
-    name: 'Uber Real-Time Geospatial Dispatch',
-    company: 'Uber',
-    badge: '25M+ Daily Rides',
-    emoji: '🚗',
-    color: 'from-slate-600/30 to-zinc-900/40',
-    borderColor: 'border-slate-400/50',
-    tagline: 'Millisecond spatial driver-rider matching powered by Kafka H3 geospatial telemetry, parallel workers, and in-memory caches.',
-    targetRps: 35000,
-    keyFeatures: ['WAF Edge Security', 'Kafka Ingestion Stream', 'Dual Matching Workers', 'Redis Geo-Telemetry', 'ACID Trip Ledger'],
-    nodes: [
-      { id: 'src', type: 'SOURCE', x: 60, y: 220, config: {} },
-      { id: 'waf-1', type: 'WAF', x: 250, y: 220, config: { mode: 1 } },
-      { id: 'lb-1', type: 'LB', x: 440, y: 220, config: { algorithm: 1 } },
-      { id: 'web-1', type: 'WEB', x: 640, y: 220, config: { tier: 1 } },
-      { id: 'cache-1', type: 'CACHE', x: 840, y: 110, config: { eviction: 1 } },
-      { id: 'kafka-1', type: 'QUEUE', x: 840, y: 260, config: { partitions: 1 } },
-      { id: 'worker-1', type: 'WORKER', x: 1040, y: 180, config: { tier: 1 } },
-      { id: 'worker-2', type: 'WORKER', x: 1040, y: 340, config: { tier: 1 } },
-      { id: 'sql-1', type: 'SQL', x: 1250, y: 260, config: { scaling: 1 } }
-    ],
-    edges: [
-      { id: 'e1', from: 'src', to: 'waf-1' },
-      { id: 'e2', from: 'waf-1', to: 'lb-1' },
-      { id: 'e3', from: 'lb-1', to: 'web-1' },
-      { id: 'e4', from: 'web-1', to: 'cache-1' },
-      { id: 'e5', from: 'web-1', to: 'kafka-1' },
-      { id: 'e6', from: 'kafka-1', to: 'worker-1' },
-      { id: 'e7', from: 'kafka-1', to: 'worker-2' },
-      { id: 'e8', from: 'worker-1', to: 'sql-1' },
-      { id: 'e9', from: 'worker-2', to: 'sql-1' }
-    ]
-  },
-  {
-    id: 'cloudflare',
-    name: 'Cloudflare Sub-10ms Edge Defense',
-    company: 'Cloudflare',
-    badge: '20% of Global Web',
-    emoji: '⚡',
-    color: 'from-amber-600/30 to-orange-900/40',
-    borderColor: 'border-orange-500/50',
-    tagline: 'Hyper-optimized edge network absorbing volumetric DDoS attacks and serving cached content in single-digit milliseconds.',
-    targetRps: 40000,
-    keyFeatures: ['DDoS Mitigation WAF', 'Global Edge CDN', 'Edge KV Cache', 'Protected Origin DB'],
-    nodes: [
-      { id: 'src', type: 'SOURCE', x: 60, y: 220, config: {} },
-      { id: 'waf-1', type: 'WAF', x: 260, y: 130, config: { mode: 1 } },
-      { id: 'cdn-1', type: 'CDN', x: 260, y: 310, config: { hitRatio: 1 } },
-      { id: 'cache-1', type: 'CACHE', x: 480, y: 220, config: { eviction: 1 } },
-      { id: 'web-1', type: 'WEB', x: 700, y: 220, config: { tier: 1 } },
-      { id: 'sql-1', type: 'SQL', x: 930, y: 220, config: { scaling: 1 } }
-    ],
-    edges: [
-      { id: 'e1', from: 'src', to: 'waf-1' },
-      { id: 'e2', from: 'src', to: 'cdn-1' },
-      { id: 'e3', from: 'waf-1', to: 'cache-1' },
-      { id: 'e4', from: 'cdn-1', to: 'cache-1' },
-      { id: 'e5', from: 'cache-1', to: 'web-1' },
-      { id: 'e6', from: 'web-1', to: 'sql-1' }
-    ]
-  }
-];
-
-// ============================================================================
-// 3.6. ARCHITECT BADGES & STREAK REWARDS SYSTEM (TROPHIES & XP MULTIPLIERS)
-// ============================================================================
-export const STREAK_REWARDS = [
-  { day: 1, xpBonus: 50, title: 'Day 1: Incident Initiate', perk: '+50 XP Base Bonus', icon: '⚡' },
-  { day: 2, xpBonus: 75, title: 'Day 2: Steady Hand', perk: '+75 XP & Low Latency Crest', icon: '🛡️' },
-  { day: 3, xpBonus: 100, title: 'Day 3: Uptime Sentinel', perk: '🔥 1.25x XP Multiplier & Sentinel Badge', icon: '🔥' },
-  { day: 4, xpBonus: 125, title: 'Day 4: Cluster Veteran', perk: '+125 XP & Surge Tolerance', icon: '🌊' },
-  { day: 5, xpBonus: 150, title: 'Day 5: Chaos Shield', perk: '+150 XP & Auto-Heal Crest', icon: '🐒' },
-  { day: 6, xpBonus: 200, title: 'Day 6: Staff Architect', perk: '+200 XP & Telemetry Halo', icon: '⭐' },
-  { day: 7, xpBonus: 500, title: 'Day 7: Five-Nines Titan', perk: '👑 1.50x XP Multiplier & Titan Trophy', icon: '👑' }
-];
-
-export const ARCHITECT_BADGES = [
-  {
-    id: 'first_wire',
-    title: 'First Pipeline Wire',
-    icon: '🔌',
-    rarity: 'Common',
-    color: 'from-emerald-500/20 to-teal-500/20 border-emerald-500/40 text-emerald-300',
-    xpReward: 100,
-    description: 'Connect your first traffic flow wire between Internet Ingress and a compute node.'
-  },
-  {
-    id: 'cache_king',
-    title: 'Cache is King',
-    icon: '⚡',
-    rarity: 'Rare',
-    color: 'from-cyan-500/20 to-blue-500/20 border-cyan-500/40 text-cyan-300',
-    xpReward: 200,
-    description: 'Deploy a Redis Cache Cluster to absorb read queries and shield your relational database.'
-  },
-  {
-    id: 'ddos_bastion',
-    title: 'DDoS Bastion',
-    icon: '🛡️',
-    rarity: 'Rare',
-    color: 'from-indigo-500/20 to-purple-500/20 border-indigo-500/40 text-indigo-300',
-    xpReward: 250,
-    description: 'Deploy a WAF & Rate Limiter to inspect L7 traffic and filter rogue packet floods.'
-  },
-  {
-    id: 'chaos_tamer',
-    title: 'Chaos Monkey Tamer',
-    icon: '🐒',
-    rarity: 'Epic',
-    color: 'from-rose-500/20 to-red-500/20 border-rose-500/40 text-rose-300',
-    xpReward: 350,
-    description: 'Survive a live Chaos Monkey sabotage strike and successfully hotfix the severed node.'
-  },
-  {
-    id: 'streak_fire',
-    title: 'Uptime Sentinel',
-    icon: '🔥',
-    rarity: 'Epic',
-    color: 'from-amber-500/20 to-orange-500/20 border-amber-500/40 text-amber-300',
-    xpReward: 300,
-    description: 'Maintain a 3-day consecutive Daily Incident challenge streak.'
-  },
-  {
-    id: 'streak_titan',
-    title: 'Five-Nines Titan',
-    icon: '👑',
-    rarity: 'Legendary',
-    color: 'from-yellow-500/20 to-amber-500/20 border-yellow-500/50 text-yellow-300',
-    xpReward: 600,
-    description: 'Maintain a 7-day consecutive Daily Incident challenge streak.'
-  },
-  {
-    id: 'wave_conqueror',
-    title: 'Tsunami Breaker',
-    icon: '🌊',
-    rarity: 'Epic',
-    color: 'from-blue-500/20 to-cyan-500/20 border-blue-500/40 text-blue-300',
-    xpReward: 400,
-    description: 'Survive Wave 3 or higher in Endless Survival Wave mode.'
-  },
-  {
-    id: 'frugal_finops',
-    title: 'Frugal FinOps Master',
-    icon: '💰',
-    rarity: 'Rare',
-    color: 'from-emerald-500/20 to-green-500/20 border-emerald-500/40 text-emerald-300',
-    xpReward: 250,
-    description: 'Pass any production mission with total hourly compute cost under $200/hr.'
-  },
-  {
-    id: 'iconic_architect',
-    title: 'Iconic Architect',
-    icon: '🏛️',
-    rarity: 'Rare',
-    color: 'from-purple-500/20 to-pink-500/20 border-purple-500/40 text-purple-300',
-    xpReward: 200,
-    description: 'Explore and deploy any Iconic Architecture Preset (Netflix, Spotify, Uber, Cloudflare).'
-  },
-  {
-    id: 'staff_fellow',
-    title: 'Mythic Reliability Fellow',
-    icon: '⭐',
-    rarity: 'Legendary',
-    color: 'from-amber-400/25 to-yellow-300/25 border-yellow-400/70 text-yellow-200',
-    xpReward: 1000,
-    description: 'Conquer all 5 Campaign levels and achieve the highest title in distributed systems.'
   }
 ];
 
@@ -2315,174 +1634,6 @@ function AudioVisualizerWidget({ soundEngine, isMuted, isPlaying, className = ''
     </div>
   );
 }
-
-// ============================================================================
-// 4.8. ANIME LEVEL MANAGERS DATA & CONFIGURATIONS
-// Every level has its own distinct stressed, snack-eating engineering manager!
-// ============================================================================
-export const LEVEL_MANAGERS = [
-  {
-    level: 1,
-    name: 'Kenji',
-    roleTag: 'Startup Tech Lead',
-    avatar: angryManagerImg,
-    badgeColor: 'from-rose-500 to-amber-500',
-    snackName: 'Crunchy Volcano Chips',
-    snackEmoji: '🥔',
-    snackSounds: ['*CRUNCH!*', '*CHOMP!*', '*CRUNCH CRUNCH!*'],
-    drinkName: 'Code Fueled Coffee',
-    drinkEmoji: '☕',
-    baseSalary: '$95,000 / yr',
-    hikeAmount: '+$50,000 / yr (+52.6% Hike!)',
-    promotedSalary: '$145,000 / yr',
-    currentJobTitle: 'Junior SRE Associate',
-    promotedJobTitle: 'Mid-Level Infrastructure Engineer',
-    scoldQuotes: [
-      'FIX IT ASAP!! THE BOARD OF DIRECTORS IS WATCHING THE DASHBOARD!!',
-      'P99 LATENCY IS SPIKING! ARE YOU RUNNING POSTGRES ON A TOASTER?!',
-      'WHO MERGED TO PRODUCTION ON A FRIDAY?! REVERT OR DIE!!',
-      'I DIDN\'T PROMISE 99.999% SLA SO YOU COULD SLEEP!',
-      'EVERY PACKET YOU DROP IS COMING OUT OF MY ANNUAL BONUS!!',
-      'WHY IS THE MESSAGE QUEUE BACKLOGGED?! DO WORKERS HAVE A UNION NOW?!'
-    ],
-    pokeQuotes: [
-      'DON\'T CLICK ME!! CLICK THE DAMN SERVERS!!',
-      'HEY! WATCH THE SUIT! YOU MADE ME DROP A VOLCANO CHIP!!',
-      'WHAT DO YOU WANT?! ADD MORE CACHE AND LESS POKING!!'
-    ],
-    congratsTitle: 'HOLY CRAP, YOU ACTUALLY DID IT!!',
-    congratsSpeech: 'I was convinced the database would melt and the VCs would pull our funding! But the cluster held! My quarterly bonus is safe! YOU EARNED THIS PROMOTION AND SALARY HIKE, ARCHITECT!!',
-    nextManagerWarning: 'Beware... on Level 2, your new manager is Daiki. He is on a permanent donut sugar rush and his throughput expectations are completely unhinged. Good luck!'
-  },
-  {
-    level: 2,
-    name: 'Daiki',
-    roleTag: 'Throughput & Scaling Guru',
-    avatar: managerDaikiImg,
-    badgeColor: 'from-pink-500 to-purple-500',
-    snackName: 'Hyper-Glazed Sprinkles Donut',
-    snackEmoji: '🍩',
-    snackSounds: ['*NOM NOM!*', '*MUNCH!*', '*SUGAR RUSH!*'],
-    drinkName: 'Triple-Shot Taro Boba',
-    drinkEmoji: '🧋',
-    baseSalary: '$145,000 / yr',
-    hikeAmount: '+$65,000 / yr (+44.8% Hike!)',
-    promotedSalary: '$210,000 / yr',
-    currentJobTitle: 'Mid-Level Infrastructure Engineer',
-    promotedJobTitle: 'Senior Distributed Systems Architect',
-    scoldQuotes: [
-      'P99 IS OVER 45MS?! WE ARE LOSING 10,000 VIRAL USERS PER MINUTE!!',
-      'I EAT DONUTS WHEN I\'M ANXIOUS AND I\'VE EATEN FOURTEEN TODAY!!',
-      'NOM NOM NOM... RE-ROUTE THROUGH THE CDN OR I\'M REVOKING AWS KEYS!!',
-      'SCALE THE WEB REPLICAS! WHY IS HORIZONTAL AUTOSCALING SLEEPING?!',
-      'DO NOT LOOK AT MY BOBA! LOOK AT THE TRAFFIC SATURATION BARS!!'
-    ],
-    pokeQuotes: [
-      'HANDS OFF THE GLASSES! GO OPTIMIZE THE CACHE HIT RATIO!!',
-      'YOU MADE ME DROP SPRINKLES ON THE PRODUCTION RUNBOOK!!',
-      'I DON\'T HAVE TIME FOR YOUR CLICKS! 30,000 RPS IS ROLLING IN!!'
-    ],
-    congratsTitle: 'VIRAL LAUNCH SURVIVED!! SENSATIONAL WORK!!',
-    congratsSpeech: 'The viral surge was off the charts, but your caching layer absorbed 88% of queries! Executive leadership was blown away! Here is your official promotion and a massive salary jump!',
-    nextManagerWarning: 'Level 3 is headed by Director Ryoko from Security & Compliance. She is ruthless, eats pure wasabi, and will fail you if even one bot slips through!'
-  },
-  {
-    level: 3,
-    name: 'Ryoko',
-    roleTag: 'Director of Security & Compliance',
-    avatar: managerRyokoImg,
-    badgeColor: 'from-rose-600 to-red-800',
-    snackName: 'Ultra-Spicy Wasabi Crackers',
-    snackEmoji: '🍘',
-    snackSounds: ['*CRUNCH!*', '*SPICY HUFF!*', '*WASABI CRUNCH!*'],
-    drinkName: 'Pure Ceremonial Matcha',
-    drinkEmoji: '🍵',
-    baseSalary: '$210,000 / yr',
-    hikeAmount: '+$90,000 / yr (+42.8% Hike!)',
-    promotedSalary: '$300,000 / yr',
-    currentJobTitle: 'Senior Distributed Systems Architect',
-    promotedJobTitle: 'Principal Reliability & Security Commander',
-    scoldQuotes: [
-      'DDOS BOTS DETECTED! WHERE IS THE WAF SHIELD AT THE PERIMETER?!',
-      'ZERO TRUST! ZERO EXCUSES! *CRUNCH* IS TRAFFIC PROPERLY FILTERED?!',
-      'IF AUDITORS SEE UNFILTERED BOT PACKETS, WE\'RE WEARING ORANGE SUITS!!',
-      'THE PERIMETER IS LEAKING! BLOCK THE BAD ACTORS IMMEDIATELY!!',
-      'THIS WASABI IS BURNING MY TONGUE AND YOUR LATENCY IS BURNING MY EYES!!'
-    ],
-    pokeQuotes: [
-      'DO NOT TOUCH COMPLIANCE PROTOCOLS!! GET BACK TO HARDENING THE PERIMETER!!',
-      'YOU DARE INTERRUPT A ZERO-TRUST AUDIT WITH A MOUSE CLICK?!',
-      'ONE MORE POKE AND I\'M QUARANTINING YOUR WORKSTATION!!'
-    ],
-    congratsTitle: 'PERIMETER SECURED! ZERO PENETRATIONS!!',
-    congratsSpeech: '99.8% of malicious bot traffic dropped at the edge without single origin degradation. The CISO sent personal commendations. You\'ve earned this Senior Principal title and a lucrative pay bump!',
-    nextManagerWarning: 'Brace yourself. Level 4 is commanded by Viktor. He runs live Chaos Monkey drills in production and eats popcorn while servers combust!'
-  },
-  {
-    level: 4,
-    name: 'Viktor',
-    roleTag: 'Chaos Resilience Commander',
-    avatar: managerViktorImg,
-    badgeColor: 'from-amber-500 to-orange-600',
-    snackName: 'Mega-Butter Cyber-Popcorn',
-    snackEmoji: '🍿',
-    snackSounds: ['*CHOMP!*', '*POPCORN CRUNCH!*', '*BUTTERY MUNCH!*'],
-    drinkName: 'High-Voltage Overclock Energy Drink',
-    drinkEmoji: '⚡',
-    baseSalary: '$300,000 / yr',
-    hikeAmount: '+$120,000 / yr (+40.0% Hike!)',
-    promotedSalary: '$420,000 / yr',
-    currentJobTitle: 'Principal Reliability & Security Commander',
-    promotedJobTitle: 'Chief Distinguished Infrastructure Fellow',
-    scoldQuotes: [
-      'CHAOS MONKEY IS RIPPING CORDS OUT OF THE SERVERS!! FAILOVER NOW!!',
-      'THE QUEUE IS BURNING!! *CHOMP CHOMP* DECOUPLE THE WORKERS!!',
-      'WHY ARE WE BUFFERING?! DO WORKERS HAVE A UNION MEETING RIGHT NOW?!',
-      'MULTI-REGION REDUNDANCY! WHERE ARE THE STANDBY NODES?! MOVE!!',
-      'I LOVE THE SMELL OF MELTING SERVERS WITH FRESH POPCORN!!'
-    ],
-    pokeQuotes: [
-      'DON\'T POKE THE COMMANDER WHILE CHAOS MONKEY IS ON THE LOOSE!!',
-      'YOU SHOOK MY POPCORN BUCKET! I\'M UNLEASHING ANOTHER OUTAGE!!',
-      'FIRE IN THE HOLE! FIX THE REDUNDANT PATHWAYS!!'
-    ],
-    congratsTitle: 'CHAOS DEFEATED! UNBREAKABLE RESILIENCE!!',
-    congratsSpeech: 'Instances were assassinated left and right, yet your decoupled pipeline rerouted packets in sub-20ms with 100% uptime! You are officially an Infrastructure Legend. Take this executive salary hike!',
-    nextManagerWarning: 'The final frontier awaits: Level 5. Executive VP Hiroshi himself is overseeing the Black Friday global mega-sale. He eats gold-leaf macarons and fires people for 10ms spikes!'
-  },
-  {
-    level: 5,
-    name: 'Hiroshi',
-    roleTag: 'Executive VP & Board Member',
-    avatar: managerHiroshiImg,
-    badgeColor: 'from-amber-400 via-yellow-300 to-amber-600',
-    snackName: '24k Gold-Leaf French Macarons',
-    snackEmoji: '🧁',
-    snackSounds: ['*DELICATE MUNCH!*', '*ROYAL CRUNCH!*', '*GOLDEN CHEW!*'],
-    drinkName: 'Vintage Sparkling Glacier Water',
-    drinkEmoji: '🍾',
-    baseSalary: '$420,000 / yr',
-    hikeAmount: '+$180,000 / yr + 15,000 RSUs (Ultimate Executive Package!)',
-    promotedSalary: '$600,000 / yr + Equity',
-    currentJobTitle: 'Chief Distinguished Infrastructure Fellow',
-    promotedJobTitle: '👑 Global Chief Architecture Officer (Legendary Partner)',
-    scoldQuotes: [
-      'WALL STREET OPENS IN 5 MINUTES!! FIX THE BLACK FRIDAY TRAFFIC SURGE!!',
-      'MY STOCK OPTIONS ARE MELTING!! *MUNCH* SCALE TO 50,000 RPS RIGHT NOW!!',
-      'DO I LOOK LIKE A C-SUITE TITAN WHO ACCEPTS 99.9%?! FIVE NINES OR RETIREMENT IS OVER!!',
-      'THE BOARD IS WATCHING THE TELEMETRY TICKER LIVE ON BLOOMBERG!!',
-      'ONE GLITCH AND MY YACHT RESERVATION CANCELS!! FIX THE TOPOLOGY!!'
-    ],
-    pokeQuotes: [
-      'DO NOT TOUCH MY BESPOKE PINSTRIPE SUIT WITH YOUR GREASY CODING HANDS!!',
-      'YOU MADE ME CHOKE ON MY 24K GOLD-LEAF MACARON!! WORK FASTER!!',
-      'DO YOU WANT ME TO FIRE YOUR ENTIRE DIVISION?! GO TUNE THE DATABASE!!'
-    ],
-    congratsTitle: '👑 THE PINNACLE OF CLOUD ARCHITECTURE REACHED!!',
-    congratsSpeech: 'Black Friday traffic shattered all world records. Zero dropped packets. Sub-15ms P99 across the entire planetary grid. The Board of Directors has unanimously appointed you Global Chief Architecture Officer! You have conquered System Saviour!!',
-    nextManagerWarning: 'You have conquered all 5 enterprise tiers! Enjoy your limitless sandbox and global leaderboards!'
-  }
-];
 
 // ============================================================================
 // 4.8. ANGRY ANIME ENGINEERING MANAGER COMPONENT
@@ -10258,7 +9409,45 @@ Can your architecture beat this? Test it in your browser:
                     <div className="font-bold text-xs uppercase tracking-wider text-slate-300">
                       ⚙️ Architectural Tuning Available in Inspector:
                     </div>
-                    <d
+                    <div className="space-y-1.5 text-xs text-slate-400">
+                      {Object.keys(item.configOptions).map((k) => (
+                        <div key={k} className="flex items-center justify-between bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800">
+                          <span className="font-medium text-slate-200">{item.configOptions[k].label}:</span>
+                          <span className="text-[11px] text-indigo-300 font-mono">
+                            {item.configOptions[k].values.join(' • ')}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer Actions */}
+              <div className="pt-4 mt-4 border-t border-slate-800 flex items-center justify-between gap-3 shrink-0">
+                <button
+                  onClick={() => setDetailModalComponent(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={() => {
+                    handleAddService(detailModalComponent);
+                    setDetailModalComponent(null);
+                  }}
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 text-white font-extrabold text-xs shadow-lg shadow-indigo-500/25 transition flex items-center gap-1.5"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Deploy to Canvas</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ========================================================================= */}
       {/* ARCHITECT HALL OF FAME & DAILY INCIDENT LEADERBOARD MODAL                 */}
       {/* ========================================================================= */}
       {showLeaderboardModal && (

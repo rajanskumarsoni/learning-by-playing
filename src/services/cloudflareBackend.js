@@ -317,6 +317,32 @@ class CloudflareBackendService {
   }
 
   /**
+   * Fetch Community Blueprints from Cloudflare D1 / R2 Store
+   */
+  async getBlueprints() {
+    if (this.config.workerUrl) {
+      try {
+        const res = await fetch(`${this.config.workerUrl}/api/blueprints`, {
+          signal: AbortSignal.timeout(3500)
+        });
+        if (res.ok) {
+          const body = await res.json();
+          return body.blueprints || [];
+        }
+      } catch (err) {
+        console.warn('Failed to fetch blueprints from Cloudflare backend, falling back to local cache:', err);
+      }
+    }
+
+    try {
+      const current = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEYS.BLUEPRINTS) || '{}');
+      return Object.values(current);
+    } catch {}
+
+    return [];
+  }
+
+  /**
    * Sync Player Profile to Cloudflare R2
    */
   async syncPlayerProfile(playerId, profileData) {

@@ -129,3 +129,19 @@ console.log('✅ Cloudflare backend seed files written to data/ :');
 console.log('  - data/leaderboards.json');
 console.log('  - data/blueprints.json');
 console.log('  - data/daily_incidents.json');
+
+// 4. Seed local Cloudflare D1 database if seed.sql exists
+const seedSqlPath = path.join(ROOT_DIR, 'backend', 'seed.sql');
+if (fs.existsSync(seedSqlPath)) {
+  try {
+    const { execSync } = await import('child_process');
+    console.log('⏳ Seeding Cloudflare D1 local database (systemsaviour_db)...');
+    execSync('npx --yes wrangler d1 execute systemsaviour_db --local --file=./seed.sql', {
+      cwd: path.join(ROOT_DIR, 'backend'),
+      stdio: 'inherit'
+    });
+    console.log('✅ Cloudflare D1 database seeded successfully with users, blueprints, and leaderboards!');
+  } catch (err) {
+    console.warn('⚠️ Note: Local D1 seed via wrangler skipped or failed:', err.message);
+  }
+}
