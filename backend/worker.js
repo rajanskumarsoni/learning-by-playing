@@ -7,7 +7,8 @@
  * - Campaign level definitions & SLA constraints
  * - Deterministic daily incident generator
  * - Chaos Monkey sabotage engine
- * - Global leaderboards & blueprint storage in KV/R2
+ * - Relational D1 Database storage (Users, Sessions, Progression, Badges, Topologies, Leaderboards)
+ * - Cloudflare KV / R2 caching and snapshot persistence
  */
 
 import {
@@ -17,7 +18,14 @@ import {
   evaluateArchitecture,
   validateLevelOutcome,
   generateDailyIncident,
-  triggerAuthoritativeChaos
+  triggerAuthoritativeChaos,
+  CLOUD_CONNECTION_RULES,
+  validateCloudConnection,
+  ICONIC_PRESETS,
+  STREAK_REWARDS,
+  ARCHITECT_BADGES,
+  LEVEL_MANAGERS,
+  evaluateUnlockedBadges
 } from './gameEngine.js';
 
 const CORS_HEADERS = {
@@ -37,6 +45,10 @@ function jsonResponse(data, status = 200, headers = {}) {
     }
   });
 }
+
+// ============================================================================
+// D1 & KV STORAGE ADAPTERS
+// ============================================================================
 
 async function storageGet(env, key) {
   if (env.SYSTEM_SAVIOUR_KV) {
@@ -100,7 +112,7 @@ async function storagePut(env, key, data) {
   }
 }
 
-// Seeded Leaderboard
+// Seeded Leaderboard for cold start or empty DB
 const SEEDED_LEADERBOARD = {
   daily: [
     { rank: 1, name: 'Jeff Dean', score: 9940, p99: '18ms', sla: '99.99%', role: 'Fellow Architect', date: new Date().toISOString() },
@@ -116,7 +128,7 @@ const SEEDED_LEADERBOARD = {
   ]
 };
 
-// Auth Cryptographic Helpers (Native Web Crypto API)
+// Cryptographic Password Hashing (Native Web Crypto API)
 async function hashPassword(password, salt) {
   const enc = new TextEncoder();
   const data = enc.encode(`${salt}:${password}:systemsaviour_edge_v2`);
@@ -144,6 +156,56 @@ function roleBySpecialization(spec) {
   }
 }
 
+// Authenticate Bearer token helper (Checks D1 first, then KV)
+async function getAuthenticatedUser(request, env) {
+  const authHeader = request.headers.get('Authorization') || '';
+  const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+  if (!token) return null;
+
+  // 1. Try D1 if bound
+  if (env.DB) {
+    try {
+      const now = Date.now();
+      const session = await env.DB.prepare(
+        'SELECT s.*, u.id as u_id, u.name, u.handle, u.email, u.role, u.specialization, u.salary, u.rank, u.avatar_url, u.auth_provider, u.created_at as user_created_at FROM sessions s JOIN users u ON s.user_id = u.id WHERE s.token = ? AND s.expires_at > ?'
+      ).bind(token, now).first();
+
+      if (session) {
+        return {
+          token,
+          user: {
+            id: session.u_id,
+            name: session.name,
+            handle: session.handle,
+            email: session.email,
+            role: session.role,
+            specialization: session.specialization,
+            salary: session.salary,
+            rank: session.rank,
+            avatar: session.avatar_url,
+            authProvider: session.auth_provider,
+            createdAt: session.user_created_at
+          }
+        };
+      }
+    } catch (e) {
+      console.warn('D1 auth lookup error, falling back to KV:', e);
+    }
+  }
+
+  // 2. Fallback to KV
+  const kvSession = await storageGet(env, `session_${token}`);
+  if (kvSession && kvSession.userId && (!kvSession.expiresAt || Date.now() < kvSession.expiresAt)) {
+    const userRecord = await storageGet(env, `user_${kvSession.userId}`);
+    if (userRecord) {
+      const { passwordHash: _p, salt: _s, ...safeUser } = userRecord;
+      return { token, user: safeUser };
+    }
+  }
+
+  return null;
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -159,15 +221,29 @@ export default {
     const path = url.pathname;
 
     try {
-      // 1. Health & Edge Telemetry
+      // ====================================================================
+      // 1. HEALTH & EDGE TELEMETRY
+      // ====================================================================
       if (path === '/' || path === '/api/health') {
+        let d1Connected = false;
+        if (env.DB) {
+          try {
+            await env.DB.prepare('SELECT 1').first();
+            d1Connected = true;
+          } catch (e) {
+            d1Connected = false;
+          }
+        }
+
         return jsonResponse({
           status: 'online',
           service: 'System Saviour Authoritative Edge Engine',
-          version: '2.0.0',
+          version: '2.1.0',
           environment: env.ENVIRONMENT || 'production',
           colo: request.cf?.colo || 'UNKNOWN',
           country: request.cf?.country || 'UNKNOWN',
+          d1Bound: Boolean(env.DB),
+          d1Connected,
           kvBound: Boolean(env.SYSTEM_SAVIOUR_KV),
           r2Bound: Boolean(env.SYSTEM_SAVIOUR_BUCKET),
           features: [
@@ -176,7 +252,9 @@ export default {
             'catalog-sync',
             'daily-incidents',
             'chaos-monkey',
-            'leaderboard-kv'
+            'd1-relational-database',
+            'cloud-player-sync',
+            'leaderboard-relational'
           ],
           timestamp: new Date().toISOString()
         });
@@ -205,15 +283,170 @@ export default {
       if (path.match(/^\/api\/levels\/\d+\/validate$/) && method === 'POST') {
         const levelId = parseInt(path.split('/')[3], 10);
         const body = await request.json();
-        const { nodes = [], edges = [], elapsedSeconds = 20 } = body;
+        const { nodes = [], edges = [], elapsedSeconds = 20, streak = 0 } = body;
 
         const validation = validateLevelOutcome(levelId, nodes, edges, elapsedSeconds);
+        const earnedBadges = evaluateUnlockedBadges(nodes, edges, { won: validation.won, levelId }, streak);
+
+        // If authenticated and won, persist any newly earned badges to D1
+        const auth = await getAuthenticatedUser(request, env);
+        if (auth && validation.won && env.DB && earnedBadges.length > 0) {
+          const timestamp = new Date().toISOString();
+          for (const badgeId of earnedBadges) {
+            try {
+              await env.DB.prepare(
+                'INSERT OR IGNORE INTO player_badges (user_id, badge_id, unlocked_at) VALUES (?, ?, ?)'
+              ).bind(auth.user.id, badgeId, timestamp).run();
+            } catch (e) {}
+          }
+        }
 
         return jsonResponse({
           success: true,
           authoritative: true,
-          validation
+          validation: {
+            ...validation,
+            earnedBadges
+          }
         });
+      }
+
+      // ====================================================================
+      // 3.5. ARCHITECTURAL CONNECTION RULES & LINTER (GET & POST /api/rules)
+      // ====================================================================
+      if (path === '/api/rules' && method === 'GET') {
+        return jsonResponse({
+          success: true,
+          rules: CLOUD_CONNECTION_RULES
+        });
+      }
+
+      if (path === '/api/rules/validate' && method === 'POST') {
+        const body = await request.json();
+        const { fromType, toType, nodes = [], edges = [], fromId = null, toId = null, options = {} } = body;
+        const result = validateCloudConnection(fromType, toType, nodes, edges, fromId, toId, options);
+        return jsonResponse({
+          success: true,
+          ...result
+        });
+      }
+
+      // ====================================================================
+      // 3.6. ICONIC ARCHITECTURE PRESETS (GET /api/presets)
+      // ====================================================================
+      if (path === '/api/presets' && method === 'GET') {
+        return jsonResponse({
+          success: true,
+          count: ICONIC_PRESETS.length,
+          presets: ICONIC_PRESETS
+        });
+      }
+
+      // ====================================================================
+      // 3.7. ARCHITECT BADGES & STREAK REWARDS (GET /api/badges)
+      // ====================================================================
+      if (path === '/api/badges' && method === 'GET') {
+        return jsonResponse({
+          success: true,
+          badges: ARCHITECT_BADGES,
+          streakRewards: STREAK_REWARDS
+        });
+      }
+
+      // ====================================================================
+      // 3.8. ENGINEERING MANAGERS & PROGRESSION DOSSIER (GET /api/managers)
+      // ====================================================================
+      if (path === '/api/managers' && method === 'GET') {
+        return jsonResponse({
+          success: true,
+          count: LEVEL_MANAGERS.length,
+          managers: LEVEL_MANAGERS
+        });
+      }
+
+      // ====================================================================
+      // 3.9. VIRAL CHALLENGES & SHORT LINKS (POST & GET /api/challenges)
+      // ====================================================================
+      if (path === '/api/challenges' && method === 'POST') {
+        const body = await request.json();
+        const auth = await getAuthenticatedUser(request, env);
+        const randId = Math.random().toString(36).substring(2, 8);
+        const challengeId = `c_${randId}`;
+        const timestamp = new Date().toISOString();
+
+        const record = {
+          id: challengeId,
+          authorName: auth?.user?.name || body.author || 'Anonymous Architect',
+          authorId: auth?.user?.id || 'anonymous',
+          gameMode: body.gameMode || 'CAMPAIGN',
+          levelIdx: body.levelIdx || 0,
+          nodes: body.nodes || [],
+          edges: body.edges || [],
+          createdAt: timestamp
+        };
+
+        if (env.DB) {
+          try {
+            await env.DB.prepare(`
+              INSERT INTO challenges (id, author_id, author_name, game_mode, level_idx, nodes_json, edges_json, created_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            `).bind(
+              challengeId,
+              record.authorId,
+              record.authorName,
+              record.gameMode,
+              record.levelIdx,
+              JSON.stringify(record.nodes),
+              JSON.stringify(record.edges),
+              timestamp
+            ).run();
+          } catch (e) {
+            console.warn('D1 challenges insert error, falling back to KV:', e);
+          }
+        }
+
+        await storagePut(env, `challenge_${challengeId}`, record);
+
+        return jsonResponse({
+          success: true,
+          id: challengeId,
+          shortCode: randId,
+          shareUrl: `${url.origin}/#challenge=${challengeId}`
+        }, 201);
+      }
+
+      if (path.startsWith('/api/challenges/') && method === 'GET') {
+        const challengeId = path.replace('/api/challenges/', '');
+        if (!challengeId) return jsonResponse({ error: 'Missing challenge ID' }, 400);
+
+        let challenge = null;
+
+        if (env.DB) {
+          try {
+            const row = await env.DB.prepare('SELECT * FROM challenges WHERE id = ? OR id = ?').bind(challengeId, `c_${challengeId}`).first();
+            if (row) {
+              await env.DB.prepare('UPDATE challenges SET clicks_count = clicks_count + 1 WHERE id = ?').bind(row.id).run();
+              challenge = {
+                id: row.id,
+                author: row.author_name,
+                gameMode: row.game_mode,
+                levelIdx: row.level_idx,
+                nodes: JSON.parse(row.nodes_json),
+                edges: JSON.parse(row.edges_json),
+                createdAt: row.created_at
+              };
+            }
+          } catch (e) {}
+        }
+
+        if (!challenge) {
+          challenge = await storageGet(env, `challenge_${challengeId}`) || await storageGet(env, `challenge_c_${challengeId}`);
+        }
+
+        if (challenge) {
+          return jsonResponse({ success: true, challenge });
+        }
+        return jsonResponse({ success: false, error: 'Challenge not found' }, 404);
       }
 
       // ====================================================================
@@ -269,13 +502,63 @@ export default {
       }
 
       // ====================================================================
-      // 8. GLOBAL LEADERBOARDS (GET & POST /api/leaderboard)
+      // 8. GLOBAL & DAILY LEADERBOARDS (GET & POST /api/leaderboard)
+      // Backed by D1 Relational SQL + KV Cache
       // ====================================================================
       if (path === '/api/leaderboard' && method === 'GET') {
+        const type = (url.searchParams.get('type') || 'daily').toLowerCase();
+        const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get('limit') || '50', 10)));
+
+        // 1. Try D1 Relational Leaderboard
+        if (env.DB) {
+          try {
+            const query = `
+              SELECT 
+                l.id, l.score, l.p99_latency_ms, l.uptime_pct, l.wave_survived, l.nodes_count, l.created_at,
+                u.id as user_id, u.name, u.handle, u.role, u.avatar_url
+              FROM leaderboard_entries l
+              JOIN users u ON l.user_id = u.id
+              WHERE l.leaderboard_type = ?
+              ORDER BY l.score DESC
+              LIMIT ?
+            `;
+            const rows = await env.DB.prepare(query).bind(type, limit).all();
+
+            if (rows && rows.results && rows.results.length > 0) {
+              const ranked = rows.results.map((r, idx) => ({
+                rank: idx + 1,
+                id: r.id,
+                name: r.name,
+                handle: r.handle,
+                role: r.role,
+                avatar: r.avatar_url,
+                score: r.score,
+                p99: `${Math.round(r.p99_latency_ms)}ms`,
+                sla: `${r.uptime_pct.toFixed(1)}%`,
+                wave: r.wave_survived,
+                nodes: r.nodes_count,
+                date: r.created_at
+              }));
+
+              return jsonResponse({
+                success: true,
+                source: 'd1_relational',
+                type,
+                count: ranked.length,
+                data: { [type]: ranked }
+              });
+            }
+          } catch (err) {
+            console.warn('D1 Leaderboard fetch error, falling back to KV/Seed:', err);
+          }
+        }
+
+        // 2. Fallback to KV or Seeded
         const stored = await storageGet(env, 'leaderboard');
         const leaderboard = stored || SEEDED_LEADERBOARD;
         return jsonResponse({
           success: true,
+          source: 'kv_cache',
           data: leaderboard,
           cachedAt: new Date().toISOString()
         });
@@ -283,58 +566,409 @@ export default {
 
       if (path === '/api/leaderboard' && method === 'POST') {
         const payload = await request.json();
-        const { type = 'daily', entry } = payload;
+        const {
+          type = 'daily',
+          entry,
+          nodes,
+          edges,
+          levelId,
+          dayNumber
+        } = payload;
 
-        if (!entry || !entry.name || entry.score == null) {
-          return jsonResponse({ success: false, error: 'Invalid leaderboard entry format' }, 400);
+        // Verify caller authentication
+        const auth = await getAuthenticatedUser(request, env);
+        let submitterUser = auth?.user;
+
+        // If no auth token, check if entry provides an identifiable user, else anonymous
+        if (!submitterUser) {
+          submitterUser = {
+            id: `anon_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+            name: entry?.name || 'Anonymous Architect',
+            handle: 'anonymous',
+            role: entry?.role || 'Guest Terminal'
+          };
         }
 
+        let verifiedScore = entry?.score;
+        let verifiedP99 = entry?.p99 ? parseFloat(String(entry.p99).replace(/[^0-9.]/g, '')) : 25;
+        let verifiedSLA = entry?.sla ? parseFloat(String(entry.sla).replace(/[^0-9.]/g, '')) : 99.9;
+        let waveSurvived = entry?.wave || null;
+        let nodesCount = Array.isArray(nodes) ? nodes.length : (entry?.nodes || 0);
+
+        // AUTHORITATIVE VERIFICATION: If nodes and edges are provided, evaluate server-side
+        if (Array.isArray(nodes) && Array.isArray(edges) && nodes.length > 0) {
+          let targetRps = 1500;
+          let trafficMix = { STATIC: 0.4, READ: 0.4, WRITE: 0.2 };
+          let budget = 250;
+
+          if (type === 'daily') {
+            const daily = generateDailyIncident(0);
+            targetRps = daily.targetRps;
+            trafficMix = daily.trafficMix;
+            budget = daily.maxBudgetHr;
+          } else if (levelId !== undefined) {
+            const lvl = CAMPAIGN_LEVELS.find((l) => l.id === Number(levelId));
+            if (lvl) {
+              targetRps = lvl.targetRps;
+              trafficMix = lvl.trafficMix;
+              budget = lvl.maxBudgetHr;
+            }
+          }
+
+          const evaluation = evaluateArchitecture(nodes, edges, targetRps, trafficMix, budget);
+          verifiedP99 = Math.round(evaluation.p99Latency);
+          verifiedSLA = evaluation.uptimePct;
+          nodesCount = nodes.length;
+
+          if (type === 'daily') {
+            verifiedScore = Math.max(1000, 10000 - Math.round(verifiedP99 * 50));
+          }
+        }
+
+        if (verifiedScore == null) {
+          return jsonResponse({ success: false, error: 'Could not calculate or verify valid score' }, 400);
+        }
+
+        const entryId = `lb_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        const timestamp = new Date().toISOString();
+
+        // 1. Insert into D1 if available
+        if (env.DB) {
+          try {
+            // Ensure user exists in users table (insert placeholder if anonymous guest)
+            const existingUser = await env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(submitterUser.id).first();
+            if (!existingUser) {
+              await env.DB.prepare(
+                'INSERT INTO users (id, handle, email, name, role, specialization, salary, rank, auth_provider) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+              ).bind(
+                submitterUser.id,
+                submitterUser.handle || `user_${submitterUser.id.substring(0, 8)}`,
+                submitterUser.email || `${submitterUser.id}@systemsaviour.dev`,
+                submitterUser.name,
+                submitterUser.role,
+                submitterUser.specialization || 'HIGH_AVAILABILITY',
+                submitterUser.salary || '$95,000 / yr',
+                submitterUser.rank || 'Junior Architect',
+                'guest'
+              ).run();
+            }
+
+            await env.DB.prepare(
+              'INSERT INTO leaderboard_entries (id, user_id, leaderboard_type, day_number, level_idx, score, p99_latency_ms, uptime_pct, wave_survived, nodes_count, verified, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)'
+            ).bind(
+              entryId,
+              submitterUser.id,
+              type.toLowerCase(),
+              dayNumber || null,
+              levelId || null,
+              verifiedScore,
+              verifiedP99,
+              verifiedSLA,
+              waveSurvived,
+              nodesCount,
+              timestamp
+            ).run();
+          } catch (dbErr) {
+            console.warn('D1 Leaderboard insert error:', dbErr);
+          }
+        }
+
+        // 2. Also update KV Cache for fast reads
         const stored = await storageGet(env, 'leaderboard');
         const currentLeaderboard = stored || SEEDED_LEADERBOARD;
-
         const list = currentLeaderboard[type] || [];
-        const updatedList = [...list, { ...entry, date: new Date().toISOString() }];
+        const newRecord = {
+          rank: 0,
+          id: entryId,
+          name: submitterUser.name,
+          score: verifiedScore,
+          p99: `${verifiedP99}ms`,
+          sla: `${verifiedSLA.toFixed(1)}%`,
+          role: submitterUser.role,
+          wave: waveSurvived,
+          date: timestamp
+        };
+
+        const updatedList = [...list, newRecord];
         updatedList.sort((a, b) => b.score - a.score);
         const ranked = updatedList.slice(0, 100).map((item, idx) => ({ ...item, rank: idx + 1 }));
-
         currentLeaderboard[type] = ranked;
         await storagePut(env, 'leaderboard', currentLeaderboard);
 
-        const playerRank = ranked.findIndex((item) => item.name === entry.name) + 1;
+        const playerRank = ranked.findIndex((item) => item.id === entryId || item.name === submitterUser.name) + 1;
 
         return jsonResponse({
           success: true,
-          playerRank,
+          verified: true,
+          playerRank: playerRank || 1,
+          score: verifiedScore,
           totalEntries: ranked.length,
           top10: ranked.slice(0, 10)
         });
       }
 
       // ====================================================================
-      // 9. BLUEPRINTS (GET & POST /api/blueprints)
+      // 9. FULL CLOUD STATE SYNCHRONIZATION (GET & POST /api/player/sync)
+      // Synchronizes Progress, Badges, and Saved Topologies across devices
+      // ====================================================================
+      if (path === '/api/player/sync') {
+        const auth = await getAuthenticatedUser(request, env);
+        if (!auth) {
+          return jsonResponse({ success: false, error: 'Authorization required for cloud sync' }, 401);
+        }
+
+        const userId = auth.user.id;
+
+        // PULL STATE (GET)
+        if (method === 'GET') {
+          let progress = {
+            unlockedLevelIdx: 0,
+            maxSurvivalWave: 0,
+            dailyStreak: 0,
+            lastDailyCompletedDate: null,
+            tutorialCompleted: false
+          };
+          let badges = [];
+          let topologies = {};
+
+          if (env.DB) {
+            try {
+              // 1. Fetch Progress
+              const pRow = await env.DB.prepare('SELECT * FROM player_progress WHERE user_id = ?').bind(userId).first();
+              if (pRow) {
+                progress = {
+                  unlockedLevelIdx: pRow.unlocked_level_idx,
+                  maxSurvivalWave: pRow.max_survival_wave,
+                  dailyStreak: pRow.daily_streak,
+                  lastDailyCompletedDate: pRow.last_daily_completed_date,
+                  tutorialCompleted: Boolean(pRow.tutorial_completed)
+                };
+              }
+
+              // 2. Fetch Badges
+              const bRows = await env.DB.prepare('SELECT badge_id FROM player_badges WHERE user_id = ?').bind(userId).all();
+              if (bRows && bRows.results) {
+                badges = bRows.results.map((r) => r.badge_id);
+              }
+
+              // 3. Fetch Topologies
+              const tRows = await env.DB.prepare('SELECT game_mode, level_idx, nodes_json, edges_json FROM saved_topologies WHERE user_id = ?').bind(userId).all();
+              if (tRows && tRows.results) {
+                for (const row of tRows.results) {
+                  const key = `${row.game_mode}_${row.level_idx}`;
+                  try {
+                    topologies[key] = {
+                      nodes: JSON.parse(row.nodes_json),
+                      edges: JSON.parse(row.edges_json)
+                    };
+                  } catch {}
+                }
+              }
+            } catch (d1Err) {
+              console.warn('D1 sync pull error, reading fallback profile from KV:', d1Err);
+            }
+          }
+
+          // Fallback to KV profile if D1 returned empty
+          if (badges.length === 0 && progress.unlockedLevelIdx === 0) {
+            const kvProfile = await storageGet(env, `player_${userId}`);
+            if (kvProfile) {
+              if (kvProfile.unlockedLevelIdx !== undefined) progress.unlockedLevelIdx = kvProfile.unlockedLevelIdx;
+              if (kvProfile.streak !== undefined) progress.dailyStreak = kvProfile.streak;
+              if (Array.isArray(kvProfile.unlockedBadges)) badges = kvProfile.unlockedBadges;
+            }
+          }
+
+          return jsonResponse({
+            success: true,
+            user: auth.user,
+            progress,
+            badges,
+            topologies,
+            syncedAt: new Date().toISOString()
+          });
+        }
+
+        // PUSH / RECONCILE STATE (POST)
+        if (method === 'POST') {
+          const body = await request.json();
+          const { progress, badges = [], topologies = {} } = body;
+          const timestamp = new Date().toISOString();
+
+          if (env.DB) {
+            try {
+              // 1. Upsert Progress
+              if (progress) {
+                await env.DB.prepare(`
+                  INSERT INTO player_progress (user_id, unlocked_level_idx, max_survival_wave, daily_streak, last_daily_completed_date, tutorial_completed, updated_at)
+                  VALUES (?, ?, ?, ?, ?, ?, ?)
+                  ON CONFLICT(user_id) DO UPDATE SET
+                    unlocked_level_idx = MAX(player_progress.unlocked_level_idx, excluded.unlocked_level_idx),
+                    max_survival_wave = MAX(player_progress.max_survival_wave, excluded.max_survival_wave),
+                    daily_streak = MAX(player_progress.daily_streak, excluded.daily_streak),
+                    last_daily_completed_date = COALESCE(excluded.last_daily_completed_date, player_progress.last_daily_completed_date),
+                    tutorial_completed = MAX(player_progress.tutorial_completed, excluded.tutorial_completed),
+                    updated_at = excluded.updated_at
+                `).bind(
+                  userId,
+                  progress.unlockedLevelIdx || 0,
+                  progress.maxSurvivalWave || 0,
+                  progress.dailyStreak || 0,
+                  progress.lastDailyCompletedDate || null,
+                  progress.tutorialCompleted ? 1 : 0,
+                  timestamp
+                ).run();
+              }
+
+              // 2. Insert Badges
+              for (const badgeId of badges) {
+                await env.DB.prepare(
+                  'INSERT OR IGNORE INTO player_badges (user_id, badge_id, unlocked_at) VALUES (?, ?, ?)'
+                ).bind(userId, badgeId, timestamp).run();
+              }
+
+              // 3. Upsert Topologies
+              for (const [key, topo] of Object.entries(topologies)) {
+                if (topo && topo.nodes && topo.edges) {
+                  const parts = key.split('_');
+                  const gameMode = parts[0] || 'CAMPAIGN';
+                  const levelIdx = parseInt(parts[1] || '0', 10);
+                  const topoId = `topo_${userId}_${key}`;
+
+                  await env.DB.prepare(`
+                    INSERT INTO saved_topologies (id, user_id, game_mode, level_idx, nodes_json, edges_json, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(user_id, game_mode, level_idx) DO UPDATE SET
+                      nodes_json = excluded.nodes_json,
+                      edges_json = excluded.edges_json,
+                      updated_at = excluded.updated_at
+                  `).bind(
+                    topoId,
+                    userId,
+                    gameMode,
+                    levelIdx,
+                    JSON.stringify(topo.nodes),
+                    JSON.stringify(topo.edges),
+                    timestamp
+                  ).run();
+                }
+              }
+            } catch (d1Err) {
+              console.warn('D1 sync push error:', d1Err);
+            }
+          }
+
+          // Also mirror to KV for fallback
+          await storagePut(env, `player_${userId}`, {
+            userId,
+            unlockedLevelIdx: progress?.unlockedLevelIdx || 0,
+            unlockedBadges: badges,
+            streak: progress?.dailyStreak || 0,
+            updatedAt: timestamp
+          });
+
+          return jsonResponse({
+            success: true,
+            message: 'Player career and architectures synchronized with Cloudflare Edge',
+            syncedAt: timestamp
+          });
+        }
+      }
+
+      // ====================================================================
+      // 10. BLUEPRINTS (GET & POST /api/blueprints)
+      // Backed by D1 Relational DB + R2 Object Storage
       // ====================================================================
       if (path === '/api/blueprints' && method === 'GET') {
+        if (env.DB) {
+          try {
+            const query = `
+              SELECT b.id, b.title, b.description, b.likes_count, b.forks_count, b.created_at,
+                     u.name as author, u.handle as author_handle
+              FROM blueprints b
+              JOIN users u ON b.author_id = u.id
+              WHERE b.is_public = 1
+              ORDER BY b.created_at DESC
+              LIMIT 50
+            `;
+            const rows = await env.DB.prepare(query).all();
+            if (rows && rows.results && rows.results.length > 0) {
+              return jsonResponse({
+                success: true,
+                count: rows.results.length,
+                blueprints: rows.results
+              });
+            }
+          } catch (e) {
+            console.warn('D1 blueprints fetch error, falling back to KV:', e);
+          }
+        }
+
         const indexList = (await storageGet(env, 'blueprints_index')) || [];
         return jsonResponse({ success: true, count: indexList.length, blueprints: indexList });
       }
 
       if (path === '/api/blueprints' && method === 'POST') {
         const payload = await request.json();
+        const auth = await getAuthenticatedUser(request, env);
+        const authorId = auth?.user?.id || 'anonymous';
+        const authorName = auth?.user?.name || payload.author || 'Anonymous Architect';
+
         const id = payload.id || `bp-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
         const record = {
           id,
           title: payload.title || 'Community Blueprint',
-          author: payload.author || 'Anonymous Architect',
+          description: payload.description || 'Architectural defense layout',
+          author: authorName,
+          authorId,
           nodes: payload.nodes || [],
           edges: payload.edges || [],
           trafficProfile: payload.trafficProfile || {},
           createdAt: new Date().toISOString()
         };
 
+        // 1. Insert into D1 if available
+        if (env.DB) {
+          try {
+            // Ensure author exists in users table
+            const userExists = await env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(authorId).first();
+            if (!userExists) {
+              await env.DB.prepare(
+                'INSERT INTO users (id, handle, email, name, role, specialization, auth_provider) VALUES (?, ?, ?, ?, ?, ?, ?)'
+              ).bind(
+                authorId,
+                `user_${authorId.substring(0, 8)}`,
+                `${authorId}@systemsaviour.dev`,
+                authorName,
+                'Architect',
+                'HIGH_AVAILABILITY',
+                'guest'
+              ).run();
+            }
+
+            await env.DB.prepare(`
+              INSERT INTO blueprints (id, author_id, title, description, nodes_json, edges_json, traffic_profile_json, is_public, created_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
+            `).bind(
+              id,
+              authorId,
+              record.title,
+              record.description,
+              JSON.stringify(record.nodes),
+              JSON.stringify(record.edges),
+              JSON.stringify(record.trafficProfile),
+              record.createdAt
+            ).run();
+          } catch (dbErr) {
+            console.warn('D1 blueprint insert error:', dbErr);
+          }
+        }
+
+        // 2. Put full snapshot to KV / R2
         await storagePut(env, `blueprint_${id}`, record);
 
         const indexList = (await storageGet(env, 'blueprints_index')) || [];
-        indexList.unshift({ id, title: record.title, author: record.author, createdAt: record.createdAt });
+        indexList.unshift({ id, title: record.title, author: authorName, createdAt: record.createdAt });
         await storagePut(env, 'blueprints_index', indexList.slice(0, 50));
 
         return jsonResponse({
@@ -349,6 +983,32 @@ export default {
         const id = path.replace('/api/blueprints/', '');
         if (!id) return jsonResponse({ error: 'Missing blueprint ID' }, 400);
 
+        if (env.DB) {
+          try {
+            const row = await env.DB.prepare(
+              'SELECT b.*, u.name as author, u.handle as author_handle FROM blueprints b JOIN users u ON b.author_id = u.id WHERE b.id = ?'
+            ).bind(id).first();
+
+            if (row) {
+              return jsonResponse({
+                success: true,
+                blueprint: {
+                  id: row.id,
+                  title: row.title,
+                  description: row.description,
+                  author: row.author,
+                  nodes: JSON.parse(row.nodes_json),
+                  edges: JSON.parse(row.edges_json),
+                  trafficProfile: row.traffic_profile_json ? JSON.parse(row.traffic_profile_json) : {},
+                  createdAt: row.created_at
+                }
+              });
+            }
+          } catch (e) {
+            console.warn('D1 blueprint item error, falling back to KV:', e);
+          }
+        }
+
         const data = await storageGet(env, `blueprint_${id}`);
         if (data) {
           return jsonResponse({ success: true, blueprint: data });
@@ -357,7 +1017,7 @@ export default {
       }
 
       // ====================================================================
-      // 10. PLAYER CLOUD PROFILE SYNC (GET & PUT /api/player/:id)
+      // 11. LEGACY PLAYER PROFILE SYNC (GET & PUT /api/player/:id)
       // ====================================================================
       if (path.startsWith('/api/player/') && method === 'GET') {
         const playerId = path.replace('/api/player/', '');
@@ -378,8 +1038,7 @@ export default {
       }
 
       // ====================================================================
-      // 11. ARCHITECT AUTHENTICATION & IDENTITY (SIGN IN, SIGN UP, GUEST, ME)
-      // Authoritative Cloudflare Edge Authentication stored in KV / R2
+      // 12. ARCHITECT AUTHENTICATION & IDENTITY (SIGN IN, SIGN UP, GUEST, ME)
       // ====================================================================
 
       // Register / Sign Up (POST /api/auth/register or /api/auth/signup)
@@ -400,7 +1059,24 @@ export default {
           return jsonResponse({ success: false, error: 'Password must be at least 6 characters' }, 400);
         }
 
-        // Check uniqueness in KV
+        // Check uniqueness in D1 and KV
+        if (env.DB) {
+          try {
+            const conflict = await env.DB.prepare(
+              'SELECT id, email, handle FROM users WHERE email = ? OR handle = ?'
+            ).bind(cleanEmail, cleanHandle.toLowerCase()).first();
+
+            if (conflict) {
+              if (conflict.email.toLowerCase() === cleanEmail) {
+                return jsonResponse({ success: false, error: 'An architect with this email already exists' }, 409);
+              }
+              return jsonResponse({ success: false, error: 'Architect handle is already claimed' }, 409);
+            }
+          } catch (e) {
+            console.warn('D1 user check error:', e);
+          }
+        }
+
         const existingByEmail = await storageGet(env, `user_by_email_${cleanEmail}`);
         if (existingByEmail) {
           return jsonResponse({ success: false, error: 'An architect with this email already exists' }, 409);
@@ -414,6 +1090,7 @@ export default {
         const salt = Math.random().toString(36).substring(2, 10);
         const passwordHash = await hashPassword(password, salt);
         const id = `arch_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+        const timestamp = new Date().toISOString();
 
         const userRecord = {
           id,
@@ -427,9 +1104,41 @@ export default {
           passwordHash,
           salt,
           authProvider: 'email',
-          createdAt: new Date().toISOString(),
-          lastLoginAt: new Date().toISOString()
+          createdAt: timestamp,
+          lastLoginAt: timestamp
         };
+
+        // Insert into D1
+        if (env.DB) {
+          try {
+            await env.DB.prepare(`
+              INSERT INTO users (id, handle, email, name, role, specialization, salary, rank, password_hash, salt, auth_provider, created_at, updated_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `).bind(
+              id,
+              userRecord.handle,
+              userRecord.email,
+              userRecord.name,
+              userRecord.role,
+              userRecord.specialization,
+              userRecord.salary,
+              userRecord.rank,
+              passwordHash,
+              salt,
+              userRecord.authProvider,
+              timestamp,
+              timestamp
+            ).run();
+
+            // Default progress
+            await env.DB.prepare(`
+              INSERT OR IGNORE INTO player_progress (user_id, unlocked_level_idx, max_survival_wave, daily_streak, updated_at)
+              VALUES (?, 0, 0, 0, ?)
+            `).bind(id, timestamp).run();
+          } catch (e) {
+            console.warn('D1 user insert error:', e);
+          }
+        }
 
         // Persist to KV
         await storagePut(env, `user_${id}`, userRecord);
@@ -438,10 +1147,22 @@ export default {
 
         // Generate session token
         const token = generateToken();
+        const expiresAt = Date.now() + 86400000 * 30;
+
+        if (env.DB) {
+          try {
+            await env.DB.prepare(
+              'INSERT INTO sessions (token, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)'
+            ).bind(token, id, expiresAt, timestamp).run();
+          } catch (e) {
+            console.warn('D1 session insert error:', e);
+          }
+        }
+
         await storagePut(env, `session_${token}`, {
           userId: id,
-          createdAt: new Date().toISOString(),
-          expiresAt: Date.now() + 86400000 * 30
+          createdAt: timestamp,
+          expiresAt
         });
 
         const { passwordHash: _p, salt: _s, ...safeUser } = userRecord;
@@ -463,18 +1184,50 @@ export default {
           return jsonResponse({ success: false, error: 'Email/Handle and password are required' }, 400);
         }
 
-        let userId = await storageGet(env, `user_by_email_${clean}`);
-        if (!userId) {
-          userId = await storageGet(env, `user_by_handle_${clean}`);
+        let userRecord = null;
+
+        // 1. Try D1
+        if (env.DB) {
+          try {
+            const row = await env.DB.prepare(
+              'SELECT * FROM users WHERE email = ? OR handle = ?'
+            ).bind(clean, clean).first();
+
+            if (row) {
+              userRecord = {
+                id: row.id,
+                name: row.name,
+                handle: row.handle,
+                email: row.email,
+                role: row.role,
+                specialization: row.specialization,
+                salary: row.salary,
+                rank: row.rank,
+                avatar: row.avatar_url,
+                passwordHash: row.password_hash,
+                salt: row.salt,
+                authProvider: row.auth_provider,
+                createdAt: row.created_at
+              };
+            }
+          } catch (e) {
+            console.warn('D1 login lookup error:', e);
+          }
         }
 
-        if (!userId) {
-          return jsonResponse({ success: false, error: 'Architect account not found' }, 401);
+        // 2. Fallback to KV
+        if (!userRecord) {
+          let userId = await storageGet(env, `user_by_email_${clean}`);
+          if (!userId) {
+            userId = await storageGet(env, `user_by_handle_${clean}`);
+          }
+          if (userId) {
+            userRecord = await storageGet(env, `user_${userId}`);
+          }
         }
 
-        const userRecord = await storageGet(env, `user_${userId}`);
         if (!userRecord || !userRecord.passwordHash) {
-          return jsonResponse({ success: false, error: 'Invalid user account state' }, 401);
+          return jsonResponse({ success: false, error: 'Architect account not found' }, 401);
         }
 
         const computedHash = await hashPassword(password, userRecord.salt);
@@ -482,16 +1235,23 @@ export default {
           return jsonResponse({ success: false, error: 'Incorrect terminal password' }, 401);
         }
 
-        // Update login timestamp
-        userRecord.lastLoginAt = new Date().toISOString();
-        await storagePut(env, `user_${userId}`, userRecord);
-
-        // Issue session token
         const token = generateToken();
+        const expiresAt = Date.now() + 86400000 * 30;
+        const timestamp = new Date().toISOString();
+
+        if (env.DB) {
+          try {
+            await env.DB.prepare('UPDATE users SET updated_at = ? WHERE id = ?').bind(timestamp, userRecord.id).run();
+            await env.DB.prepare('INSERT INTO sessions (token, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)').bind(token, userRecord.id, expiresAt, timestamp).run();
+          } catch (e) {
+            console.warn('D1 session insert error:', e);
+          }
+        }
+
         await storagePut(env, `session_${token}`, {
-          userId,
-          createdAt: new Date().toISOString(),
-          expiresAt: Date.now() + 86400000 * 30
+          userId: userRecord.id,
+          createdAt: timestamp,
+          expiresAt
         });
 
         const { passwordHash: _p, salt: _s, ...safeUser } = userRecord;
@@ -508,6 +1268,7 @@ export default {
         const payload = (await request.json().catch(() => ({}))) || {};
         const randNum = Math.floor(100 + Math.random() * 900);
         const id = `guest_${Date.now()}_${randNum}`;
+        const timestamp = new Date().toISOString();
 
         const guestUser = {
           id,
@@ -520,16 +1281,51 @@ export default {
           rank: 'Guest Fellow',
           authProvider: 'guest',
           isGuest: true,
-          createdAt: new Date().toISOString()
+          createdAt: timestamp
         };
+
+        if (env.DB) {
+          try {
+            await env.DB.prepare(`
+              INSERT INTO users (id, handle, email, name, role, specialization, salary, rank, auth_provider, created_at, updated_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'guest', ?, ?)
+            `).bind(
+              id,
+              guestUser.handle,
+              guestUser.email,
+              guestUser.name,
+              guestUser.role,
+              guestUser.specialization,
+              guestUser.salary,
+              guestUser.rank,
+              timestamp,
+              timestamp
+            ).run();
+
+            await env.DB.prepare(`
+              INSERT OR IGNORE INTO player_progress (user_id, unlocked_level_idx, max_survival_wave, daily_streak, updated_at)
+              VALUES (?, 0, 0, 0, ?)
+            `).bind(id, timestamp).run();
+          } catch (e) {
+            console.warn('D1 guest insert error:', e);
+          }
+        }
 
         await storagePut(env, `user_${id}`, guestUser);
 
         const token = generateToken();
+        const expiresAt = Date.now() + 86400000 * 7;
+
+        if (env.DB) {
+          try {
+            await env.DB.prepare('INSERT INTO sessions (token, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)').bind(token, id, expiresAt, timestamp).run();
+          } catch (e) {}
+        }
+
         await storagePut(env, `session_${token}`, {
           userId: id,
-          createdAt: new Date().toISOString(),
-          expiresAt: Date.now() + 86400000 * 7
+          createdAt: timestamp,
+          expiresAt
         });
 
         return jsonResponse({
@@ -549,23 +1345,35 @@ export default {
         const cleanName = name || `${cleanProvider === 'github' ? 'OctoArchitect' : 'GoogleArchitect'}_${randId}`;
         const cleanEmail = (email || `${(handle || cleanName).replace(/\s+/g, '_').toLowerCase()}@${cleanProvider}.user`).toLowerCase();
         const cleanHandle = (handle || cleanName.replace(/[^a-zA-Z0-9_]/g, '_')).toLowerCase();
+        const timestamp = new Date().toISOString();
 
-        let userId = await storageGet(env, `user_by_email_${cleanEmail}`);
-        let userRecord;
+        let userId = null;
+        let userRecord = null;
 
-        if (userId) {
+        if (env.DB) {
+          try {
+            const existing = await env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(cleanEmail).first();
+            if (existing) {
+              userId = existing.id;
+              await env.DB.prepare('UPDATE users SET avatar_url = COALESCE(?, avatar_url), updated_at = ? WHERE id = ?').bind(avatar || null, timestamp, userId).run();
+              userRecord = { ...existing, avatar: avatar || existing.avatar_url };
+            }
+          } catch (e) {}
+        }
+
+        if (!userId) {
+          userId = await storageGet(env, `user_by_email_${cleanEmail}`);
+        }
+
+        if (userId && !userRecord) {
           userRecord = await storageGet(env, `user_${userId}`);
           if (userRecord) {
-            // Update profile with fresh OAuth provider details
             if (avatar) userRecord.avatar = avatar;
             if (name) userRecord.name = cleanName;
-            if (cleanHandle && !userRecord.handle) userRecord.handle = cleanHandle;
-            userRecord.authProvider = cleanProvider;
-            if (providerId) userRecord.providerId = providerId;
-            userRecord.updatedAt = new Date().toISOString();
+            userRecord.updatedAt = timestamp;
             await storagePut(env, `user_${userId}`, userRecord);
           }
-        } else {
+        } else if (!userId) {
           userId = `oauth_${cleanProvider}_${Date.now()}_${randId}`;
           userRecord = {
             id: userId,
@@ -579,18 +1387,39 @@ export default {
             rank: 'Senior Architect',
             authProvider: cleanProvider,
             providerId: providerId || null,
-            createdAt: new Date().toISOString()
+            createdAt: timestamp
           };
+
+          if (env.DB) {
+            try {
+              await env.DB.prepare(`
+                INSERT INTO users (id, handle, email, name, role, specialization, salary, rank, avatar_url, auth_provider, provider_id, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              `).bind(
+                userId, cleanHandle, cleanEmail, cleanName, userRecord.role, userRecord.specialization,
+                userRecord.salary, userRecord.rank, avatar || null, cleanProvider, providerId || null, timestamp, timestamp
+              ).run();
+            } catch (e) {}
+          }
+
           await storagePut(env, `user_${userId}`, userRecord);
           await storagePut(env, `user_by_email_${cleanEmail}`, userId);
           await storagePut(env, `user_by_handle_${cleanHandle}`, userId);
         }
 
         const token = generateToken();
+        const expiresAt = Date.now() + 86400000 * 30;
+
+        if (env.DB) {
+          try {
+            await env.DB.prepare('INSERT INTO sessions (token, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)').bind(token, userId, expiresAt, timestamp).run();
+          } catch (e) {}
+        }
+
         await storagePut(env, `session_${token}`, {
           userId,
-          createdAt: new Date().toISOString(),
-          expiresAt: Date.now() + 86400000 * 30
+          createdAt: timestamp,
+          expiresAt
         });
 
         const { passwordHash: _p, salt: _s, ...safeUser } = userRecord;
@@ -612,7 +1441,6 @@ export default {
         let verifiedAvatar = picture;
         let googleSub = sub;
 
-        // If a real Google ID Token is provided, verify against Google's public tokeninfo endpoint
         if (credential) {
           try {
             const googleRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
@@ -635,22 +1463,35 @@ export default {
         }
 
         const cleanEmail = verifiedEmail.toLowerCase();
-        let userId = await storageGet(env, `user_by_email_${cleanEmail}`);
-        let userRecord;
+        const randId = Math.random().toString(36).substring(2, 7);
+        const timestamp = new Date().toISOString();
+        let userId = null;
+        let userRecord = null;
+
+        if (env.DB) {
+          try {
+            const existing = await env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(cleanEmail).first();
+            if (existing) {
+              userId = existing.id;
+              userRecord = existing;
+            }
+          } catch (e) {}
+        }
+
+        if (!userId) {
+          userId = await storageGet(env, `user_by_email_${cleanEmail}`);
+        }
 
         if (userId) {
-          userRecord = await storageGet(env, `user_${userId}`);
+          userRecord = userRecord || (await storageGet(env, `user_${userId}`));
           if (userRecord) {
             if (verifiedAvatar) userRecord.avatar = verifiedAvatar;
             if (verifiedName) userRecord.name = verifiedName;
-            userRecord.authProvider = 'google';
-            if (googleSub) userRecord.providerId = googleSub;
-            userRecord.updatedAt = new Date().toISOString();
+            userRecord.updatedAt = timestamp;
             await storagePut(env, `user_${userId}`, userRecord);
           }
         } else {
-          const randId = Math.random().toString(36).substring(2, 7);
-          const handle = (verifiedEmail.split('@')[0] || `google_${randId}`).replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
+          const handle = (cleanEmail.split('@')[0] || `google_${randId}`).replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
           userId = `oauth_google_${Date.now()}_${randId}`;
           userRecord = {
             id: userId,
@@ -664,18 +1505,39 @@ export default {
             rank: 'Staff Architect',
             authProvider: 'google',
             providerId: googleSub || null,
-            createdAt: new Date().toISOString()
+            createdAt: timestamp
           };
+
+          if (env.DB) {
+            try {
+              await env.DB.prepare(`
+                INSERT INTO users (id, handle, email, name, role, specialization, salary, rank, avatar_url, auth_provider, provider_id, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              `).bind(
+                userId, handle, cleanEmail, userRecord.name, userRecord.role, userRecord.specialization,
+                userRecord.salary, userRecord.rank, verifiedAvatar || null, 'google', googleSub || null, timestamp, timestamp
+              ).run();
+            } catch (e) {}
+          }
+
           await storagePut(env, `user_${userId}`, userRecord);
           await storagePut(env, `user_by_email_${cleanEmail}`, userId);
           await storagePut(env, `user_by_handle_${handle}`, userId);
         }
 
         const token = generateToken();
+        const expiresAt = Date.now() + 86400000 * 30;
+
+        if (env.DB) {
+          try {
+            await env.DB.prepare('INSERT INTO sessions (token, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)').bind(token, userId, expiresAt, timestamp).run();
+          } catch (e) {}
+        }
+
         await storagePut(env, `session_${token}`, {
           userId,
-          createdAt: new Date().toISOString(),
-          expiresAt: Date.now() + 86400000 * 30
+          createdAt: timestamp,
+          expiresAt
         });
 
         const { passwordHash: _p, salt: _s, ...safeUser } = userRecord;
@@ -689,7 +1551,6 @@ export default {
 
       // GitHub OAuth Authorization Callback (GET /api/auth/oauth/github/callback)
       if (path === '/api/auth/oauth/github/callback' && method === 'GET') {
-        const url = new URL(request.url);
         const code = url.searchParams.get('code');
         const clientId = env.GITHUB_CLIENT_ID;
         const clientSecret = env.GITHUB_CLIENT_SECRET;
@@ -726,6 +1587,7 @@ export default {
           const ghUser = await ghUserRes.json();
 
           const cleanEmail = (ghUser.email || `${ghUser.login}@github.user`).toLowerCase();
+          const timestamp = new Date().toISOString();
           let userId = await storageGet(env, `user_by_email_${cleanEmail}`);
           let userRecord;
 
@@ -753,7 +1615,7 @@ export default {
               rank: 'Senior Architect',
               authProvider: 'github',
               providerId: String(ghUser.id),
-              createdAt: new Date().toISOString()
+              createdAt: timestamp
             };
             await storagePut(env, `user_${userId}`, userRecord);
             await storagePut(env, `user_by_email_${cleanEmail}`, userId);
@@ -761,15 +1623,22 @@ export default {
           }
 
           const sessionToken = generateToken();
+          const expiresAt = Date.now() + 86400000 * 30;
+
+          if (env.DB) {
+            try {
+              await env.DB.prepare('INSERT INTO sessions (token, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)').bind(sessionToken, userId, expiresAt, timestamp).run();
+            } catch (e) {}
+          }
+
           await storagePut(env, `session_${sessionToken}`, {
             userId,
-            createdAt: new Date().toISOString(),
-            expiresAt: Date.now() + 86400000 * 30
+            createdAt: timestamp,
+            expiresAt
           });
 
           const { passwordHash: _p, salt: _s, ...safeUser } = userRecord;
 
-          // Return HTML that communicates to opener window or redirects
           const html = `<!DOCTYPE html>
 <html>
 <head><title>GitHub Authentication Successful</title></head>
@@ -801,27 +1670,14 @@ export default {
 
       // Current Authenticated User (GET /api/auth/me)
       if (path === '/api/auth/me' && method === 'GET') {
-        const authHeader = request.headers.get('Authorization') || '';
-        const token = authHeader.replace(/^Bearer\s+/i, '').trim();
-
-        if (!token) {
-          return jsonResponse({ success: false, error: 'Missing bearer authorization token' }, 401);
-        }
-
-        const session = await storageGet(env, `session_${token}`);
-        if (!session || !session.userId || (session.expiresAt && Date.now() > session.expiresAt)) {
+        const auth = await getAuthenticatedUser(request, env);
+        if (!auth) {
           return jsonResponse({ success: false, error: 'Session expired or invalid' }, 401);
         }
 
-        const userRecord = await storageGet(env, `user_${session.userId}`);
-        if (!userRecord) {
-          return jsonResponse({ success: false, error: 'User record not found' }, 404);
-        }
-
-        const { passwordHash: _p, salt: _s, ...safeUser } = userRecord;
         return jsonResponse({
           success: true,
-          user: safeUser
+          user: auth.user
         });
       }
 
@@ -830,6 +1686,11 @@ export default {
         const authHeader = request.headers.get('Authorization') || '';
         const token = authHeader.replace(/^Bearer\s+/i, '').trim();
         if (token) {
+          if (env.DB) {
+            try {
+              await env.DB.prepare('DELETE FROM sessions WHERE token = ?').bind(token).run();
+            } catch (e) {}
+          }
           await storagePut(env, `session_${token}`, null);
         }
         return jsonResponse({ success: true, message: 'Terminal session terminated' });

@@ -22,7 +22,12 @@ const LOCAL_STORAGE_KEYS = {
   PLAYER_SYNC: 'systemsaviour_cf_player_sync',
   LAST_SYNC: 'systemsaviour_cf_last_sync',
   AUTH_TOKEN: 'systemsaviour_cf_auth_token',
-  AUTH_USER: 'systemsaviour_auth_user'
+  AUTH_TOKEN_ALT: 'systemsaviour_auth_token',
+  AUTH_USER: 'systemsaviour_auth_user',
+  UNLOCKED_LEVEL: 'systemsaviour_unlocked_level',
+  UNLOCKED_BADGES: 'systemsaviour_unlocked_badges',
+  DAILY_STREAK: 'systemsaviour_daily_streak',
+  DAILY_LAST_DATE: 'systemsaviour_daily_last_completed_date'
 };
 
 class CloudflareBackendService {
@@ -113,12 +118,37 @@ class CloudflareBackendService {
     return null;
   }
 
+  getToken() {
+    try {
+      return localStorage.getItem(LOCAL_STORAGE_KEYS.AUTH_TOKEN) ||
+             localStorage.getItem(LOCAL_STORAGE_KEYS.AUTH_TOKEN_ALT) || null;
+    } catch {
+      return null;
+    }
+  }
+
   /**
-   * Submit Score to Cloudflare Leaderboard
+   * Submit Score to Cloudflare Leaderboard (with optional authoritative simulation validation)
    */
-  async submitScore(type = 'daily', entry) {
+  async submitScore(type = 'daily', entryOrPayload) {
     const timestamp = new Date().toISOString();
-    const fullEntry = { ...entry, date: timestamp };
+    const token = this.getToken();
+    const isAuthoritative = entryOrPayload && (entryOrPayload.nodes || entryOrPayload.levelId !== undefined);
+
+    let fullEntry;
+    let requestBody;
+
+    if (isAuthoritative) {
+      fullEntry = entryOrPayload.entry ? { ...entryOrPayload.entry, date: timestamp } : { date: timestamp };
+      requestBody = {
+        type,
+        ...entryOrPayload,
+        entry: fullEntry
+      };
+    } else {
+      fullEntry = { ...(entryOrPayload || {}), date: timestamp };
+      requestBody = { type, entry: fullEntry };
+    }
 
     // Update local cache replica
     try {
@@ -134,23 +164,89 @@ class CloudflareBackendService {
       this.status.lastSync = timestamp;
     } catch (e) {}
 
-    if (this.config.workerUrl) {
-      try {
-        const res = await fetch(`${this.config.workerUrl}/api/leaderboard`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type, entry: fullEntry }),
-          signal: AbortSignal.timeout(4000)
-        });
-        if (res.ok) {
-          return await res.json();
-        }
-      } catch (err) {
-        console.warn('Worker submission offline, preserved in local R2 store:', err.message);
-      }
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await this._fetchApi('/api/leaderboard', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(requestBody)
+    });
+
+    if (res && res.success) {
+      return res;
     }
 
     return { success: true, entry: fullEntry, storedIn: 'Cloudflare Cache' };
+  }
+
+  /**
+   * Submit Authoritative Topology for Anti-Cheat Verification and Leaderboard Placement
+   */
+  async submitAuthoritativeScore(type = 'daily', { levelId, nodes, edges, dayNumber, entry, elapsedSeconds = 20 }) {
+    return this.submitScore(type, { levelId, nodes, edges, dayNumber, entry, elapsedSeconds });
+  }
+
+  /**
+   * Pull Full Player Career State & Topologies from Cloudflare D1
+   */
+  async pullCloudState() {
+    const token = this.getToken();
+    if (!token) return null;
+
+    try {
+      const res = await this._fetchApi('/api/player/sync', {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (res && res.success) {
+        // Reconcile into local storage
+        if (res.progress) {
+          if (res.progress.unlockedLevelIdx !== undefined) {
+            localStorage.setItem(LOCAL_STORAGE_KEYS.UNLOCKED_LEVEL, res.progress.unlockedLevelIdx.toString());
+          }
+          if (res.progress.dailyStreak !== undefined) {
+            localStorage.setItem(LOCAL_STORAGE_KEYS.DAILY_STREAK, res.progress.dailyStreak.toString());
+          }
+          if (res.progress.lastDailyCompletedDate) {
+            localStorage.setItem(LOCAL_STORAGE_KEYS.DAILY_LAST_DATE, res.progress.lastDailyCompletedDate);
+          }
+        }
+        if (Array.isArray(res.badges)) {
+          localStorage.setItem(LOCAL_STORAGE_KEYS.UNLOCKED_BADGES, JSON.stringify(res.badges));
+        }
+        if (res.topologies && typeof res.topologies === 'object') {
+          for (const [key, val] of Object.entries(res.topologies)) {
+            localStorage.setItem(`systemsaviour_arch_${key}`, JSON.stringify(val));
+          }
+        }
+        return res;
+      }
+    } catch (e) {
+      console.warn('Failed to pull cloud state:', e);
+    }
+    return null;
+  }
+
+  /**
+   * Push Local Player Career State & Topologies to Cloudflare D1
+   */
+  async pushCloudState({ progress, badges, topologies }) {
+    const token = this.getToken();
+    if (!token) return null;
+
+    try {
+      const res = await this._fetchApi('/api/player/sync', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ progress, badges, topologies })
+      });
+      return res;
+    } catch (e) {
+      console.warn('Failed to push cloud state:', e);
+      return null;
+    }
   }
 
   /**
@@ -280,13 +376,17 @@ class CloudflareBackendService {
   /**
    * Authoritative Level Victory & Star Validation on Cloudflare Edge
    */
-  async validateLevel(levelId, nodes, edges, elapsedSeconds = 20) {
+  async validateLevel(levelId, nodes, edges, elapsedSeconds = 20, streak = 0) {
+    const token = this.getToken();
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
     if (this.config.workerUrl) {
       try {
         const res = await fetch(`${this.config.workerUrl}/api/levels/${levelId}/validate`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nodes, edges, elapsedSeconds }),
+          headers,
+          body: JSON.stringify({ nodes, edges, elapsedSeconds, streak }),
           signal: AbortSignal.timeout(3500)
         });
         if (res.ok) {
@@ -300,6 +400,62 @@ class CloudflareBackendService {
       }
     }
     return null;
+  }
+
+  /**
+   * Fetch Architectural Rules & Matrix from Edge
+   */
+  async getRules() {
+    const res = await this._fetchApi('/api/rules');
+    return res && res.success ? res.rules : null;
+  }
+
+  /**
+   * Fetch Iconic Architecture Presets from Edge
+   */
+  async getPresets() {
+    const res = await this._fetchApi('/api/presets');
+    return res && res.success ? res.presets : null;
+  }
+
+  /**
+   * Fetch Badges & Streak Rewards from Edge
+   */
+  async getBadges() {
+    const res = await this._fetchApi('/api/badges');
+    return res && res.success ? res : null;
+  }
+
+  /**
+   * Fetch Manager Dossiers from Edge
+   */
+  async getManagers() {
+    const res = await this._fetchApi('/api/managers');
+    return res && res.success ? res.managers : null;
+  }
+
+  /**
+   * Create a Short-URL Shareable Challenge
+   */
+  async createChallenge({ nodes, edges, author, gameMode, levelIdx }) {
+    const token = this.getToken();
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await this._fetchApi('/api/challenges', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ nodes, edges, author, gameMode, levelIdx })
+    });
+    return res;
+  }
+
+  /**
+   * Retrieve a Shared Challenge by Short Code
+   */
+  async getChallenge(challengeId) {
+    const res = await this._fetchApi(`/api/challenges/${challengeId}`);
+    return res && res.success ? res.challenge : null;
   }
 
   /**

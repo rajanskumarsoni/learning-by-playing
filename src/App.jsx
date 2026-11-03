@@ -4311,10 +4311,21 @@ export default function App() {
       if (!prevBest || p99 < parseFloat(prevBest)) {
         localStorage.setItem(bestKey, p99.toString());
       }
+      // Submit authoritative run to Cloudflare D1 leaderboard
+      cloudflareBackend.submitAuthoritativeScore('daily', {
+        dayNumber: dailyIncident.dayNumber,
+        nodes,
+        edges,
+        entry: {
+          name: currentUser?.name || 'Architect Player',
+          role: currentUser?.role || 'Junior Architect',
+          p99: `${Math.round(p99)}ms`
+        }
+      }).catch(() => {});
     } catch (err) {
       console.warn('Failed recording daily completion:', err);
     }
-  }, [dailyIncident, dailyStreak]);
+  }, [dailyIncident, dailyStreak, nodes, edges, currentUser]);
 
   const [activeChallengeBanner, setActiveChallengeBanner] = useState(() => {
     if (initialChallengeRef.current) {
@@ -4520,6 +4531,34 @@ export default function App() {
       });
     });
     return () => unsub();
+  }, []);
+
+  // Asynchronous Short-Code Challenge Fetcher from Edge API
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const hash = window.location.hash || '';
+    const search = window.location.search || '';
+    const match = hash.match(/challenge=(c_[a-zA-Z0-9_-]+)/) || search.match(/challenge=(c_[a-zA-Z0-9_-]+)/);
+    if (match && match[1]) {
+      cloudflareBackend.getChallenge(match[1]).then((remoteChallenge) => {
+        if (remoteChallenge && remoteChallenge.nodes && remoteChallenge.edges) {
+          setNodes(remoteChallenge.nodes);
+          setEdges(remoteChallenge.edges);
+          if (remoteChallenge.gameMode) setGameMode(remoteChallenge.gameMode);
+          if (typeof remoteChallenge.levelIdx === 'number') setCurrentLevelIdx(remoteChallenge.levelIdx);
+          setActiveChallengeBanner({
+            author: remoteChallenge.author || 'Architect',
+            levelIdx: remoteChallenge.levelIdx || 0,
+            gameMode: remoteChallenge.gameMode || 'CAMPAIGN'
+          });
+          setToastNotification({
+            type: 'info',
+            message: `📥 Loaded Cloud Architecture Challenge by ${remoteChallenge.author}!`
+          });
+          setTimeout(() => setToastNotification(null), 4000);
+        }
+      }).catch(() => {});
+    }
   }, []);
 
   // Background Warrior Music & Web Audio: Autostart if enabled & unlock on first user gesture
@@ -5217,9 +5256,23 @@ export default function App() {
     return `${baseUrl}#challenge=${encodeURIComponent(b64)}`;
   }, [gameMode, currentLevelIdx, survivalWave, nodes, edges]);
 
-  const handleCopyChallengeLink = () => {
+  const handleCopyChallengeLink = async () => {
     sound.playClick();
-    const url = generateChallengeUrl();
+    let url = generateChallengeUrl();
+
+    try {
+      const shortRes = await cloudflareBackend.createChallenge({
+        nodes,
+        edges,
+        author: currentUser?.name || 'Anonymous Architect',
+        gameMode,
+        levelIdx: currentLevelIdx
+      });
+      if (shortRes && shortRes.shareUrl) {
+        url = shortRes.shareUrl;
+      }
+    } catch {}
+
     if (navigator.clipboard) {
       navigator.clipboard.writeText(url);
     }
@@ -5566,7 +5619,7 @@ Can your architecture beat this? Test it in your browser:
             // Authoritative server-side validation & anti-cheat verification on Cloudflare Edge
             if (isWon) {
               const targetLevelId = gameMode === 'CAMPAIGN' ? currentLevel.id : 1;
-              cloudflareBackend.validateLevel(targetLevelId, nodes, edges).then((edgeRes) => {
+              cloudflareBackend.validateLevel(targetLevelId, nodes, edges, 20, dailyStreak).then((edgeRes) => {
                 if (edgeRes && edgeRes.validationToken) {
                   setPostMortemModal((prev) => (prev ? {
                     ...prev,
@@ -5574,6 +5627,10 @@ Can your architecture beat this? Test it in your browser:
                     stars: edgeRes.stars || prev.stars,
                     edgeValidated: true
                   } : prev));
+                  // Authoritatively unlock any newly earned badges returned by edge validation
+                  if (Array.isArray(edgeRes.earnedBadges)) {
+                    edgeRes.earnedBadges.forEach((bId) => unlockBadge(bId));
+                  }
                 }
               }).catch(() => {});
             }
@@ -6205,11 +6262,22 @@ Can your architecture beat this? Test it in your browser:
     });
   }, [activeCatalogTab]);
 
-  // Cloudflare R2 Sync and Export Handlers
+  // Cloudflare D1 & R2 Sync and Export Handlers
   const handleCloudflareSync = useCallback(async () => {
     setCfSyncInProgress(true);
     sound.playUpgrade();
     try {
+      await cloudflareBackend.pushCloudState({
+        progress: {
+          unlockedLevelIdx,
+          dailyStreak,
+          lastDailyCompletedDate: localStorage.getItem('systemsaviour_daily_last_completed_date')
+        },
+        badges: unlockedBadges,
+        topologies: {
+          [`${gameMode}_${currentLevelIdx}`]: { nodes, edges }
+        }
+      });
       await cloudflareBackend.syncPlayerProfile('player-primary', {
         rank: playerRank,
         unlockedLevelIdx,
@@ -6217,28 +6285,30 @@ Can your architecture beat this? Test it in your browser:
         streak: dailyStreak,
         updatedAt: new Date().toISOString()
       });
-      await cloudflareBackend.submitScore('daily', {
-        name: 'Player Architect',
-        score: Math.max(1000, 10000 - Math.round(evaluation.p99Latency * 50)),
-        p99: `${Math.round(evaluation.p99Latency)}ms`,
-        sla: `${evaluation.uptimePct.toFixed(1)}%`,
-        role: playerRank.title
+      await cloudflareBackend.submitAuthoritativeScore('daily', {
+        dayNumber: dailyIncident.dayNumber,
+        nodes,
+        edges,
+        entry: {
+          name: currentUser?.name || 'Player Architect',
+          role: playerRank.title
+        }
       });
       setCfStatus(cloudflareBackend.getStatus());
       setToastNotification({
         type: 'success',
-        message: '☁️ Cloudflare R2: Architectural state synchronized!'
+        message: '☁️ Cloudflare D1: Career progress & architecture synchronized!'
       });
     } catch (e) {
       setToastNotification({
         type: 'success',
-        message: '☁️ Cloudflare R2: Cached locally and queued for edge sync!'
+        message: '☁️ Cloudflare Cache: Stored locally and queued for edge sync!'
       });
     } finally {
       setCfSyncInProgress(false);
       setTimeout(() => setToastNotification(null), 3000);
     }
-  }, [playerRank, unlockedLevelIdx, unlockedBadges, dailyStreak, evaluation]);
+  }, [playerRank, unlockedLevelIdx, unlockedBadges, dailyStreak, evaluation, nodes, edges, gameMode, currentLevelIdx, currentUser, dailyIncident]);
 
   const handleDownloadCloudSnapshot = useCallback(() => {
     sound.playClick();
@@ -10188,45 +10258,7 @@ Can your architecture beat this? Test it in your browser:
                     <div className="font-bold text-xs uppercase tracking-wider text-slate-300">
                       ⚙️ Architectural Tuning Available in Inspector:
                     </div>
-                    <div className="space-y-1.5 text-xs text-slate-400">
-                      {Object.keys(item.configOptions).map((k) => (
-                        <div key={k} className="flex items-center justify-between bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800">
-                          <span className="font-medium text-slate-200">{item.configOptions[k].label}:</span>
-                          <span className="text-[11px] text-indigo-300 font-mono">
-                            {item.configOptions[k].values.join(' • ')}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Modal Footer Actions */}
-              <div className="pt-4 mt-4 border-t border-slate-800 flex items-center justify-between gap-3 shrink-0">
-                <button
-                  onClick={() => setDetailModalComponent(null)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition"
-                >
-                  Close
-                </button>
-                <button
-                  onClick={() => {
-                    handleAddService(detailModalComponent);
-                    setDetailModalComponent(null);
-                  }}
-                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 text-white font-extrabold text-xs shadow-lg shadow-indigo-500/25 transition flex items-center gap-1.5"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Deploy to Canvas</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* ========================================================================= */}
+                    <d
       {/* ARCHITECT HALL OF FAME & DAILY INCIDENT LEADERBOARD MODAL                 */}
       {/* ========================================================================= */}
       {showLeaderboardModal && (
@@ -11041,6 +11073,38 @@ Can your architecture beat this? Test it in your browser:
           try {
             localStorage.setItem('systemsaviour_auth_user', JSON.stringify(user));
           } catch (e) {}
+
+          // Cloudflare D1 Sync & Local-to-Cloud Migration
+          cloudflareBackend.pullCloudState().then((cloudData) => {
+            if (cloudData && cloudData.success) {
+              const hasCloud = (cloudData.progress?.unlockedLevelIdx || 0) > 0 || (cloudData.badges?.length || 0) > 0;
+              if (hasCloud) {
+                if (cloudData.progress.unlockedLevelIdx !== undefined) {
+                  setUnlockedLevelIdx((prev) => Math.max(prev, cloudData.progress.unlockedLevelIdx));
+                }
+                if (cloudData.progress.dailyStreak !== undefined) {
+                  setDailyStreak((prev) => Math.max(prev, cloudData.progress.dailyStreak));
+                }
+                if (Array.isArray(cloudData.badges)) {
+                  setUnlockedBadges((prev) => Array.from(new Set([...prev, ...cloudData.badges])));
+                }
+              } else {
+                // Initial migration: Push local state up to the new cloud account
+                cloudflareBackend.pushCloudState({
+                  progress: {
+                    unlockedLevelIdx,
+                    dailyStreak,
+                    lastDailyCompletedDate: localStorage.getItem('systemsaviour_daily_last_completed_date')
+                  },
+                  badges: unlockedBadges,
+                  topologies: {
+                    [`${gameMode}_${currentLevelIdx}`]: { nodes, edges }
+                  }
+                }).catch(() => {});
+              }
+            }
+          }).catch(() => {});
+
           setToastNotification({
             type: 'success',
             message: `🔑 Terminal Authenticated! Welcome, ${user.name}.`
