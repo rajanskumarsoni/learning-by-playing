@@ -27,7 +27,6 @@
     "deploy:backend": "cd backend && npx wrangler deploy"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1159.0",
     "lucide-react": "^0.454.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

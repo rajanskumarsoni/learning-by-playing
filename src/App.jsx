@@ -1,13 +1,13 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   Server, Database, Shield, Globe, Cpu, Layers, Activity, Zap, Play, Pause,
-  RotateCcw, AlertTriangle, CheckCircle2, HelpCircle, Plus, Trash2,
+  RotateCcw, AlertTriangle, CheckCircle2, Plus, Trash2,
   Settings, Award, Terminal, Flame, ChevronRight, Copy, Check, Download, Upload,
-  FastForward, Eye, Sliders, Share2, Lock, Unlock, Box, HardDrive, Network,
+  Eye, Sliders, Share2, Lock, Box, Network,
   ArrowRight, Sparkles, Info, X, RefreshCw, ZoomIn, ZoomOut, Maximize2, Move,
-  BookOpen, Search, Bot, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
+  Search, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
   ChevronLeft, ChevronDown, Star, Trophy, Radio, Target, Volume2, VolumeX, Music, Headphones, Mic,
-  Link as LinkIcon, Calendar, Crown, Medal, Cloud, ShieldAlert, CheckCircle,
+  Link as LinkIcon, Calendar, Cloud, ShieldAlert, CheckCircle,
   User, UserPlus, LogIn, LogOut, Mail, Key, EyeOff, Briefcase
 } from 'lucide-react';
 import mentorAdaImg from './assets/mentor_ada.jpg';
@@ -30,8 +30,7 @@ import {
   ICONIC_PRESETS,
   STREAK_REWARDS,
   ARCHITECT_BADGES,
-  LEVEL_MANAGERS as BASE_LEVEL_MANAGERS,
-  evaluateUnlockedBadges
+  LEVEL_MANAGERS as BASE_LEVEL_MANAGERS
 } from '../backend/gameEngine.js';
 
 export {

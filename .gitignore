@@ -28,3 +28,8 @@ dist-ssr
 .env.*
 !.env.example
 .wrangler/
+
+# Test screenshots & video recordings
+/*.png
+/*.mp4
+
