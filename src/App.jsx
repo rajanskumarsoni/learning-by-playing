@@ -440,7 +440,7 @@ const CAMPAIGN_LEVELS = [
     trafficMix: { READ: 0.65, WRITE: 0.35, STATIC: 0.0, SEARCH: 0.0, BOT: 0.0, AI_PROMPT: 0.0 },
     maxLatencyMs: 140,
     minUptimePct: 99.0,
-    maxBudgetHr: 560,
+    maxBudgetHr: 580,
     allowedComponents: ['CDN', 'LB', 'WEB', 'CACHE', 'SQL'],
     initialNodes: [
       { id: 'src', type: 'SOURCE', x: 45, y: 220, config: {} },
@@ -590,7 +590,7 @@ function getNodeEffectiveStats(node) {
   };
 }
 
-function evaluateArchitecture(nodes, edges, incomingRps, trafficMix, maxBudgetHr) {
+function evaluateArchitecture(nodes, edges, incomingRps, trafficMix, maxBudgetHr, allowedComponents = null) {
   const nodeMetrics = {};
   const edgeFlows = {};
   let totalHourlyCost = 0;
@@ -855,12 +855,18 @@ function evaluateArchitecture(nodes, edges, incomingRps, trafficMix, maxBudgetHr
     } else if (m.utilization > 1.0) {
       const pct = Math.round(m.utilization * 100);
       if (n.type === 'SQL') {
+        const canUseKafka = !allowedComponents || allowedComponents.includes('QUEUE');
         diagnostics.push(
-          `BOTTLENECK: ${spec.name} is overloaded at ${pct}% capacity! Add Redis Cache upstream, buffer writes via Kafka, or upgrade to Sharded Cluster.`
+          canUseKafka
+            ? `BOTTLENECK: ${spec.name} is overloaded at ${pct}% capacity! Add Redis Cache upstream, buffer writes via Kafka, or upgrade to Sharded Cluster.`
+            : `BOTTLENECK: ${spec.name} is overloaded at ${pct}% capacity! Add Redis Cache upstream to absorb reads, or upgrade Topology Mode to "+2 Read Replicas".`
         );
       } else if (n.type === 'WEB') {
+        const canUseCDN = !allowedComponents || allowedComponents.includes('CDN');
         diagnostics.push(
-          `BOTTLENECK: ${spec.name} is saturated at ${pct}%! Add a Load Balancer with redundant Web Servers or offload reads with CDN.`
+          canUseCDN
+            ? `BOTTLENECK: ${spec.name} is saturated at ${pct}%! Add a Load Balancer with redundant Web Servers or offload reads with CDN.`
+            : `BOTTLENECK: ${spec.name} is saturated at ${pct}%! Add a Load Balancer with redundant Web Servers or upgrade instance tier.`
         );
       } else {
         diagnostics.push(`BOTTLENECK: ${spec.name} is overloaded at ${pct}% capacity! Tune its configuration tier or add parallel nodes.`);
@@ -4101,8 +4107,8 @@ Can your architecture beat this? Test it in your browser:
 
   // Run real-time simulation evaluation
   const evaluation = useMemo(() => {
-    return evaluateArchitecture(nodes, edges, currentLiveRps, activeTrafficMix, currentMaxBudget);
-  }, [nodes, edges, currentLiveRps, activeTrafficMix, currentMaxBudget]);
+    return evaluateArchitecture(nodes, edges, currentLiveRps, activeTrafficMix, currentMaxBudget, currentLevel?.allowedComponents);
+  }, [nodes, edges, currentLiveRps, activeTrafficMix, currentMaxBudget, currentLevel]);
 
   // Real-time pass criteria evaluation
   const targetLatency = (gameMode === 'CAMPAIGN' || gameMode === 'DAILY') ? currentLevel.maxLatencyMs : 250;

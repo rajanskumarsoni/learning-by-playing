@@ -361,7 +361,7 @@ export const CAMPAIGN_LEVELS = [
     trafficMix: { READ: 0.65, WRITE: 0.35, STATIC: 0.0, SEARCH: 0.0, BOT: 0.0, AI_PROMPT: 0.0 },
     maxLatencyMs: 140,
     minUptimePct: 99.0,
-    maxBudgetHr: 560,
+    maxBudgetHr: 580,
     allowedComponents: ['CDN', 'LB', 'WEB', 'CACHE', 'SQL'],
     initialNodes: [
       { id: 'src', type: 'SOURCE', x: 45, y: 220, config: {} },
@@ -578,7 +578,7 @@ export function getNodeEffectiveStats(node) {
 // ============================================================================
 // 6. SIMULATION & TOPOLOGICAL EVALUATION ENGINE
 // ============================================================================
-export function evaluateArchitecture(nodes = [], edges = [], incomingRps = 1000, trafficMix = {}, maxBudgetHr = null) {
+export function evaluateArchitecture(nodes = [], edges = [], incomingRps = 1000, trafficMix = {}, maxBudgetHr = null, allowedComponents = null) {
   const nodeMetrics = {};
   const edgeFlows = {};
   let totalHourlyCost = 0;
@@ -811,9 +811,19 @@ export function evaluateArchitecture(nodes = [], edges = [], incomingRps = 1000,
     } else if (m.utilization > 1.0) {
       const pct = Math.round(m.utilization * 100);
       if (n.type === 'SQL') {
-        diagnostics.push(`BOTTLENECK: ${spec.name} is overloaded at ${pct}% capacity! Add Redis Cache upstream, buffer writes via Kafka, or upgrade to Sharded Cluster.`);
+        const canUseKafka = !allowedComponents || allowedComponents.includes('QUEUE');
+        diagnostics.push(
+          canUseKafka
+            ? `BOTTLENECK: ${spec.name} is overloaded at ${pct}% capacity! Add Redis Cache upstream, buffer writes via Kafka, or upgrade to Sharded Cluster.`
+            : `BOTTLENECK: ${spec.name} is overloaded at ${pct}% capacity! Add Redis Cache upstream to absorb reads, or upgrade Topology Mode to "+2 Read Replicas".`
+        );
       } else if (n.type === 'WEB') {
-        diagnostics.push(`BOTTLENECK: ${spec.name} is saturated at ${pct}%! Add a Load Balancer with redundant Web Servers or offload reads with CDN.`);
+        const canUseCDN = !allowedComponents || allowedComponents.includes('CDN');
+        diagnostics.push(
+          canUseCDN
+            ? `BOTTLENECK: ${spec.name} is saturated at ${pct}%! Add a Load Balancer with redundant Web Servers or offload reads with CDN.`
+            : `BOTTLENECK: ${spec.name} is saturated at ${pct}%! Add a Load Balancer with redundant Web Servers or upgrade instance tier.`
+        );
       } else {
         diagnostics.push(`BOTTLENECK: ${spec.name} is overloaded at ${pct}% capacity! Tune its configuration tier or add parallel nodes.`);
       }
@@ -867,7 +877,8 @@ export function validateLevelOutcome(levelId, nodes, edges, elapsedSeconds = 20)
     edges,
     level.targetRps,
     level.trafficMix,
-    level.maxBudgetHr
+    level.maxBudgetHr,
+    level.allowedComponents
   );
 
   const passedUptime = evaluation.uptimePct >= level.minUptimePct;
