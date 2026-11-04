@@ -2981,40 +2981,6 @@ export default function App() {
     }
   });
 
-  const recordDailyCompletion = useCallback((p99) => {
-    try {
-      const today = dailyIncident.dateKey;
-      const lastDate = localStorage.getItem('systemsaviour_daily_last_completed_date');
-      let newStreak = dailyStreak;
-      if (lastDate !== today) {
-        const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-        newStreak = lastDate === yesterday ? dailyStreak + 1 : 1;
-        localStorage.setItem('systemsaviour_daily_streak', newStreak.toString());
-        localStorage.setItem('systemsaviour_daily_last_completed_date', today);
-        setDailyStreak(newStreak);
-        setIsDailyCompletedToday(true);
-      }
-      const bestKey = `systemsaviour_daily_best_${dailyIncident.dayNumber}`;
-      const prevBest = localStorage.getItem(bestKey);
-      if (!prevBest || p99 < parseFloat(prevBest)) {
-        localStorage.setItem(bestKey, p99.toString());
-      }
-      // Submit authoritative run to Cloudflare D1 leaderboard
-      cloudflareBackend.submitAuthoritativeScore('daily', {
-        dayNumber: dailyIncident.dayNumber,
-        nodes,
-        edges,
-        entry: {
-          name: currentUser?.name || 'Architect Player',
-          role: currentUser?.role || 'Junior Architect',
-          p99: `${Math.round(p99)}ms`
-        }
-      }).catch(() => {});
-    } catch (err) {
-      console.warn('Failed recording daily completion:', err);
-    }
-  }, [dailyIncident, dailyStreak, nodes, edges, currentUser]);
-
   const [activeChallengeBanner, setActiveChallengeBanner] = useState(() => {
     if (initialChallengeRef.current) {
       return {
@@ -3133,6 +3099,40 @@ export default function App() {
       return null;
     }
   });
+
+  const recordDailyCompletion = useCallback((p99) => {
+    try {
+      const today = dailyIncident.dateKey;
+      const lastDate = localStorage.getItem('systemsaviour_daily_last_completed_date');
+      let newStreak = dailyStreak;
+      if (lastDate !== today) {
+        const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+        newStreak = lastDate === yesterday ? dailyStreak + 1 : 1;
+        localStorage.setItem('systemsaviour_daily_streak', newStreak.toString());
+        localStorage.setItem('systemsaviour_daily_last_completed_date', today);
+        setDailyStreak(newStreak);
+        setIsDailyCompletedToday(true);
+      }
+      const bestKey = `systemsaviour_daily_best_${dailyIncident.dayNumber}`;
+      const prevBest = localStorage.getItem(bestKey);
+      if (!prevBest || p99 < parseFloat(prevBest)) {
+        localStorage.setItem(bestKey, p99.toString());
+      }
+      // Submit authoritative run to Cloudflare D1 leaderboard
+      cloudflareBackend.submitAuthoritativeScore('daily', {
+        dayNumber: dailyIncident.dayNumber,
+        nodes,
+        edges,
+        entry: {
+          name: currentUser?.name || 'Architect Player',
+          role: currentUser?.role || 'Junior Architect',
+          p99: `${Math.round(p99)}ms`
+        }
+      }).catch(() => {});
+    } catch (err) {
+      console.warn('Failed recording daily completion:', err);
+    }
+  }, [dailyIncident, dailyStreak, nodes, edges, currentUser]);
   // Default landing view is the Sign In / Sign Up page
   const [authModal, setAuthModal] = useState(() => {
     if (typeof window !== 'undefined') {

@@ -546,7 +546,7 @@ class CloudflareBackendService {
    */
   async _fetchApi(endpoint, options = {}) {
     const urls = [];
-    if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+    if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
       urls.push(`${LOCAL_WORKER_URL}${endpoint}`);
     }
     if (this.config.workerUrl) {
