@@ -2202,7 +2202,7 @@ function ManagerPromotionModal({ promotion, onAccept, onReplay, onClose }) {
             onClick={onAccept}
             className="flex-1 py-3 px-5 rounded-xl bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-emerald-500/30 flex items-center justify-center gap-2 active:scale-95 transition ring-2 ring-emerald-200"
           >
-            <span>{nextManager ? `Accept Promotion & Meet ${nextManager.name} (Level ${levelIdx + 2}) →` : 'Enter Master Architect Sandbox →'}</span>
+            <span>{nextManager ? `Accept Promotion & View Level ${levelIdx + 2} Problem & Targets →` : 'Enter Master Architect Sandbox →'}</span>
           </button>
         </div>
       </div>
@@ -3711,10 +3711,13 @@ export default function App() {
     }
   }, [nodes, edges, gameMode, currentLevelIdx, dailyIncident.dayNumber]);
 
-  // Advance to next level after promotion
-  const advanceToNextLevel = useCallback((nextIdx) => {
+  // Advance to next level after promotion / level win
+  const advanceToNextLevel = useCallback((nextIdx, fromWin = true) => {
     if (nextIdx >= CAMPAIGN_LEVELS.length) {
       setPromotionModal(null);
+      setPostMortemModal(null);
+      setGameMode('SANDBOX');
+      setLevelBriefingModal({ mode: 'SANDBOX', fromWin: true });
       return;
     }
     sound.playSelect();
@@ -3735,6 +3738,11 @@ export default function App() {
     setWaveProgress(0);
     setPan({ x: 0, y: 0 });
     setZoom(1);
+
+    // After level win, explicitly display target / problem explaining screen before the game arena screen
+    if (fromWin) {
+      setLevelBriefingModal({ mode: 'CAMPAIGN', levelIdx: nextIdx, fromWin: true });
+    }
   }, [unlockedLevelIdx]);
   const selectLevel = useCallback((idx) => {
     if (idx > unlockedLevelIdx) return;
@@ -7163,12 +7171,11 @@ Can your architecture beat this? Test it in your browser:
                   {postMortemModal.won && gameMode === 'CAMPAIGN' && currentLevelIdx < CAMPAIGN_LEVELS.length - 1 && (
                     <button
                       onClick={() => {
-                        setPostMortemModal(null);
-                        setLevelBriefingModal({ mode: 'CAMPAIGN', levelIdx: currentLevelIdx + 1 });
+                        advanceToNextLevel(currentLevelIdx + 1, true);
                       }}
                       className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold text-xs shadow-lg shadow-emerald-500/20 active:scale-95 transition flex items-center gap-1.5"
                     >
-                      <span>Next Mission Briefing</span>
+                      <span>Next Level Problem &amp; Targets</span>
                       <span>➡️</span>
                     </button>
                   )}
@@ -8531,6 +8538,25 @@ Can your architecture beat this? Test it in your browser:
               {/* Modal Header */}
               {modalMode === 'CAMPAIGN' ? (
                 <div>
+                  {levelBriefingModal.fromWin && (
+                    <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-950/90 via-slate-900 to-teal-950/90 border border-emerald-500/50 flex items-center justify-between text-xs text-emerald-300 shadow-xl mb-3.5 animate-in fade-in">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-xl">🏆</span>
+                        <div>
+                          <div className="font-bold text-white text-xs sm:text-sm">
+                            Level {selectedLvlIdx} Conquered! Incoming Level {selectedLvl.id} Challenge
+                          </div>
+                          <p className="text-[11px] text-slate-300 mt-0.5">
+                            Examine the problem scenario and SLA targets below before opening the game arena.
+                          </p>
+                        </div>
+                      </div>
+                      <span className="hidden sm:inline-block text-[10px] uppercase font-mono font-black px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 shrink-0">
+                        Problem &amp; Targets
+                      </span>
+                    </div>
+                  )}
+
                   <div className="flex items-center gap-3.5 mb-4 p-4 rounded-2xl bg-gradient-to-r from-indigo-950/80 via-slate-900 to-cyan-950/80 border border-cyan-500/40 shadow-xl">
                     <img
                       src={mentorAdaImg}
@@ -8656,11 +8682,11 @@ Can your architecture beat this? Test it in your browser:
 
               {/* Scrollable Body */}
               <div className="flex-1 overflow-y-auto space-y-4 pr-1 min-h-0 text-xs sm:text-sm">
-                {/* Scenario Box */}
+                {/* Scenario & Problem Statement Box */}
                 <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2.5">
-                  <div className="font-bold text-white text-xs uppercase tracking-wider flex items-center gap-1.5 text-indigo-400">
-                    <BookOpen className="w-4 h-4" />
-                    <span>Mission Scenario</span>
+                  <div className="font-bold text-white text-xs uppercase tracking-wider flex items-center gap-1.5 text-amber-400">
+                    <AlertTriangle className="w-4 h-4 text-amber-400" />
+                    <span>Problem Statement &amp; Architectural Bottleneck</span>
                   </div>
                   <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
                     {modalMode === 'CAMPAIGN' || modalMode === 'DAILY'
@@ -8680,7 +8706,7 @@ Can your architecture beat this? Test it in your browser:
                 <div>
                   <h3 className="text-xs font-bold uppercase tracking-wider text-cyan-400 mb-2.5 flex items-center gap-1.5">
                     <Target className="w-4 h-4 text-cyan-400" />
-                    <span>Targets You Must Achieve To Pass</span>
+                    <span>Required Targets You Must Achieve To Pass</span>
                   </h3>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                     {/* Target 1: Peak Traffic */}
@@ -9712,17 +9738,11 @@ Can your architecture beat this? Test it in your browser:
                 onClick={() => {
                   sound.playSelect();
                   setTutorialVictoryModal(null);
-                  setCurrentLevelIdx(1);
-                  setNodes(JSON.parse(JSON.stringify(CAMPAIGN_LEVELS[1].initialNodes)));
-                  setEdges(JSON.parse(JSON.stringify(CAMPAIGN_LEVELS[1].initialEdges)));
-                  setIsRunning(false);
-                  setWaveProgress(0);
-                  setPostMortemModal(null);
-                  setTimeout(() => resetView(), 100);
+                  advanceToNextLevel(1, true);
                 }}
                 className="w-full sm:flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-slate-950 font-black text-xs shadow-xl shadow-emerald-500/30 flex items-center justify-center gap-2 active:scale-95 transition ring-2 ring-emerald-200"
               >
-                <span>Level 2: Viral Launch →</span>
+                <span>Level 2: View Problem &amp; Targets →</span>
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
@@ -9747,8 +9767,8 @@ Can your architecture beat this? Test it in your browser:
       <ManagerPromotionModal
         promotion={promotionModal}
         onAccept={() => {
-          if (promotionModal && typeof promotionModal.levelIdx === 'number' && promotionModal.nextManager) {
-            advanceToNextLevel(promotionModal.levelIdx + 1);
+          if (promotionModal && typeof promotionModal.levelIdx === 'number') {
+            advanceToNextLevel(promotionModal.levelIdx + 1, true);
           } else {
             setPromotionModal(null);
           }
