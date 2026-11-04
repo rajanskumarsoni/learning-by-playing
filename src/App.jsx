@@ -519,7 +519,8 @@ const CAMPAIGN_LEVELS = [
     hints: [
       'You MUST connect at least one Vector DB + GPU Node downstream from your Web Servers.',
       'Have at least 2 (ideally 3) Web Servers behind the Load Balancer so when Chaos Monkey strikes, traffic auto-heals.',
-      'Enable TensorRT + FP8 Batching on your GPU Node and Semantic Cache on Redis.'
+      'Enable TensorRT + FP8 Batching on your GPU Node and Semantic Cache on Redis.',
+      'When Chaos Monkey strikes mid-wave, click "🔧 Hotfix & Banish" on the monkey or "🔧 Reboot" on the top banner to restore service (+150 XP)!'
     ]
   }
 ];
@@ -4685,8 +4686,10 @@ Can your architecture beat this? Test it in your browser:
     sound.playCrash();
     triggerScreenShake(true);
 
-    // Pick victim node
-    const victim = candidates[Math.floor(Math.random() * candidates.length)];
+    // Pick victim node: prioritize WEB servers for realistic auto-healing behind Load Balancer
+    const webCandidates = candidates.filter((n) => n.type === 'WEB');
+    const victimPool = webCandidates.length > 0 ? webCandidates : candidates;
+    const victim = victimPool[Math.floor(Math.random() * victimPool.length)];
     const victimName = COMPONENT_CATALOG[victim.type]?.name || victim.type;
 
     // Multi-Vector Sabotage Attack Scenarios

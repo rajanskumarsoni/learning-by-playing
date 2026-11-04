@@ -438,7 +438,8 @@ export const CAMPAIGN_LEVELS = [
     hints: [
       'You MUST connect at least one Vector DB + GPU Node downstream from your Web Servers.',
       'Have at least 2 (ideally 3) Web Servers behind the Load Balancer so when Chaos Monkey strikes, traffic auto-heals.',
-      'Enable TensorRT + FP8 Batching on your GPU Node and Semantic Cache on Redis.'
+      'Enable TensorRT + FP8 Batching on your GPU Node and Semantic Cache on Redis.',
+      'When Chaos Monkey strikes mid-wave, click "🔧 Hotfix & Banish" on the monkey or "🔧 Reboot" on the top banner to restore service (+150 XP)!'
     ]
   }
 ];
@@ -937,7 +938,10 @@ export function triggerAuthoritativeChaos(nodes, preferredType = null) {
     return { error: 'No active nodes available to sabotage.' };
   }
 
-  const victim = eligibleVictims[Math.floor(Math.random() * eligibleVictims.length)];
+  // Prioritize WEB servers for realistic auto-healing behind Load Balancer
+  const webVictims = eligibleVictims.filter((n) => n.type === 'WEB');
+  const victimPool = webVictims.length > 0 ? webVictims : eligibleVictims;
+  const victim = victimPool[Math.floor(Math.random() * victimPool.length)];
   const spec = COMPONENT_CATALOG[victim.type] || { name: victim.type };
 
   const attackVariants = [
