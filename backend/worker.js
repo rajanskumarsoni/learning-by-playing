@@ -86,10 +86,10 @@ async function storageGet(env, key) {
 async function storagePut(env, key, data) {
   if (data === null || data === undefined) {
     if (env.SYSTEM_SAVIOUR_KV) {
-      try { await env.SYSTEM_SAVIOUR_KV.delete(key); } catch {}
+      try { await env.SYSTEM_SAVIOUR_KV.delete(key); } catch { }
     }
     if (env.SYSTEM_SAVIOUR_BUCKET) {
-      try { await env.SYSTEM_SAVIOUR_BUCKET.delete(key); } catch {}
+      try { await env.SYSTEM_SAVIOUR_BUCKET.delete(key); } catch { }
     }
     return;
   }
@@ -297,7 +297,7 @@ export default {
               await env.DB.prepare(
                 'INSERT OR IGNORE INTO player_badges (user_id, badge_id, unlocked_at) VALUES (?, ?, ?)'
               ).bind(auth.user.id, badgeId, timestamp).run();
-            } catch (e) {}
+            } catch (e) { }
           }
         }
 
@@ -436,7 +436,7 @@ export default {
                 createdAt: row.created_at
               };
             }
-          } catch (e) {}
+          } catch (e) { }
         }
 
         if (!challenge) {
@@ -761,7 +761,7 @@ export default {
                       nodes: JSON.parse(row.nodes_json),
                       edges: JSON.parse(row.edges_json)
                     };
-                  } catch {}
+                  } catch { }
                 }
               }
             } catch (d1Err) {
@@ -1319,7 +1319,7 @@ export default {
         if (env.DB) {
           try {
             await env.DB.prepare('INSERT INTO sessions (token, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)').bind(token, id, expiresAt, timestamp).run();
-          } catch (e) {}
+          } catch (e) { }
         }
 
         await storagePut(env, `session_${token}`, {
@@ -1334,338 +1334,6 @@ export default {
           user: guestUser,
           message: `Guest terminal activated for ${guestUser.name}`
         });
-      }
-
-      // Social OAuth Connect (POST /api/auth/social)
-      if (path === '/api/auth/social' && method === 'POST') {
-        const payload = await request.json();
-        const { provider = 'github', email, name, handle, avatar, providerId } = payload;
-        const randId = Math.random().toString(36).substring(2, 7);
-        const cleanProvider = (provider || 'github').toLowerCase();
-        const cleanName = name || `${cleanProvider === 'github' ? 'OctoArchitect' : 'GoogleArchitect'}_${randId}`;
-        const cleanEmail = (email || `${(handle || cleanName).replace(/\s+/g, '_').toLowerCase()}@${cleanProvider}.user`).toLowerCase();
-        const cleanHandle = (handle || cleanName.replace(/[^a-zA-Z0-9_]/g, '_')).toLowerCase();
-        const timestamp = new Date().toISOString();
-
-        let userId = null;
-        let userRecord = null;
-
-        if (env.DB) {
-          try {
-            const existing = await env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(cleanEmail).first();
-            if (existing) {
-              userId = existing.id;
-              await env.DB.prepare('UPDATE users SET avatar_url = COALESCE(?, avatar_url), updated_at = ? WHERE id = ?').bind(avatar || null, timestamp, userId).run();
-              userRecord = { ...existing, avatar: avatar || existing.avatar_url };
-            }
-          } catch (e) {}
-        }
-
-        if (!userId) {
-          userId = await storageGet(env, `user_by_email_${cleanEmail}`);
-        }
-
-        if (userId && !userRecord) {
-          userRecord = await storageGet(env, `user_${userId}`);
-          if (userRecord) {
-            if (avatar) userRecord.avatar = avatar;
-            if (name) userRecord.name = cleanName;
-            userRecord.updatedAt = timestamp;
-            await storagePut(env, `user_${userId}`, userRecord);
-          }
-        } else if (!userId) {
-          userId = `oauth_${cleanProvider}_${Date.now()}_${randId}`;
-          userRecord = {
-            id: userId,
-            name: cleanName,
-            handle: cleanHandle,
-            email: cleanEmail,
-            avatar: avatar || null,
-            role: cleanProvider === 'github' ? 'GitHub Senior Architect' : 'Google Cloud Fellow',
-            specialization: cleanProvider === 'github' ? 'THROUGHPUT' : 'AVAILABILITY',
-            salary: '$165,000 / yr',
-            rank: 'Senior Architect',
-            authProvider: cleanProvider,
-            providerId: providerId || null,
-            createdAt: timestamp
-          };
-
-          if (env.DB) {
-            try {
-              await env.DB.prepare(`
-                INSERT INTO users (id, handle, email, name, role, specialization, salary, rank, avatar_url, auth_provider, provider_id, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-              `).bind(
-                userId, cleanHandle, cleanEmail, cleanName, userRecord.role, userRecord.specialization,
-                userRecord.salary, userRecord.rank, avatar || null, cleanProvider, providerId || null, timestamp, timestamp
-              ).run();
-            } catch (e) {}
-          }
-
-          await storagePut(env, `user_${userId}`, userRecord);
-          await storagePut(env, `user_by_email_${cleanEmail}`, userId);
-          await storagePut(env, `user_by_handle_${cleanHandle}`, userId);
-        }
-
-        const token = generateToken();
-        const expiresAt = Date.now() + 86400000 * 30;
-
-        if (env.DB) {
-          try {
-            await env.DB.prepare('INSERT INTO sessions (token, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)').bind(token, userId, expiresAt, timestamp).run();
-          } catch (e) {}
-        }
-
-        await storagePut(env, `session_${token}`, {
-          userId,
-          createdAt: timestamp,
-          expiresAt
-        });
-
-        const { passwordHash: _p, salt: _s, ...safeUser } = userRecord;
-        return jsonResponse({
-          success: true,
-          token,
-          user: safeUser,
-          message: `Authenticated via ${cleanProvider.toUpperCase()}`
-        });
-      }
-
-      // Google Identity Services ID Token Verification (POST /api/auth/oauth/google)
-      if (path === '/api/auth/oauth/google' && method === 'POST') {
-        const payload = await request.json();
-        const { credential, email, name, picture, sub } = payload;
-
-        let verifiedEmail = email;
-        let verifiedName = name;
-        let verifiedAvatar = picture;
-        let googleSub = sub;
-
-        if (credential) {
-          try {
-            const googleRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
-            if (googleRes.ok) {
-              const googleData = await googleRes.json();
-              if (googleData.email) {
-                verifiedEmail = googleData.email;
-                verifiedName = googleData.name || googleData.given_name || 'Google Architect';
-                verifiedAvatar = googleData.picture || null;
-                googleSub = googleData.sub;
-              }
-            }
-          } catch (e) {
-            console.error('Google token verification error:', e);
-          }
-        }
-
-        if (!verifiedEmail) {
-          return jsonResponse({ success: false, error: 'Could not verify Google credentials' }, 400);
-        }
-
-        const cleanEmail = verifiedEmail.toLowerCase();
-        const randId = Math.random().toString(36).substring(2, 7);
-        const timestamp = new Date().toISOString();
-        let userId = null;
-        let userRecord = null;
-
-        if (env.DB) {
-          try {
-            const existing = await env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(cleanEmail).first();
-            if (existing) {
-              userId = existing.id;
-              userRecord = existing;
-            }
-          } catch (e) {}
-        }
-
-        if (!userId) {
-          userId = await storageGet(env, `user_by_email_${cleanEmail}`);
-        }
-
-        if (userId) {
-          userRecord = userRecord || (await storageGet(env, `user_${userId}`));
-          if (userRecord) {
-            if (verifiedAvatar) userRecord.avatar = verifiedAvatar;
-            if (verifiedName) userRecord.name = verifiedName;
-            userRecord.updatedAt = timestamp;
-            await storagePut(env, `user_${userId}`, userRecord);
-          }
-        } else {
-          const handle = (cleanEmail.split('@')[0] || `google_${randId}`).replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
-          userId = `oauth_google_${Date.now()}_${randId}`;
-          userRecord = {
-            id: userId,
-            name: verifiedName || 'Google Cloud Architect',
-            handle,
-            email: cleanEmail,
-            avatar: verifiedAvatar || null,
-            role: 'Google Cloud Fellow',
-            specialization: 'AVAILABILITY',
-            salary: '$175,000 / yr',
-            rank: 'Staff Architect',
-            authProvider: 'google',
-            providerId: googleSub || null,
-            createdAt: timestamp
-          };
-
-          if (env.DB) {
-            try {
-              await env.DB.prepare(`
-                INSERT INTO users (id, handle, email, name, role, specialization, salary, rank, avatar_url, auth_provider, provider_id, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-              `).bind(
-                userId, handle, cleanEmail, userRecord.name, userRecord.role, userRecord.specialization,
-                userRecord.salary, userRecord.rank, verifiedAvatar || null, 'google', googleSub || null, timestamp, timestamp
-              ).run();
-            } catch (e) {}
-          }
-
-          await storagePut(env, `user_${userId}`, userRecord);
-          await storagePut(env, `user_by_email_${cleanEmail}`, userId);
-          await storagePut(env, `user_by_handle_${handle}`, userId);
-        }
-
-        const token = generateToken();
-        const expiresAt = Date.now() + 86400000 * 30;
-
-        if (env.DB) {
-          try {
-            await env.DB.prepare('INSERT INTO sessions (token, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)').bind(token, userId, expiresAt, timestamp).run();
-          } catch (e) {}
-        }
-
-        await storagePut(env, `session_${token}`, {
-          userId,
-          createdAt: timestamp,
-          expiresAt
-        });
-
-        const { passwordHash: _p, salt: _s, ...safeUser } = userRecord;
-        return jsonResponse({
-          success: true,
-          token,
-          user: safeUser,
-          message: 'Google Account authenticated successfully'
-        });
-      }
-
-      // GitHub OAuth Authorization Callback (GET /api/auth/oauth/github/callback)
-      if (path === '/api/auth/oauth/github/callback' && method === 'GET') {
-        const code = url.searchParams.get('code');
-        const clientId = env.GITHUB_CLIENT_ID;
-        const clientSecret = env.GITHUB_CLIENT_SECRET;
-
-        if (!code || !clientId || !clientSecret) {
-          return new Response('GitHub OAuth not configured or missing code parameter', { status: 400 });
-        }
-
-        try {
-          const tokenRes = await fetch('https://github.com/login/oauth/access_token', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            },
-            body: JSON.stringify({
-              client_id: clientId,
-              client_secret: clientSecret,
-              code
-            })
-          });
-
-          const tokenData = await tokenRes.json();
-          if (!tokenData.access_token) {
-            return new Response(`GitHub OAuth failed: ${tokenData.error_description || tokenData.error}`, { status: 400 });
-          }
-
-          const ghUserRes = await fetch('https://api.github.com/user', {
-            headers: {
-              'Authorization': `Bearer ${tokenData.access_token}`,
-              'User-Agent': 'SystemSaviour-App'
-            }
-          });
-          const ghUser = await ghUserRes.json();
-
-          const cleanEmail = (ghUser.email || `${ghUser.login}@github.user`).toLowerCase();
-          const timestamp = new Date().toISOString();
-          let userId = await storageGet(env, `user_by_email_${cleanEmail}`);
-          let userRecord;
-
-          if (userId) {
-            userRecord = await storageGet(env, `user_${userId}`);
-            if (userRecord) {
-              userRecord.avatar = ghUser.avatar_url;
-              userRecord.name = ghUser.name || ghUser.login;
-              userRecord.authProvider = 'github';
-              userRecord.providerId = String(ghUser.id);
-              await storagePut(env, `user_${userId}`, userRecord);
-            }
-          } else {
-            const randId = Math.random().toString(36).substring(2, 7);
-            userId = `oauth_github_${Date.now()}_${randId}`;
-            userRecord = {
-              id: userId,
-              name: ghUser.name || ghUser.login,
-              handle: ghUser.login.toLowerCase(),
-              email: cleanEmail,
-              avatar: ghUser.avatar_url,
-              role: 'GitHub Senior Architect',
-              specialization: 'THROUGHPUT',
-              salary: '$165,000 / yr',
-              rank: 'Senior Architect',
-              authProvider: 'github',
-              providerId: String(ghUser.id),
-              createdAt: timestamp
-            };
-            await storagePut(env, `user_${userId}`, userRecord);
-            await storagePut(env, `user_by_email_${cleanEmail}`, userId);
-            await storagePut(env, `user_by_handle_${ghUser.login.toLowerCase()}`, userId);
-          }
-
-          const sessionToken = generateToken();
-          const expiresAt = Date.now() + 86400000 * 30;
-
-          if (env.DB) {
-            try {
-              await env.DB.prepare('INSERT INTO sessions (token, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)').bind(sessionToken, userId, expiresAt, timestamp).run();
-            } catch (e) {}
-          }
-
-          await storagePut(env, `session_${sessionToken}`, {
-            userId,
-            createdAt: timestamp,
-            expiresAt
-          });
-
-          const { passwordHash: _p, salt: _s, ...safeUser } = userRecord;
-
-          const html = `<!DOCTYPE html>
-<html>
-<head><title>GitHub Authentication Successful</title></head>
-<body style="background:#070a13;color:#38bdf8;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
-  <div style="text-align:center;">
-    <h2>Authentication Successful!</h2>
-    <p>Logging into System Saviour...</p>
-    <script>
-      const authData = ${JSON.stringify({ token: sessionToken, user: safeUser })};
-      if (window.opener) {
-        window.opener.postMessage({ type: 'SYSTEM_SAVIOUR_OAUTH_SUCCESS', payload: authData }, '*');
-        window.close();
-      } else {
-        localStorage.setItem('systemsaviour_auth_user', JSON.stringify(authData.user));
-        localStorage.setItem('systemsaviour_auth_token', authData.token);
-        window.location.href = '/';
-      }
-    </script>
-  </div>
-</body>
-</html>`;
-          return new Response(html, {
-            headers: { 'Content-Type': 'text/html; charset=utf-8' }
-          });
-        } catch (err) {
-          return new Response(`OAuth Error: ${err.message}`, { status: 500 });
-        }
       }
 
       // Current Authenticated User (GET /api/auth/me)
@@ -1689,7 +1357,7 @@ export default {
           if (env.DB) {
             try {
               await env.DB.prepare('DELETE FROM sessions WHERE token = ?').bind(token).run();
-            } catch (e) {}
+            } catch (e) { }
           }
           await storagePut(env, `session_${token}`, null);
         }

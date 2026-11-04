@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   Server, Database, Shield, Globe, Cpu, Layers, Activity, Zap, Play, Pause,
-  RotateCcw, AlertTriangle, CheckCircle2, HelpCircle, Github, Plus, Trash2,
+  RotateCcw, AlertTriangle, CheckCircle2, HelpCircle, Plus, Trash2,
   Settings, Award, Terminal, Flame, ChevronRight, Copy, Check, Download, Upload,
   FastForward, Eye, Sliders, Share2, Lock, Unlock, Box, HardDrive, Network,
   ArrowRight, Sparkles, Info, X, RefreshCw, ZoomIn, ZoomOut, Maximize2, Move,
@@ -2211,20 +2211,6 @@ function ManagerPromotionModal({ promotion, onAccept, onReplay, onClose }) {
 }
 
 // ============================================================================
-// 4.95. OFFICIAL BRAND ICONS (GOOGLE MULTI-COLOR SVG)
-// ============================================================================
-function GoogleIcon({ className = "w-4 h-4" }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24">
-      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-    </svg>
-  );
-}
-
-// ============================================================================
 // 4.10. AUTHENTICATION & ARCHITECT IDENTITY PANE (SIGN IN & SIGN UP)
 // Built with the First Page Pane Technique with Hero (Left) and Devil (Right) background
 // ============================================================================
@@ -2239,7 +2225,6 @@ function AuthModal({
   if (!isOpen) return null;
 
   const [tab, setTab] = useState(initialTab); // 'SIGNIN' | 'SIGNUP'
-  const [socialModal, setSocialModal] = useState(null); // 'GITHUB' | 'GOOGLE' | null
   const [isSwitchingAccount, setIsSwitchingAccount] = useState(false);
 
   // Sign In State
@@ -2259,130 +2244,10 @@ function AuthModal({
   const [agreedToTerms, setAgreedToTerms] = useState(true);
   const [signUpError, setSignUpError] = useState(null);
 
-  // GitHub OAuth Connect State
-  const [ghUsername, setGhUsername] = useState('rajanskumarsoni');
-  const [ghProfile, setGhProfile] = useState(null);
-  const [ghLoading, setGhLoading] = useState(false);
-  const [ghError, setGhError] = useState(null);
-
-  // Google Sign-In Connect State
-  const [googleEmail, setGoogleEmail] = useState('rajan.soni@gmail.com');
-  const [googleName, setGoogleName] = useState('Rajan Soni');
-  const [googleLoading, setGoogleLoading] = useState(false);
-  const [googleError, setGoogleError] = useState(null);
-
   // Interaction State
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [authSuccessMsg, setAuthSuccessMsg] = useState(null);
   const [forgotPasswordNotice, setForgotPasswordNotice] = useState(false);
-
-  // Fetch live GitHub profile
-  const fetchGithubProfile = useCallback(async (targetUsername) => {
-    const target = (targetUsername || ghUsername || '').trim();
-    if (!target) {
-      setGhError('Please provide a GitHub username');
-      return;
-    }
-    setGhLoading(true);
-    setGhError(null);
-    try {
-      const res = await fetch(`https://api.github.com/users/${encodeURIComponent(target)}`);
-      if (!res.ok) {
-        if (res.status === 404) throw new Error(`GitHub user "${target}" was not found.`);
-        throw new Error(`GitHub API returned status ${res.status}`);
-      }
-      const data = await res.json();
-      setGhProfile(data);
-    } catch (err) {
-      setGhError(err.message || 'Failed to fetch GitHub profile');
-      setGhProfile(null);
-    } finally {
-      setGhLoading(false);
-    }
-  }, [ghUsername]);
-
-  // Auto-fetch default GitHub profile when switching to GITHUB view
-  useEffect(() => {
-    if (socialModal === 'GITHUB' && !ghProfile && ghUsername) {
-      fetchGithubProfile(ghUsername);
-    }
-  }, [socialModal, ghProfile, ghUsername, fetchGithubProfile]);
-
-  // Confirm GitHub Verified Login
-  const handleConfirmGithubLogin = async () => {
-    if (!ghProfile) {
-      fetchGithubProfile(ghUsername);
-      return;
-    }
-    sound.playClick();
-    setIsSubmitting(true);
-    setGhError(null);
-
-    const res = await cloudflareBackend.socialLogin(
-      'github',
-      ghProfile.email || `${ghProfile.login}@github.user`,
-      ghProfile.name || ghProfile.login,
-      {
-        avatar: ghProfile.avatar_url,
-        handle: ghProfile.login,
-        providerId: String(ghProfile.id),
-        bio: ghProfile.bio,
-        company: ghProfile.company
-      }
-    );
-    setIsSubmitting(false);
-
-    if (res && res.user) {
-      setAuthSuccessMsg(`Connected via GitHub as @${ghProfile.login}!`);
-      sound.playVictory();
-      setTimeout(() => {
-        onLogin(res.user);
-        onClose();
-      }, 500);
-    } else {
-      setGhError(res?.error || 'GitHub connection failed on Edge');
-      sound.playDefeat();
-    }
-  };
-
-  // Confirm Google Account Login
-  const handleConfirmGoogleLogin = async (selectedEmail, selectedName) => {
-    const emailTrimmed = (selectedEmail || googleEmail || '').trim();
-    const nameTrimmed = (selectedName || googleName || 'Google Cloud Architect').trim();
-    if (!emailTrimmed || !emailTrimmed.includes('@')) {
-      setGoogleError('Please provide a valid Google email address');
-      return;
-    }
-
-    sound.playClick();
-    setIsSubmitting(true);
-    setGoogleError(null);
-
-    const googleAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(nameTrimmed)}&background=4285F4&color=fff&rounded=true&size=128&bold=true`;
-    const res = await cloudflareBackend.socialLogin(
-      'google',
-      emailTrimmed,
-      nameTrimmed,
-      {
-        avatar: googleAvatar,
-        handle: emailTrimmed.split('@')[0],
-        providerId: `google_${Date.now()}`
-      }
-    );
-    setIsSubmitting(false);
-
-    if (res && res.user) {
-      setAuthSuccessMsg(`Connected via Google as ${res.user.name}!`);
-      sound.playVictory();
-      setTimeout(() => {
-        onLogin(res.user);
-        onClose();
-      }, 500);
-    } else {
-      setGoogleError(res?.error || 'Google connection failed on Edge');
-      sound.playDefeat();
-    }
-  };
 
   // Real-time password strength
   const passwordStrength = useMemo(() => {
@@ -2638,16 +2503,9 @@ function AuthModal({
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold">
                     Active
                   </span>
-                  {currentUser.authProvider === 'github' && (
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-200 border border-slate-700 font-bold flex items-center gap-1">
-                      <Github className="w-3 h-3 text-white" /> GitHub
-                    </span>
-                  )}
-                  {currentUser.authProvider === 'google' && (
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-200 border border-slate-700 font-bold flex items-center gap-1">
-                      <GoogleIcon className="w-3 h-3" /> Google
-                    </span>
-                  )}
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-200 border border-slate-700 font-bold flex items-center gap-1">
+                    Terminal Verified
+                  </span>
                 </div>
                 <p className="text-xs text-slate-400 truncate">{currentUser.email}</p>
                 <div className="text-[11px] font-medium text-cyan-300 mt-0.5">
@@ -2701,256 +2559,6 @@ function AuthModal({
                 <span>Continue to Game Modes &amp; Arena →</span>
               </button>
             </div>
-          </div>
-        ) : socialModal === 'GITHUB' ? (
-          /* =================================================================== */
-          /* GITHUB DEVELOPER OAUTH VERIFICATION VIEW                            */
-          /* =================================================================== */
-          <div className="space-y-4 p-5 rounded-2xl bg-slate-900/95 border border-slate-700 text-slate-100 animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-xl bg-slate-800 text-white">
-                  <Github className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-black text-sm text-white">GitHub Developer OAuth</h3>
-                  <p className="text-[10px] text-slate-400">Verify engineering profile on Edge</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  sound.playClick();
-                  setSocialModal(null);
-                  setGhError(null);
-                }}
-                className="text-xs text-slate-400 hover:text-cyan-300 font-mono flex items-center gap-1 transition"
-              >
-                ← Back
-              </button>
-            </div>
-
-            {ghError && (
-              <div className="p-2.5 rounded-xl bg-rose-950/80 border border-rose-500/50 text-rose-300 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
-                <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
-                <span>{ghError}</span>
-              </div>
-            )}
-
-            {/* GitHub Username Input & Quick Selector */}
-            <div className="space-y-2">
-              <label className="text-[11px] font-bold text-slate-300 uppercase tracking-wider font-mono flex items-center justify-between">
-                <span>GitHub Username or Handle</span>
-                <span className="text-[10px] text-slate-500">Live API Lookup</span>
-              </label>
-              {/* Clean GitHub Username Input */}
-              <div className="flex gap-2 pt-1">
-                <div className="relative flex-1">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-mono text-xs">@</span>
-                  <input
-                    type="text"
-                    value={ghUsername}
-                    onChange={(e) => setGhUsername(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && fetchGithubProfile(ghUsername)}
-                    placeholder="Enter GitHub handle (e.g. rajanskumarsoni)"
-                    className="w-full pl-7 pr-3 py-2 rounded-xl bg-slate-950 border border-slate-700/80 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 text-slate-100 text-xs font-mono outline-none transition"
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => fetchGithubProfile(ghUsername)}
-                  disabled={ghLoading}
-                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 text-xs font-bold transition flex items-center gap-1.5 shrink-0"
-                >
-                  {ghLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
-                  <span>Verify</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Live Profile Card Preview */}
-            {ghProfile ? (
-              <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-700/80 space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="relative">
-                    <img
-                      src={ghProfile.avatar_url}
-                      alt={ghProfile.login}
-                      className="w-12 h-12 rounded-xl object-cover ring-2 ring-emerald-400 shadow-md"
-                    />
-                    <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 ring-2 ring-slate-950" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <h4 className="font-bold text-white text-sm truncate">{ghProfile.name || ghProfile.login}</h4>
-                      <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/60 px-1.5 py-0.2 rounded border border-emerald-500/40">✓ Verified</span>
-                    </div>
-                    <p className="text-[11px] font-mono text-slate-400">@{ghProfile.login}</p>
-                    {ghProfile.bio && <p className="text-[11px] text-slate-300 line-clamp-2 mt-0.5">{ghProfile.bio}</p>}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 text-center text-[10px] font-mono pt-1">
-                  <div className="p-1.5 rounded-lg bg-slate-900 border border-slate-800">
-                    <div className="text-slate-400">Repos</div>
-                    <div className="font-bold text-white">{ghProfile.public_repos || 0}</div>
-                  </div>
-                  <div className="p-1.5 rounded-lg bg-slate-900 border border-slate-800">
-                    <div className="text-slate-400">Followers</div>
-                    <div className="font-bold text-white">{ghProfile.followers || 0}</div>
-                  </div>
-                  <div className="p-1.5 rounded-lg bg-slate-900 border border-slate-800">
-                    <div className="text-slate-400">Location</div>
-                    <div className="font-bold text-white truncate">{ghProfile.location || 'Global'}</div>
-                  </div>
-                </div>
-
-                {/* Primary Authorization Button */}
-                <button
-                  type="button"
-                  onClick={handleConfirmGithubLogin}
-                  disabled={isSubmitting}
-                  className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 active:scale-95 transition disabled:opacity-50"
-                >
-                  {isSubmitting ? (
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <>
-                      <Github className="w-4 h-4" />
-                      <span>Authorize Terminal as @{ghProfile.login} &rarr;</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            ) : null}
-          </div>
-        ) : socialModal === 'GOOGLE' ? (
-          /* =================================================================== */
-          /* GOOGLE CLOUD IDENTITY SERVICES - ACCOUNT CHOOSER                    */
-          /* =================================================================== */
-          <div className="space-y-4 p-5 sm:p-6 rounded-2xl bg-slate-900/95 border border-slate-700 text-slate-100 animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-white text-slate-900 shadow">
-                  <GoogleIcon className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-black text-sm text-white">Sign in with Google</h3>
-                  <p className="text-[10px] text-slate-400">Choose an account to continue to System Saviour</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  sound.playClick();
-                  setSocialModal(null);
-                  setGoogleError(null);
-                }}
-                className="text-xs text-slate-400 hover:text-cyan-300 font-mono flex items-center gap-1 transition"
-              >
-                ← Back
-              </button>
-            </div>
-
-            {googleError && (
-              <div className="p-2.5 rounded-xl bg-rose-950/80 border border-rose-500/50 text-rose-300 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
-                <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
-                <span>{googleError}</span>
-              </div>
-            )}
-
-            {/* Google Account Options (1-Click Authenticate) */}
-            <div className="space-y-2 pt-1">
-              {/* Option 1: Rajan Soni */}
-              <button
-                type="button"
-                disabled={isSubmitting}
-                onClick={() => handleConfirmGoogleLogin('rajan.soni@gmail.com', 'Rajan Soni')}
-                className="w-full p-3 rounded-2xl bg-slate-950 hover:bg-slate-800/90 border border-slate-800 hover:border-blue-500/50 flex items-center justify-between text-left transition group active:scale-[0.99] disabled:opacity-50 cursor-pointer"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-sm shadow ring-2 ring-blue-400/50 group-hover:scale-105 transition-transform shrink-0">
-                    R
-                  </div>
-                  <div className="min-w-0">
-                    <div className="font-bold text-white text-xs truncate flex items-center gap-1.5">
-                      <span>Rajan Soni</span>
-                      <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40">Verified</span>
-                    </div>
-                    <div className="text-[11px] font-mono text-slate-400 truncate">rajan.soni@gmail.com</div>
-                    <div className="text-[10px] text-cyan-400 font-medium">Google Cloud Architect • Fellow</div>
-                  </div>
-                </div>
-                <div className="text-slate-500 group-hover:text-blue-400 transition-colors pl-2">
-                  {isSubmitting ? (
-                    <RefreshCw className="w-4 h-4 animate-spin text-blue-400" />
-                  ) : (
-                    <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                  )}
-                </div>
-              </button>
-
-              {/* Option 2: Google Cloud Fellow */}
-              <button
-                type="button"
-                disabled={isSubmitting}
-                onClick={() => handleConfirmGoogleLogin('architect.google@cloud.dev', 'Google Cloud Fellow')}
-                className="w-full p-3 rounded-2xl bg-slate-950 hover:bg-slate-800/90 border border-slate-800 hover:border-emerald-500/50 flex items-center justify-between text-left transition group active:scale-[0.99] disabled:opacity-50 cursor-pointer"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-sm shadow ring-2 ring-emerald-400/50 group-hover:scale-105 transition-transform shrink-0">
-                    G
-                  </div>
-                  <div className="min-w-0">
-                    <div className="font-bold text-white text-xs truncate flex items-center gap-1.5">
-                      <span>Google Cloud Fellow</span>
-                      <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">Workspace</span>
-                    </div>
-                    <div className="text-[11px] font-mono text-slate-400 truncate">architect.google@cloud.dev</div>
-                    <div className="text-[10px] text-emerald-400 font-medium">Principal SRE Systems Engineer</div>
-                  </div>
-                </div>
-                <div className="text-slate-500 group-hover:text-emerald-400 transition-colors pl-2">
-                  {isSubmitting ? (
-                    <RefreshCw className="w-4 h-4 animate-spin text-emerald-400" />
-                  ) : (
-                    <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                  )}
-                </div>
-              </button>
-
-              {/* Option 3: Custom Google Account Toggle */}
-              <div className="pt-1">
-                <div className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2.5">
-                  <div className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
-                    <UserPlus className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>Use another Google account</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <input
-                      type="email"
-                      value={googleEmail}
-                      onChange={(e) => setGoogleEmail(e.target.value)}
-                      placeholder="user@gmail.com"
-                      className="flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 focus:border-cyan-400 text-slate-100 text-xs font-mono outline-none transition"
-                    />
-                    <button
-                      type="button"
-                      disabled={isSubmitting}
-                      onClick={() => handleConfirmGoogleLogin(googleEmail, googleName || googleEmail.split('@')[0])}
-                      className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs flex items-center gap-1.5 active:scale-95 transition disabled:opacity-50 cursor-pointer"
-                    >
-                      {isSubmitting ? <RefreshCw className="w-3.5 h-3.5 animate-spin text-slate-900" /> : <GoogleIcon className="w-3.5 h-3.5" />}
-                      <span>Continue</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <p className="text-[10px] text-slate-500 text-center pt-2">
-              To continue, Google securely verifies your engineering session with Cloudflare Edge.
-            </p>
           </div>
         ) : (
           <>
@@ -3031,42 +2639,6 @@ function AuthModal({
                     <span>Password reset instructions dispatched to email terminal.</span>
                   </div>
                 )}
-
-                {/* 1-Click Social Sign-In (Top Placement for Modern Fast Access) */}
-                <div className="grid grid-cols-2 gap-2 pt-0.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      sound.playClick();
-                      setSocialModal('GOOGLE');
-                    }}
-                    className="py-2.5 px-3 rounded-xl bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs flex items-center justify-center gap-2 transition active:scale-95 shadow-sm ring-1 ring-slate-300 cursor-pointer"
-                  >
-                    <GoogleIcon className="w-4 h-4" />
-                    <span>Google</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      sound.playClick();
-                      setSocialModal('GITHUB');
-                    }}
-                    className="py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white border border-slate-700 font-bold text-xs flex items-center justify-center gap-2 transition active:scale-95 shadow-sm cursor-pointer"
-                  >
-                    <Github className="w-4 h-4 text-white" />
-                    <span>GitHub</span>
-                  </button>
-                </div>
-
-                {/* Divider */}
-                <div className="relative my-2.5">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-slate-800" />
-                  </div>
-                  <div className="relative flex justify-center text-[10px] uppercase font-mono tracking-wider">
-                    <span className="bg-slate-950 px-2.5 text-slate-500">Or continue with email</span>
-                  </div>
-                </div>
 
                 {/* Email / Handle Input */}
                 <div className="space-y-1">
@@ -3184,41 +2756,6 @@ function AuthModal({
                     <span>{signUpError}</span>
                   </div>
                 )}
-
-                {/* 1-Click Social Sign-Up (Top Placement) */}
-                <div className="grid grid-cols-2 gap-2 pt-0.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      sound.playClick();
-                      setSocialModal('GOOGLE');
-                    }}
-                    className="py-2.5 px-3 rounded-xl bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs flex items-center justify-center gap-2 transition active:scale-95 shadow-sm ring-1 ring-slate-300 cursor-pointer"
-                  >
-                    <GoogleIcon className="w-4 h-4" />
-                    <span>Google</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      sound.playClick();
-                      setSocialModal('GITHUB');
-                    }}
-                    className="py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white border border-slate-700 font-bold text-xs flex items-center justify-center gap-2 transition active:scale-95 shadow-sm cursor-pointer"
-                  >
-                    <Github className="w-4 h-4 text-white" />
-                    <span>GitHub</span>
-                  </button>
-                </div>
-
-                <div className="relative my-2.5">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-slate-800" />
-                  </div>
-                  <div className="relative flex justify-center text-[10px] uppercase font-mono tracking-wider">
-                    <span className="bg-slate-950 px-2.5 text-slate-500">Or register with email</span>
-                  </div>
-                </div>
 
                 {/* Architect Handle & Email Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -5541,12 +5078,6 @@ Can your architecture beat this? Test it in your browser:
                 <span className="font-black text-xs sm:text-sm tracking-wide text-white truncate font-display max-w-[120px] sm:max-w-[170px]">
                   {currentUser ? currentUser.name : 'System Saviour'}
                 </span>
-                {currentUser?.authProvider === 'github' && (
-                  <span title="Verified via GitHub"><Github className="w-3 h-3 text-slate-300 shrink-0" /></span>
-                )}
-                {currentUser?.authProvider === 'google' && (
-                  <span title="Verified via Google"><GoogleIcon className="w-3 h-3 shrink-0" /></span>
-                )}
                 <ChevronDown className={`w-3 h-3 text-indigo-400 group-hover:text-cyan-400 transition-transform duration-200 ${isProfilePaneOpen ? 'rotate-180 text-cyan-400' : ''}`} />
               </div>
               <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono">
@@ -5584,19 +5115,9 @@ Can your architecture beat this? Test it in your browser:
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <h3 className="font-black text-sm sm:text-base text-white truncate">{currentUser ? currentUser.name : 'Guest Architect'}</h3>
-                    {currentUser?.authProvider === 'github' ? (
-                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-200 border border-slate-700 font-bold flex items-center gap-1">
-                        <Github className="w-2.5 h-2.5 text-white" /> GitHub
-                      </span>
-                    ) : currentUser?.authProvider === 'google' ? (
-                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-200 border border-slate-700 font-bold flex items-center gap-1">
-                        <GoogleIcon className="w-2.5 h-2.5" /> Google
-                      </span>
-                    ) : (
-                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-indigo-950/70 text-indigo-300 border border-indigo-500/40 font-bold">
-                        {currentUser ? 'Verified' : 'Guest Terminal'}
-                      </span>
-                    )}
+                    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-indigo-950/70 text-indigo-300 border border-indigo-500/40 font-bold">
+                      {currentUser ? (currentUser.authProvider === 'guest' ? 'Guest Terminal' : 'Verified Architect') : 'Guest Terminal'}
+                    </span>
                   </div>
                   <p className="text-[11px] font-mono text-slate-400 truncate">
                     {currentUser?.email || (currentUser?.handle ? `@${currentUser.handle}` : 'terminal@systemsaviour.dev')}
