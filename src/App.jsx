@@ -23,6 +23,7 @@ import managerHiroshiImg from './assets/manager_hiroshi.png';
 import { sound } from './audioEngine.js';
 import { introAudioTour, INTRO_TOUR_STEPS } from './introAudioTour.js';
 import { cloudflareBackend } from './services/cloudflareBackend.js';
+import Arena3D from './components/Arena3D.jsx';
 import {
   CLOUD_CONNECTION_RULES,
   isConnectionAllowed,
@@ -3075,6 +3076,19 @@ export default function App() {
   const [connectionViolation, setConnectionViolation] = useState(null); // { fromNode, toNode, title, category, explanation, recommendation, validTargets }
   const [toastNotification, setToastNotification] = useState(null);
   const [lastSavedTimestamp, setLastSavedTimestamp] = useState(Date.now());
+  const [viewMode, setViewMode] = useState(() => {
+    try {
+      return localStorage.getItem('systemsaviour_view_mode') || '3D';
+    } catch {
+      return '3D';
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('systemsaviour_view_mode', viewMode);
+    } catch {}
+  }, [viewMode]);
 
   // Progressive Level Unlocking State (Persisted in localStorage)
   const [unlockedLevelIdx, setUnlockedLevelIdx] = useState(() => {
@@ -4526,6 +4540,7 @@ Can your architecture beat this? Test it in your browser:
   };
 
   const handleCanvasMouseDown = (e) => {
+    if (viewMode === '3D') return;
     if (e.target.closest('.no-pan') || e.target.closest('button') || e.target.closest('input')) {
       return;
     }
@@ -4538,6 +4553,7 @@ Can your architecture beat this? Test it in your browser:
   };
 
   const handleCanvasMouseMove = (e) => {
+    if (viewMode === '3D') return;
     if (!canvasRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
     const screenX = e.clientX - rect.left;
@@ -4584,6 +4600,7 @@ Can your architecture beat this? Test it in your browser:
   };
 
   const handleCanvasTouchStart = (e) => {
+    if (viewMode === '3D') return;
     if (e.target.closest('.no-pan') || e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) {
       return;
     }
@@ -6422,6 +6439,22 @@ Can your architecture beat this? Test it in your browser:
             >
               <RotateCcw className="w-3.5 h-3.5" />
             </button>
+            <div className="w-px h-4 bg-indigo-500/20 mx-0.5" />
+            <button
+              onClick={() => {
+                sound.playClick();
+                setViewMode((m) => (m === '3D' ? '2D' : '3D'));
+              }}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition flex items-center gap-1.5 shadow-md ${
+                viewMode === '3D'
+                  ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 shadow-cyan-500/30'
+                  : 'bg-slate-800/80 hover:bg-slate-700/80 text-cyan-300 border border-cyan-500/30'
+              }`}
+              title="Switch between 2D Tactical Grid and 3D Interactive Cyber Arena"
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>{viewMode === '3D' ? '3D ARENA' : '2D GRID'}</span>
+            </button>
           </div>
 
           {/* FLOATING BLUEPRINT & STATUS DOCK (BOTTOM-LEFT) */}
@@ -6469,14 +6502,44 @@ Can your architecture beat this? Test it in your browser:
             </button>
           </div>
 
-          {/* GRAPH WORLD CONTAINER (TRANSFORMED BY PAN & ZOOM) */}
-          <div
-            className="absolute inset-0 origin-top-left pointer-events-none"
-            style={{
-              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-              transformOrigin: '0 0'
-            }}
-          >
+          {viewMode === '3D' ? (
+            <div className="absolute inset-0 z-0 pointer-events-auto">
+              <Arena3D
+                nodes={nodes}
+                edges={edges}
+                evaluation={evaluation}
+                selectedNodeId={selectedNodeId}
+                onSelectNode={(id) => {
+                  sound.playClick();
+                  handleSelectNode(id);
+                }}
+                connectingFromId={connectingFromId}
+                onStartConnect={(id) => {
+                  sound.playClick();
+                  handlePortClick({ stopPropagation: () => {} }, id, 'out');
+                }}
+                onCompleteConnect={(toId) => {
+                  handlePortClick({ stopPropagation: () => {} }, toId, 'in');
+                }}
+                onDeleteEdge={(edgeId) => {
+                  sound.playDelete();
+                  setEdges((prev) => prev.filter((ed) => ed.id !== edgeId));
+                }}
+                isRunning={isRunning}
+                isChaosActive={Boolean(chaosEncounter)}
+                chaosNodeId={chaosEncounter?.nodeId}
+                onFallbackTo2D={() => setViewMode('2D')}
+              />
+            </div>
+          ) : (
+            /* GRAPH WORLD CONTAINER (TRANSFORMED BY PAN & ZOOM) */
+            <div
+              className="absolute inset-0 origin-top-left pointer-events-none"
+              style={{
+                transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                transformOrigin: '0 0'
+              }}
+            >
             {/* SVG WIRES & ANIMATED PARTICLES */}
             <svg className="overflow-visible absolute inset-0 pointer-events-none z-10" style={{ width: '1px', height: '1px' }}>
               <defs>
@@ -6883,6 +6946,7 @@ Can your architecture beat this? Test it in your browser:
               )}
             </div>
           </div>
+        )}
 
           {/* Real-World Architectural Connection Violation Modal */}
           {connectionViolation && (
