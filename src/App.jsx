@@ -3715,6 +3715,7 @@ export default function App() {
   const advanceToNextLevel = useCallback((nextIdx, fromWin = true) => {
     if (nextIdx >= CAMPAIGN_LEVELS.length) {
       setPromotionModal(null);
+      setTutorialVictoryModal(null);
       setPostMortemModal(null);
       setGameMode('SANDBOX');
       setLevelBriefingModal({ mode: 'SANDBOX', fromWin: true });
@@ -3722,6 +3723,7 @@ export default function App() {
     }
     sound.playSelect();
     setPromotionModal(null);
+    setTutorialVictoryModal(null);
     setPostMortemModal(null);
     setUnlockedLevelIdx((prev) => Math.max(prev, nextIdx));
     setCurrentLevelIdx(nextIdx);
@@ -3744,9 +3746,13 @@ export default function App() {
       setLevelBriefingModal({ mode: 'CAMPAIGN', levelIdx: nextIdx, fromWin: true });
     }
   }, [unlockedLevelIdx]);
-  const selectLevel = useCallback((idx) => {
+
+  const selectLevel = useCallback((idx, showBriefing = true) => {
     if (idx > unlockedLevelIdx) return;
     sound.playSelect();
+    setPromotionModal(null);
+    setTutorialVictoryModal(null);
+    setPostMortemModal(null);
     setCurrentLevelIdx(idx);
     try {
       localStorage.setItem('systemsaviour_active_level', idx.toString());
@@ -3761,7 +3767,11 @@ export default function App() {
     setPostMortemModal(null);
     setPan({ x: 0, y: 0 });
     setZoom(1);
-  }, [unlockedLevelIdx]);
+
+    if (showBriefing && gameMode === 'CAMPAIGN') {
+      setLevelBriefingModal({ mode: 'CAMPAIGN', levelIdx: idx, fromWin: false });
+    }
+  }, [unlockedLevelIdx, gameMode]);
 
   const switchMode = (mode) => {
     sound.playSelect();
@@ -4270,7 +4280,7 @@ Can your architecture beat this? Test it in your browser:
                   } catch (e) {}
                   return updated;
                 });
-                if (tutorialStep !== null || currentLevelIdx === 0) {
+                if (!isTutorialCompleted && (tutorialStep !== null || currentLevelIdx === 0)) {
                   const elapsed = tutorialStartTime ? Math.max(12, Math.round((Date.now() - tutorialStartTime) / 1000)) : 24;
                   setTutorialVictoryModal({
                     elapsedSeconds: elapsed,
@@ -4281,19 +4291,19 @@ Can your architecture beat this? Test it in your browser:
                   try {
                     localStorage.setItem('systemsaviour_tutorial_completed', 'true');
                   } catch {}
+                } else {
+                  // Trigger Anime Manager Congratulations & Promotion Ceremony!
+                  const currentMgr = LEVEL_MANAGERS[currentLevelIdx] || LEVEL_MANAGERS[0];
+                  const nextMgr = LEVEL_MANAGERS[currentLevelIdx + 1] || null;
+                  setPromotionModal({
+                    manager: currentMgr,
+                    nextManager: nextMgr,
+                    levelIdx: currentLevelIdx,
+                    stars: 1 + (passedSLA ? 1 : 0) + (passedBudget ? 1 : 0),
+                    p99Latency: evaluation.p99Latency,
+                    uptimePct: evaluation.uptimePct
+                  });
                 }
-
-                // Trigger Anime Manager Congratulations & Promotion Ceremony!
-                const currentMgr = LEVEL_MANAGERS[currentLevelIdx] || LEVEL_MANAGERS[0];
-                const nextMgr = LEVEL_MANAGERS[currentLevelIdx + 1] || null;
-                setPromotionModal({
-                  manager: currentMgr,
-                  nextManager: nextMgr,
-                  levelIdx: currentLevelIdx,
-                  stars: 1 + (passedSLA ? 1 : 0) + (passedBudget ? 1 : 0),
-                  p99Latency: evaluation.p99Latency,
-                  uptimePct: evaluation.uptimePct
-                });
               } else if (gameMode === 'DAILY') {
                 recordDailyCompletion(evaluation.p99Latency);
               }
@@ -8524,7 +8534,7 @@ Can your architecture beat this? Test it in your browser:
         const selectedLvl = modalMode === 'DAILY' ? dailyIncident : (CAMPAIGN_LEVELS[selectedLvlIdx] || CAMPAIGN_LEVELS[0]);
 
         return (
-          <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 z-[100] overflow-y-auto">
             <div className="relative max-w-3xl w-full bg-slate-900 border border-indigo-500/40 rounded-3xl p-6 sm:p-8 shadow-2xl my-auto text-slate-100 max-h-[92vh] flex flex-col">
               {/* Close Button */}
               <button
@@ -8826,7 +8836,7 @@ Can your architecture beat this? Test it in your browser:
                 <button
                   onClick={() => {
                     if (modalMode === 'CAMPAIGN') {
-                      selectLevel(selectedLvlIdx);
+                      selectLevel(selectedLvlIdx, false);
                       setGameMode('CAMPAIGN');
                     } else {
                       switchMode(modalMode);
@@ -8869,7 +8879,7 @@ Can your architecture beat this? Test it in your browser:
         const Icon = item.icon;
 
         return (
-          <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 z-[100] overflow-y-auto">
             <div className="relative max-w-2xl w-full bg-slate-900 border border-slate-700/80 rounded-3xl p-6 sm:p-7 shadow-2xl my-auto text-slate-100 max-h-[90vh] flex flex-col">
               {/* Close Button */}
               <button
@@ -9664,9 +9674,12 @@ Can your architecture beat this? Test it in your browser:
                 </div>
               </div>
               <button
-                onClick={() => setTutorialVictoryModal(null)}
+                onClick={() => {
+                  setTutorialVictoryModal(null);
+                  advanceToNextLevel(1, true);
+                }}
                 className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
-                title="Close"
+                title="Close and View Level 2 Problem & Targets"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -9767,17 +9780,21 @@ Can your architecture beat this? Test it in your browser:
       <ManagerPromotionModal
         promotion={promotionModal}
         onAccept={() => {
+          setPromotionModal(null);
+          setTutorialVictoryModal(null);
           if (promotionModal && typeof promotionModal.levelIdx === 'number') {
             advanceToNextLevel(promotionModal.levelIdx + 1, true);
-          } else {
-            setPromotionModal(null);
           }
         }}
         onReplay={() => {
           setPromotionModal(null);
+          setTutorialVictoryModal(null);
           resetWave();
         }}
-        onClose={() => setPromotionModal(null)}
+        onClose={() => {
+          setPromotionModal(null);
+          setTutorialVictoryModal(null);
+        }}
       />
 
       {/* =================================================================== */}
