@@ -3140,21 +3140,17 @@ export default function App({ onSwitchGame, openGameSelectSignal = 0 }) {
       console.warn('Failed recording daily completion:', err);
     }
   }, [dailyIncident, dailyStreak, nodes, edges, currentUser]);
-  // Default landing view is the Sign In / Sign Up page
+  // Zero-friction onboarding: only open AuthModal on explicit #signin / #signup hash
   const [authModal, setAuthModal] = useState(() => {
     if (typeof window !== 'undefined') {
       if (window.location.hash === '#signup' || window.location.hash === '#register') {
-        return { isOpen: true, initialTab: 'SIGNUP', isInitialOnboarding: true };
+        return { isOpen: true, initialTab: 'SIGNUP', isInitialOnboarding: false };
       }
-      if (window.location.hash === '#arena' || window.location.hash === '#play' || window.location.hash === '#game') {
-        return null;
-      }
-      if (initialChallengeRef.current) {
-        return null;
+      if (window.location.hash === '#signin' || window.location.hash === '#auth') {
+        return { isOpen: true, initialTab: 'SIGNIN', isInitialOnboarding: false };
       }
     }
-    // Default page is Sign In / Sign Up!
-    return { isOpen: true, initialTab: 'SIGNIN', isInitialOnboarding: true };
+    return null;
   }); // { isOpen: boolean, initialTab: 'SIGNIN' | 'SIGNUP', isInitialOnboarding?: boolean } | null
 
   // When switching back from another game via 'All Games', open the standalone Game Selection screen directly
@@ -3454,6 +3450,86 @@ export default function App({ onSwitchGame, openGameSelectSignal = 0 }) {
   const [isScorecardCopied, setIsScorecardCopied] = useState(false);
   const [isChallengeLinkCopied, setIsChallengeLinkCopied] = useState(false);
   const [showBeginnerHints, setShowBeginnerHints] = useState(true);
+
+  // Game Juice: Floating Action Popups, Undo/Redo History Stack, Mid-Wave SRE Abilities & Roguelite Perks
+  const [floatingPopups, setFloatingPopups] = useState([]);
+  const spawnFloatingPopup = useCallback((x, y, text, color = 'text-emerald-300 border-emerald-400/60 bg-emerald-950/90') => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    setFloatingPopups((prev) => [...prev.slice(-8), { id, x, y, text, color }]);
+    setTimeout(() => {
+      setFloatingPopups((prev) => prev.filter((p) => p.id !== id));
+    }, 1150);
+  }, []);
+
+  const [historyStack, setHistoryStack] = useState([]);
+  const [redoStack, setRedoStack] = useState([]);
+  const pushHistorySnapshot = useCallback(() => {
+    setHistoryStack((prev) => [
+      ...prev.slice(-24),
+      { nodes: JSON.parse(JSON.stringify(nodes)), edges: JSON.parse(JSON.stringify(edges)) }
+    ]);
+    setRedoStack([]);
+  }, [nodes, edges]);
+
+  const handleUndo = useCallback(() => {
+    setHistoryStack((prev) => {
+      if (prev.length === 0) return prev;
+      const last = prev[prev.length - 1];
+      setRedoStack((r) => [...r.slice(-24), { nodes: JSON.parse(JSON.stringify(nodes)), edges: JSON.parse(JSON.stringify(edges)) }]);
+      setNodes(last.nodes);
+      setEdges(last.edges);
+      sound.playUndo?.() || sound.playClick();
+      return prev.slice(0, -1);
+    });
+  }, [nodes, edges]);
+
+  const handleRedo = useCallback(() => {
+    setRedoStack((prev) => {
+      if (prev.length === 0) return prev;
+      const nextState = prev[prev.length - 1];
+      setHistoryStack((h) => [...h.slice(-24), { nodes: JSON.parse(JSON.stringify(nodes)), edges: JSON.parse(JSON.stringify(edges)) }]);
+      setNodes(nextState.nodes);
+      setEdges(nextState.edges);
+      sound.playUndo?.() || sound.playClick();
+      return prev.slice(0, -1);
+    });
+  }, [nodes, edges]);
+
+  useEffect(() => {
+    const onUndoKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        e.preventDefault();
+        if (e.shiftKey) handleRedo();
+        else handleUndo();
+      } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'y') {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+    window.addEventListener('keydown', onUndoKey);
+    return () => window.removeEventListener('keydown', onUndoKey);
+  }, [handleUndo, handleRedo]);
+
+  // Active Mid-Wave SRE Emergency Cooldown Abilities
+  const [activeSreBuffs, setActiveSreBuffs] = useState({ CACHE_BOOST: false, DDOS_SCRUB: false, SPOT_BURST: false });
+  const [sreCooldownUntil, setSreCooldownUntil] = useState({ CACHE_BOOST: 0, DDOS_SCRUB: 0, SPOT_BURST: 0 });
+  const triggerSreAbility = useCallback((key, label, popupColor) => {
+    const now = Date.now();
+    if (sreCooldownUntil[key] > now) return;
+    sound.playAbilityActivate?.() || sound.playUpgrade();
+    setActiveSreBuffs((prev) => ({ ...prev, [key]: true }));
+    setSreCooldownUntil((prev) => ({ ...prev, [key]: now + 9000 }));
+    spawnFloatingPopup(380, 140, `⚡ ${label} ACTIVE! (5s)`, popupColor);
+    setTimeout(() => {
+      setActiveSreBuffs((prev) => ({ ...prev, [key]: false }));
+    }, 5000);
+  }, [sreCooldownUntil, spawnFloatingPopup]);
+
+  // Roguelite Survival Perk Draft State
+  const [survivalPerks, setSurvivalPerks] = useState([]);
+  const [survivalPerkDraftModal, setSurvivalPerkDraftModal] = useState(null);
 
   // Game Juice & Screen Shake State
   const [isScreenShaking, setIsScreenShaking] = useState(false);
@@ -4116,10 +4192,40 @@ Can your architecture beat this? Test it in your browser:
 
   const currentMaxBudget = (gameMode === 'CAMPAIGN' || gameMode === 'DAILY') ? currentLevel.maxBudgetHr : null;
 
-  // Run real-time simulation evaluation
+  // Run real-time simulation evaluation (incorporating Mid-Wave SRE Emergency Buffs & Roguelite Survival Perks)
   const evaluation = useMemo(() => {
-    return evaluateArchitecture(nodes, edges, currentLiveRps, activeTrafficMix, currentMaxBudget, currentLevel?.allowedComponents);
-  }, [nodes, edges, currentLiveRps, activeTrafficMix, currentMaxBudget, currentLevel]);
+    const effectiveMix = { ...activeTrafficMix };
+    if (activeSreBuffs.DDOS_SCRUB || survivalPerks.includes('anycast_shield')) {
+      effectiveMix.BOT = (effectiveMix.BOT || 0) * 0.08;
+    }
+    const capacityFactor =
+      (activeSreBuffs.SPOT_BURST ? 0.72 : 1.0) *
+      (survivalPerks.includes('overclock_compute') ? 0.80 : 1.0);
+    const baseEval = evaluateArchitecture(
+      nodes,
+      edges,
+      Math.round(currentLiveRps * capacityFactor),
+      effectiveMix,
+      currentMaxBudget,
+      currentLevel?.allowedComponents
+    );
+    let adjLatency = baseEval.p99Latency;
+    let adjCost = baseEval.totalHourlyCost;
+    if (activeSreBuffs.CACHE_BOOST || survivalPerks.includes('edge_ai_cache')) {
+      adjLatency = Math.max(8, Math.round(adjLatency * 0.82));
+    }
+    if (survivalPerks.includes('zero_copy_kernel')) {
+      adjLatency = Math.max(8, Math.round(adjLatency * 0.84));
+    }
+    if (survivalPerks.includes('finops_rebate')) {
+      adjCost = Math.round(adjCost * 0.80);
+    }
+    return {
+      ...baseEval,
+      p99Latency: adjLatency,
+      totalHourlyCost: adjCost
+    };
+  }, [nodes, edges, currentLiveRps, activeTrafficMix, currentMaxBudget, currentLevel, activeSreBuffs, survivalPerks]);
 
   // Real-time pass criteria evaluation
   const targetLatency = (gameMode === 'CAMPAIGN' || gameMode === 'DAILY') ? currentLevel.maxLatencyMs : 250;
@@ -4360,19 +4466,28 @@ Can your architecture beat this? Test it in your browser:
           } else if (gameMode === 'SURVIVAL') {
             if (passedSLA) {
               sound.playVictory();
-              setSurvivalWave((w) => {
-                const nextWave = w + 1;
-                setBestSurvivalWave((prevBest) => {
-                  const updatedBest = Math.max(prevBest, nextWave);
-                  try {
-                    localStorage.setItem('systemsaviour_best_survival_wave', updatedBest.toString());
-                  } catch (e) {}
-                  return updatedBest;
-                });
-                return nextWave;
+              const nextWaveNum = survivalWave + 1;
+              setSurvivalWave(nextWaveNum);
+              setBestSurvivalWave((prevBest) => {
+                const updatedBest = Math.max(prevBest, nextWaveNum);
+                try {
+                  localStorage.setItem('systemsaviour_best_survival_wave', updatedBest.toString());
+                } catch (e) {}
+                return updatedBest;
               });
               setWaveProgress(0);
-              setIsRunning(true);
+              setIsRunning(false);
+              // Roguelite Perk Draft between Survival Waves!
+              const PERK_POOL = [
+                { id: 'zero_copy_kernel', icon: '🚀', title: 'eBPF Zero-Copy Kernel', desc: 'Reduces cluster-wide P99 latency by 16% on all tiers.' },
+                { id: 'overclock_compute', icon: '⚡', title: 'Liquid-Cooled Overclock', desc: 'Boosts effective RPS throughput capacity of all nodes by +25%.' },
+                { id: 'edge_ai_cache', icon: '🧠', title: 'Predictive Edge Prefetch', desc: 'Cuts P99 tail latency by 18% via speculative edge caching.' },
+                { id: 'anycast_shield', icon: '🛡️', title: 'Autonomous Anycast Scrubbing', desc: 'Neutralizes 92% of incoming DDoS bot floods automatically.' },
+                { id: 'finops_rebate', icon: '💰', title: 'Reserved Instance Rebate', desc: 'Slashes hourly cloud compute bill by 20% across the grid.' }
+              ];
+              const available = PERK_POOL.filter((p) => !survivalPerks.includes(p.id));
+              const choices = (available.length >= 3 ? available : PERK_POOL).slice(0, 3);
+              setSurvivalPerkDraftModal({ waveCleared: survivalWave, nextWave: nextWaveNum, choices });
             } else {
               sound.playDefeat();
               setBestSurvivalWave((prevBest) => {
@@ -4398,13 +4513,14 @@ Can your architecture beat this? Test it in your browser:
     }, 100);
 
     return () => clearInterval(interval);
-  }, [isRunning, simSpeed, chaosActive, evaluation, gameMode, currentLevel, currentMaxBudget, survivalWave, currentLevelIdx]);
+  }, [isRunning, simSpeed, chaosActive, evaluation, gameMode, currentLevel, currentMaxBudget, survivalWave, currentLevelIdx, survivalPerks]);
 
   // Component Actions & Dragging
   const handleAddService = (type, explicitX, explicitY) => {
     sound.playPlaceNode();
     const spec = COMPONENT_CATALOG[type];
     if (!spec) return;
+    pushHistorySnapshot();
 
     const defaultConfig = {};
     if (spec.configOptions) {
@@ -4434,12 +4550,18 @@ Can your architecture beat this? Test it in your browser:
 
     setNodes((prev) => [...prev, newNode]);
     setSelectedNodeId(newNode.id);
+    spawnFloatingPopup(spawnX + 40, spawnY - 12, `+${spec.name.split(' ')[0]} ($${spec.baseCost}/hr)`, 'text-cyan-300 border-cyan-400/60 bg-cyan-950/90');
     return newNode;
   };
 
   const deleteNode = (nodeId) => {
     if (nodeId === 'src') return;
+    const target = nodes.find((n) => n.id === nodeId);
+    pushHistorySnapshot();
     sound.playDelete();
+    if (target) {
+      spawnFloatingPopup(target.x + 40, target.y, '🗑️ DECOMMISSIONED', 'text-rose-300 border-rose-400/60 bg-rose-950/90');
+    }
     setNodes((prev) => prev.filter((n) => n.id !== nodeId));
     setEdges((prev) => prev.filter((e) => e.from !== nodeId && e.to !== nodeId));
     if (selectedNodeId === nodeId) setSelectedNodeId('src');
@@ -4505,7 +4627,9 @@ Can your architecture beat this? Test it in your browser:
       }
 
       // Connection is valid!
+      pushHistorySnapshot();
       sound.playConnectWire();
+      spawnFloatingPopup(toNode.x + 30, toNode.y - 10, '⚡ LINK ESTABLISHED!', 'text-emerald-300 border-emerald-400/60 bg-emerald-950/90');
       setEdges((prev) => [
         ...prev,
         { id: `e_${Date.now()}`, from: connectingFromId, to: nodeId }
@@ -4770,6 +4894,10 @@ Can your architecture beat this? Test it in your browser:
     sound.playUpgrade();
     sound.playPlaceNode();
     unlockBadge('chaos_tamer');
+    const target = nodes.find((n) => n.id === nodeId);
+    if (target) {
+      spawnFloatingPopup(target.x + 20, target.y - 16, '🔧 HOTFIXED! +150 XP', 'text-amber-300 border-amber-400/70 bg-amber-950/95');
+    }
     setNodes((prev) => prev.map((n) => (n.id === nodeId ? { ...n, crashed: false } : n)));
     setChaosEncounter(null);
     setActiveOutageTicker(null);
@@ -5500,17 +5628,19 @@ Can your architecture beat this? Test it in your browser:
             )}
           </div>
 
-          {/* Overall Level Readiness Pill (Campaign Mode) */}
+          {/* Overall Level Readiness Pill (Suspenseful until Peak Wave is tested) */}
           {gameMode === 'CAMPAIGN' && (
             <div
               className={`hidden xl:flex items-center gap-1 px-2 py-1 rounded-xl border text-[11px] font-bold shrink-0 backdrop-blur-md ${
-                isLevelPassing
+                !isRunning && waveProgress === 0
+                  ? 'bg-amber-950/60 border-amber-500/50 text-amber-300'
+                  : isLevelPassing
                   ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300'
                   : 'bg-rose-950/60 border-rose-500/50 text-rose-300'
               }`}
-              title={isLevelPassing ? 'Current system status meets all targets to pass this level!' : 'Current system status breaches latency or uptime targets'}
+              title={!isRunning && waveProgress === 0 ? 'Click Simulate Peak Wave to stress-test your architecture against 100% surge load!' : isLevelPassing ? 'Current system status meets all targets to pass this level!' : 'Current system status breaches latency or uptime targets'}
             >
-              <span>{isLevelPassing ? '✅ Ready' : '❌ Breached'}</span>
+              <span>{!isRunning && waveProgress === 0 ? `🎯 Target: ${currentLevel.targetRps.toLocaleString()} RPS` : isLevelPassing ? '✅ SLA Holding' : '❌ SLA Breached'}</span>
             </div>
           )}
         </div>
@@ -6167,12 +6297,62 @@ Can your architecture beat this? Test it in your browser:
             <span className="w-2.5 h-2.5 border-b-2 border-r-2 border-cyan-500/50" />
           </div>
 
-          {/* Surge Alert Ambient Banner (when Peak Wave is active) */}
+          {/* Active Mid-Wave Tactical SRE Emergency Cooldown Deck */}
           {isRunning && (
-            <div className="absolute top-12 left-1/2 -translate-x-1/2 z-30 pointer-events-none animate-pulse">
-              <div className="px-3.5 py-1 rounded-full bg-rose-950/90 border border-rose-500/60 text-rose-300 text-[11px] font-bold flex items-center gap-2 shadow-2xl backdrop-blur-md">
-                <span className="w-2 h-2 rounded-full bg-rose-400 animate-ping" />
-                <span>⚡ LIVE PEAK WAVE: SIMULATING MAXIMUM SURGE LOAD</span>
+            <div className="absolute top-12 left-1/2 -translate-x-1/2 z-30 pointer-events-auto flex flex-col items-center gap-1.5">
+              <div className="px-3 py-1 rounded-2xl bg-slate-950/95 border border-rose-500/60 text-rose-200 text-[11px] font-bold flex flex-wrap items-center justify-center gap-2 shadow-2xl backdrop-blur-xl">
+                <span className="flex items-center gap-1.5 text-rose-400 font-mono uppercase tracking-wider text-[10px]">
+                  <span className="w-2 h-2 rounded-full bg-rose-400 animate-ping" />
+                  <span>LIVE WAVE OPS:</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => triggerSreAbility('CACHE_BOOST', 'CACHE OVERDRIVE', 'text-cyan-300 border-cyan-400 bg-cyan-950/95')}
+                  disabled={sreCooldownUntil.CACHE_BOOST > Date.now()}
+                  className={`px-2.5 py-1 rounded-xl text-[10px] font-black font-mono transition flex items-center gap-1 cursor-pointer ${
+                    activeSreBuffs.CACHE_BOOST
+                      ? 'bg-cyan-400 text-slate-950 ring-2 ring-cyan-200 animate-pulse'
+                      : sreCooldownUntil.CACHE_BOOST > Date.now()
+                      ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      : 'bg-cyan-950/90 hover:bg-cyan-800 text-cyan-300 border border-cyan-500/50 active:scale-95'
+                  }`}
+                  title="Emergency Cache Warmup: -18% P99 Latency for 5 seconds"
+                >
+                  <span>🧹 Warm Cache</span>
+                  {activeSreBuffs.CACHE_BOOST && <span>(ON)</span>}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => triggerSreAbility('DDOS_SCRUB', 'PERIMETER SCRUB', 'text-rose-300 border-rose-400 bg-rose-950/95')}
+                  disabled={sreCooldownUntil.DDOS_SCRUB > Date.now()}
+                  className={`px-2.5 py-1 rounded-xl text-[10px] font-black font-mono transition flex items-center gap-1 cursor-pointer ${
+                    activeSreBuffs.DDOS_SCRUB
+                      ? 'bg-rose-400 text-slate-950 ring-2 ring-rose-200 animate-pulse'
+                      : sreCooldownUntil.DDOS_SCRUB > Date.now()
+                      ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      : 'bg-rose-950/90 hover:bg-rose-800 text-rose-300 border border-rose-500/50 active:scale-95'
+                  }`}
+                  title="Emergency L7 Bot Scrub: Drops 92% of DDoS Bot flood for 5 seconds"
+                >
+                  <span>🛡️ Scrub Bots</span>
+                  {activeSreBuffs.DDOS_SCRUB && <span>(ON)</span>}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => triggerSreAbility('SPOT_BURST', 'SPOT FLEET BURST', 'text-amber-300 border-amber-400 bg-amber-950/95')}
+                  disabled={sreCooldownUntil.SPOT_BURST > Date.now()}
+                  className={`px-2.5 py-1 rounded-xl text-[10px] font-black font-mono transition flex items-center gap-1 cursor-pointer ${
+                    activeSreBuffs.SPOT_BURST
+                      ? 'bg-amber-400 text-slate-950 ring-2 ring-amber-200 animate-pulse'
+                      : sreCooldownUntil.SPOT_BURST > Date.now()
+                      ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      : 'bg-amber-950/90 hover:bg-amber-800 text-amber-300 border border-amber-500/50 active:scale-95'
+                  }`}
+                  title="Spot Fleet Burst: Absorbs +28% surge traffic across all compute tiers for 5 seconds"
+                >
+                  <span>⚡ Spot Burst</span>
+                  {activeSreBuffs.SPOT_BURST && <span>(ON)</span>}
+                </button>
               </div>
             </div>
           )}
@@ -6500,6 +6680,22 @@ Can your architecture beat this? Test it in your browser:
               <span>Auto-Saved</span>
             </div>
             <div className="w-px h-4 bg-indigo-500/20 mx-0.5" />
+            <button
+              onClick={handleUndo}
+              disabled={historyStack.length === 0}
+              className="px-2 py-1 rounded-lg bg-slate-800/60 hover:bg-indigo-900/50 disabled:opacity-35 text-[11px] text-slate-200 hover:text-cyan-300 transition flex items-center gap-1 font-mono font-bold cursor-pointer"
+              title="Undo last topology action (Ctrl+Z / Cmd+Z)"
+            >
+              <span>↶ Undo</span>
+            </button>
+            <button
+              onClick={handleRedo}
+              disabled={redoStack.length === 0}
+              className="px-2 py-1 rounded-lg bg-slate-800/60 hover:bg-indigo-900/50 disabled:opacity-35 text-[11px] text-slate-200 hover:text-cyan-300 transition flex items-center gap-1 font-mono font-bold cursor-pointer"
+              title="Redo topology action (Ctrl+Y / Cmd+Shift+Z)"
+            >
+              <span>↷</span>
+            </button>
             <button
               onClick={resetCurrentTopology}
               className="px-2 py-1 rounded-lg bg-slate-800/60 hover:bg-rose-900/40 text-[11px] text-slate-300 hover:text-rose-300 transition flex items-center gap-1 font-medium"
@@ -6946,6 +7142,17 @@ Can your architecture beat this? Test it in your browser:
                   </div>
                 </div>
               )}
+
+              {/* Juicy Floating Feedback Popups on Canvas */}
+              {floatingPopups.map((pop) => (
+                <div
+                  key={pop.id}
+                  style={{ left: pop.x, top: pop.y }}
+                  className={`absolute z-50 pointer-events-none px-2.5 py-1 rounded-full border text-[11px] font-black font-mono shadow-2xl animate-bounce whitespace-nowrap ${pop.color}`}
+                >
+                  {pop.text}
+                </div>
+              ))}
             </div>
           </div>
 
@@ -7173,12 +7380,22 @@ Can your architecture beat this? Test it in your browser:
                   )}
                 </div>
 
-                {/* Viral Shareable Architect Scorecard (Wordle Style) */}
+                {/* Global Efficiency Percentile Callout */}
+                {postMortemModal.won && (
+                  <div className="mt-2.5 px-3 py-1.5 rounded-xl bg-emerald-950/50 border border-emerald-500/40 flex items-center justify-between text-[11px]">
+                    <span className="text-emerald-300 font-bold">🔥 Global Efficiency Percentile:</span>
+                    <span className="font-mono font-black text-white bg-emerald-500/20 px-2 py-0.5 rounded-full border border-emerald-400/40">
+                      Faster than {Math.min(99, Math.max(68, Math.round(100 - postMortemModal.p99Latency * 0.35)))}% of Architects
+                    </span>
+                  </div>
+                )}
+
+                {/* Viral Shareable Architect Scorecard (Wordle + Visual Blueprint PNG Card) */}
                 <div className="mt-3.5 p-3 rounded-2xl bg-indigo-950/40 border border-indigo-500/40 shadow-lg text-left space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-300 uppercase tracking-wider font-display">
                       <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Architect Scorecard</span>
+                      <span>Architect Scorecard &amp; Visual Blueprint</span>
                     </div>
                     <span className="text-[10px] font-mono text-emerald-400 font-bold bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-full">
                       Ready to Share
@@ -7186,21 +7403,89 @@ Can your architecture beat this? Test it in your browser:
                   </div>
 
                   <p className="text-[11px] text-slate-300 leading-snug">
-                    Brag about your SLA stats, latency, and system stack with your engineering friends or community:
+                    Share your topology card, SLA stats, or a 1-click playable challenge link with your team:
                   </p>
 
-                  <div className="flex items-center gap-2 pt-1">
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
                     <button
                       onClick={handleCopyScorecard}
-                      className="flex-1 py-2 px-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition active:scale-95 shadow-md shadow-indigo-600/30 flex items-center justify-center gap-1.5"
+                      className="flex-1 py-2 px-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition active:scale-95 shadow-md shadow-indigo-600/30 flex items-center justify-center gap-1.5 cursor-pointer"
                       title="Copy formatted scorecard with stats and challenge link to clipboard"
                     >
                       {isScorecardCopied ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />}
                       <span>{isScorecardCopied ? 'Copied!' : 'Scorecard'}</span>
                     </button>
                     <button
+                      onClick={() => {
+                        sound.playClick();
+                        const canvas = document.createElement('canvas');
+                        canvas.width = 1200;
+                        canvas.height = 630;
+                        const ctx = canvas.getContext('2d');
+                        if (!ctx) return;
+                        ctx.fillStyle = '#070a13';
+                        ctx.fillRect(0, 0, 1200, 630);
+                        ctx.strokeStyle = 'rgba(56, 189, 248, 0.12)';
+                        ctx.lineWidth = 1;
+                        for (let x = 0; x < 1200; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 630); ctx.stroke(); }
+                        for (let y = 0; y < 630; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(1200, y); ctx.stroke(); }
+                        ctx.strokeStyle = postMortemModal.won ? '#10b981' : '#f43f5e';
+                        ctx.lineWidth = 6;
+                        ctx.strokeRect(24, 24, 1152, 582);
+                        ctx.fillStyle = '#38bdf8';
+                        ctx.font = 'bold 28px monospace';
+                        ctx.fillText('⚡ SYSTEM SAVIOUR // VERIFIED ARCHITECTURE SCORECARD', 60, 82);
+                        ctx.fillStyle = '#ffffff';
+                        ctx.font = 'bold 44px sans-serif';
+                        const titleStr = gameMode === 'CAMPAIGN' ? CAMPAIGN_LEVELS[currentLevelIdx]?.title : gameMode === 'DAILY' ? dailyIncident.title : `Survival Wave ${survivalWave}`;
+                        ctx.fillText(titleStr || 'Cloud Cluster', 60, 145);
+                        ctx.fillStyle = postMortemModal.won ? '#34d399' : '#fb7185';
+                        ctx.font = 'bold 32px monospace';
+                        ctx.fillText(`P99 Latency: ${postMortemModal.p99Latency}ms   •   Uptime: ${postMortemModal.uptimePct}%   •   Cost: $${postMortemModal.totalCost || evaluation.totalHourlyCost}/hr`, 60, 210);
+                        ctx.save();
+                        ctx.translate(80, 250);
+                        edges.forEach((ed) => {
+                          const fn = nodes.find((n) => n.id === ed.from);
+                          const tn = nodes.find((n) => n.id === ed.to);
+                          if (fn && tn) {
+                            ctx.strokeStyle = '#38bdf8';
+                            ctx.lineWidth = 3;
+                            ctx.beginPath();
+                            ctx.moveTo(fn.x * 0.85 + 60, fn.y * 0.65 + 25);
+                            ctx.lineTo(tn.x * 0.85, tn.y * 0.65 + 25);
+                            ctx.stroke();
+                          }
+                        });
+                        nodes.forEach((nd) => {
+                          const nx = nd.x * 0.85;
+                          const ny = nd.y * 0.65;
+                          ctx.fillStyle = '#0f172a';
+                          ctx.strokeStyle = '#6366f1';
+                          ctx.lineWidth = 2.5;
+                          ctx.fillRect(nx, ny, 110, 48);
+                          ctx.strokeRect(nx, ny, 110, 48);
+                          ctx.fillStyle = '#e2e8f0';
+                          ctx.font = 'bold 14px monospace';
+                          ctx.fillText(nd.type, nx + 12, ny + 30);
+                        });
+                        ctx.restore();
+                        ctx.fillStyle = '#94a3b8';
+                        ctx.font = '22px monospace';
+                        ctx.fillText('Play & challenge this topology free in browser: rajanskumarsoni.github.io/learning-by-playing', 60, 575);
+                        const link = document.createElement('a');
+                        link.download = `systemsaviour-card-${Date.now()}.png`;
+                        link.href = canvas.toDataURL('image/png');
+                        link.click();
+                      }}
+                      className="flex-1 py-2 px-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-black text-xs transition active:scale-95 flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
+                      title="Download high-res PNG Blueprint Scorecard image for X, LinkedIn, or Discord"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>PNG Card</span>
+                    </button>
+                    <button
                       onClick={handleCopyChallengeLink}
-                      className="flex-1 py-2 px-2.5 rounded-xl bg-cyan-950/80 hover:bg-cyan-900/90 text-cyan-300 border border-cyan-500/40 font-bold text-xs transition active:scale-95 flex items-center justify-center gap-1.5 shadow-md shadow-cyan-950/50"
+                      className="flex-1 py-2 px-2.5 rounded-xl bg-cyan-950/80 hover:bg-cyan-900/90 text-cyan-300 border border-cyan-500/40 font-bold text-xs transition active:scale-95 flex items-center justify-center gap-1.5 shadow-md shadow-cyan-950/50 cursor-pointer"
                       title="Copy 1-click playable challenge link so anyone can test your exact architecture"
                     >
                       {isChallengeLinkCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <LinkIcon className="w-3.5 h-3.5 text-cyan-400" />}
@@ -7208,7 +7493,7 @@ Can your architecture beat this? Test it in your browser:
                     </button>
                     <button
                       onClick={handleShareTweet}
-                      className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-400 border border-sky-500/40 font-bold text-xs transition active:scale-95 flex items-center gap-1.5"
+                      className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-400 border border-sky-500/40 font-bold text-xs transition active:scale-95 flex items-center gap-1.5 cursor-pointer"
                       title="Share directly to Twitter / X"
                     >
                       <Share2 className="w-3.5 h-3.5" />
@@ -7262,6 +7547,50 @@ Can your architecture beat this? Test it in your browser:
                       <span>➡️</span>
                     </button>
                   )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Roguelite Survival Perk Draft Modal (Between Endless Survival Waves) */}
+          {survivalPerkDraftModal && (
+            <div className="absolute inset-0 bg-slate-950/88 backdrop-blur-xl flex items-center justify-center p-4 z-50 animate-fade-in">
+              <ConfettiOverlay />
+              <div className="max-w-lg w-full bg-slate-900 border-2 border-amber-400/70 rounded-3xl p-6 text-slate-100 shadow-2xl space-y-4 relative z-10">
+                <div className="text-center space-y-1">
+                  <span className="px-3 py-0.5 rounded-full bg-amber-500/20 border border-amber-400/50 text-amber-300 font-mono text-[10px] font-black uppercase tracking-wider">
+                    🔥 Wave {survivalPerkDraftModal.waveCleared} Cleared • Roguelite Infra Draft
+                  </span>
+                  <h3 className="text-lg sm:text-xl font-black text-white font-display">
+                    Select 1 Cluster Upgrade Before Wave {survivalPerkDraftModal.nextWave}
+                  </h3>
+                  <p className="text-xs text-slate-300">
+                    Traffic scales to {(3000 + survivalPerkDraftModal.nextWave * 2500).toLocaleString()} RPS next wave. Draft a permanent run modifier:
+                  </p>
+                </div>
+                <div className="space-y-2.5">
+                  {survivalPerkDraftModal.choices.map((perk) => (
+                    <button
+                      key={perk.id}
+                      onClick={() => {
+                        sound.playAbilityActivate?.() || sound.playUpgrade();
+                        setSurvivalPerks((prev) => Array.from(new Set([...prev, perk.id])));
+                        setSurvivalPerkDraftModal(null);
+                        spawnFloatingPopup(380, 180, `${perk.icon} ${perk.title} EQUIPPED!`, 'text-amber-300 border-amber-400 bg-amber-950/95');
+                        setIsRunning(true);
+                      }}
+                      className="w-full p-3.5 rounded-2xl bg-slate-950/80 hover:bg-indigo-950/60 border border-slate-800 hover:border-amber-400/70 text-left transition flex items-start gap-3 group cursor-pointer active:scale-95"
+                    >
+                      <span className="text-2xl shrink-0 mt-0.5 group-hover:scale-110 transition-transform">{perk.icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-black text-xs sm:text-sm text-amber-300 group-hover:text-white transition-colors">{perk.title}</div>
+                        <p className="text-[11px] text-slate-300 mt-0.5 leading-snug">{perk.desc}</p>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 font-mono text-[10px] font-bold self-center shrink-0">
+                        Draft &rarr;
+                      </span>
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>

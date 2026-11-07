@@ -111,6 +111,16 @@ class SoundEngine {
     }
   }
 
+  // Helper: random pitch multiplier (+/-6%, ~1 semitone) to prevent robotic SFX repetition
+  _randPitch(spread = 0.06) {
+    return 1 + (Math.random() * 2 - 1) * spread;
+  }
+
+  // Helper: random volume multiplier (+/-12%)
+  _randGain(base, spread = 0.12) {
+    return base * (1 + (Math.random() * 2 - 1) * spread);
+  }
+
   // 1. Crisp UI Button Click / Tab Switch
   playClick() {
     if (this.isMuted) return;
@@ -120,12 +130,13 @@ class SoundEngine {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     const now = ctx.currentTime;
+    const pitch = this._randPitch(0.06);
 
     osc.type = 'triangle';
-    osc.frequency.setValueAtTime(800, now);
-    osc.frequency.exponentialRampToValueAtTime(400, now + 0.04);
+    osc.frequency.setValueAtTime(800 * pitch, now);
+    osc.frequency.exponentialRampToValueAtTime(400 * pitch, now + 0.04);
 
-    gain.gain.setValueAtTime(0.2, now);
+    gain.gain.setValueAtTime(this._randGain(0.2), now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
 
     osc.connect(gain);
@@ -144,12 +155,13 @@ class SoundEngine {
     const now = ctx.currentTime;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
+    const pitch = this._randPitch(0.05);
 
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(480, now);
-    osc.frequency.exponentialRampToValueAtTime(720, now + 0.08);
+    osc.frequency.setValueAtTime(480 * pitch, now);
+    osc.frequency.exponentialRampToValueAtTime(720 * pitch, now + 0.08);
 
-    gain.gain.setValueAtTime(0.25, now);
+    gain.gain.setValueAtTime(this._randGain(0.25), now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
 
     osc.connect(gain);
@@ -166,15 +178,16 @@ class SoundEngine {
     if (!ctx) return;
 
     const now = ctx.currentTime;
+    const pitch = this._randPitch(0.07);
 
     // Body tone
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(260, now);
-    osc.frequency.exponentialRampToValueAtTime(80, now + 0.12);
+    osc.frequency.setValueAtTime(260 * pitch, now);
+    osc.frequency.exponentialRampToValueAtTime(80 * pitch, now + 0.12);
 
-    gain.gain.setValueAtTime(0.4, now);
+    gain.gain.setValueAtTime(this._randGain(0.4), now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
 
     osc.connect(gain);
@@ -186,8 +199,8 @@ class SoundEngine {
     const clickOsc = ctx.createOscillator();
     const clickGain = ctx.createGain();
     clickOsc.type = 'triangle';
-    clickOsc.frequency.setValueAtTime(950, now);
-    clickGain.gain.setValueAtTime(0.3, now);
+    clickOsc.frequency.setValueAtTime(950 * pitch, now);
+    clickGain.gain.setValueAtTime(this._randGain(0.3), now);
     clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.025);
 
     clickOsc.connect(clickGain);
@@ -203,7 +216,8 @@ class SoundEngine {
     if (!ctx) return;
 
     const now = ctx.currentTime;
-    [520, 1040].forEach((freq, i) => {
+    const pitch = this._randPitch(0.05);
+    [520 * pitch, 1040 * pitch].forEach((freq, i) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
 
@@ -211,7 +225,7 @@ class SoundEngine {
       osc.frequency.setValueAtTime(freq, now);
       osc.frequency.exponentialRampToValueAtTime(freq * 1.5, now + 0.1);
 
-      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.setValueAtTime(this._randGain(0.2), now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
 
       osc.connect(gain);
@@ -231,12 +245,13 @@ class SoundEngine {
     const now = ctx.currentTime;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
+    const pitch = this._randPitch(0.06);
 
     osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(320, now);
-    osc.frequency.exponentialRampToValueAtTime(60, now + 0.15);
+    osc.frequency.setValueAtTime(320 * pitch, now);
+    osc.frequency.exponentialRampToValueAtTime(60 * pitch, now + 0.15);
 
-    gain.gain.setValueAtTime(0.25, now);
+    gain.gain.setValueAtTime(this._randGain(0.25), now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
 
     osc.connect(gain);
@@ -246,13 +261,57 @@ class SoundEngine {
     osc.stop(now + 0.16);
   }
 
+  // 5b. Undo / Redo Action (Crisp Rewind Blip)
+  playUndo() {
+    if (this.isMuted) return;
+    const ctx = this.ensureContext();
+    if (!ctx) return;
+
+    [660, 495].forEach((freq, idx) => {
+      const now = ctx.currentTime + idx * 0.045;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq * this._randPitch(0.04), now);
+      gain.gain.setValueAtTime(0.22, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+      osc.start(now);
+      osc.stop(now + 0.08);
+    });
+  }
+
+  // 5c. Active Mid-Wave SRE Emergency Ability Fired (Cyber Overdrive Sweep)
+  playAbilityActivate() {
+    if (this.isMuted) return;
+    const ctx = this.ensureContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    [440, 659.25, 880, 1174.66].forEach((freq, idx) => {
+      const t = now + idx * 0.045;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = idx % 2 === 0 ? 'triangle' : 'sine';
+      osc.frequency.setValueAtTime(freq, t);
+      gain.gain.setValueAtTime(0.28, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+      osc.start(t);
+      osc.stop(t + 0.18);
+    });
+  }
+
   // 6. Upgrading a Component Configuration (Ascending Tech Chime)
   playUpgrade() {
     if (this.isMuted) return;
     const ctx = this.ensureContext();
     if (!ctx) return;
 
-    const notes = [587.33, 880]; // D5, A5
+    const pitch = this._randPitch(0.04);
+    const notes = [587.33 * pitch, 880 * pitch]; // D5, A5
     notes.forEach((freq, idx) => {
       const now = ctx.currentTime + idx * 0.07;
       const osc = ctx.createOscillator();
@@ -261,7 +320,7 @@ class SoundEngine {
       osc.type = 'sine';
       osc.frequency.setValueAtTime(freq, now);
 
-      gain.gain.setValueAtTime(0.25, now);
+      gain.gain.setValueAtTime(this._randGain(0.25), now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
 
       osc.connect(gain);

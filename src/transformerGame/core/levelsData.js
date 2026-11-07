@@ -143,8 +143,8 @@ export const GAME_STAGES = [
     slaTargetLabel: 'Cosine Similarity ≥ 90.0%',
     targetSimilarity: 0.90,
     hints: [
-      'Move the ΔX Dimension slider toward -0.45 to align the horizontal royalty coordinate.',
-      'Move the ΔY Dimension slider toward +0.45 to shift into the feminine semantic subspace.',
+      'Notice how "King" sits on the right (masculine) while "Queen" sits on the upper-left (feminine + royal).',
+      'Drag the cyan Result Vector node directly on the 2D canvas—or tune ΔX and ΔY—to shift left (negative X) and upward (positive Y).',
       'Watch the Cosine Similarity meter cross 90.0% to lock the embedding and unlock Level 2!'
     ],
     learningTakeaway: 'In high-dimensional embedding spaces, arithmetic operations preserve semantic concepts like royalty, gender, and verb tense.'
@@ -166,8 +166,8 @@ export const GAME_STAGES = [
     slaTargetLabel: 'Order Resonance ≥ 88% (6/6 Tokens)',
     sentence: ['The', 'firewall', 'blocked', 'the', 'malicious', 'exploit'],
     hints: [
-      'Tune Harmonic Frequency (ω) close to 1.00x so the wavelength matches the token spacing.',
-      'Tune Phase Offset (θ) close to 0.00 rad so POS #0 through POS #5 lock into green ALIGNED status.',
+      'Match the wave carrier to the natural 1:1 token spacing so each word lands on a distinct crest.',
+      'Zero out the phase drift so POS #0 through POS #5 lock into green ALIGNED status.',
       'Once all 6 tokens align ("The firewall blocked the malicious exploit"), Level 3 unlocks!'
     ],
     learningTakeaway: 'Transformers use multi-frequency sine and cosine waves so the model can attend to relative token distances without linear sequential recurrence.'

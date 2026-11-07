@@ -47,6 +47,23 @@ export default function TokenizerStage({ stage, onStageComplete }) {
   const toSvgX = (x) => 200 + x * 150;
   const toSvgY = (y) => 200 - y * 150;
 
+  const svgRef = useRef(null);
+  const [isDraggingVec, setIsDraggingVec] = useState(false);
+
+  const updateVectorFromPointer = (clientX, clientY) => {
+    if (!svgRef.current) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const svgX = ((clientX - rect.left) / rect.width) * 400;
+    const svgY = ((clientY - rect.top) / rect.height) * 400;
+    const targetX = (svgX - 200) / 150;
+    const targetY = (200 - svgY) / 150;
+    // currentResultVec[0] = 0.30 + userDelta.x + 0.45 => userDelta.x = targetX - 0.75
+    // currentResultVec[1] = 0.65 + userDelta.y - 0.45 => userDelta.y = targetY - 0.20
+    const nextDx = Math.max(-1.0, Math.min(0.5, +(targetX - 0.75).toFixed(2)));
+    const nextDy = Math.max(0.0, Math.min(1.0, +(targetY - 0.20).toFixed(2)));
+    setUserDelta({ x: nextDx, y: nextDy });
+  };
+
   return (
     <div className="w-full max-w-5xl mx-auto p-4 md:p-6 space-y-6">
       {/* Intro banner */}
@@ -59,7 +76,7 @@ export default function TokenizerStage({ stage, onStageComplete }) {
             Vector("King") - Vector("Man") + Vector("Woman") = ?
           </h2>
           <p className="text-xs md:text-sm text-slate-300 mt-1 max-w-2xl">
-            In Word2Vec & Transformer embedding layers, words with similar gender or semantic roles differ by a constant translation vector. Align your gender transformation vector until it lands on <strong>Queen</strong>.
+            In Word2Vec & Transformer embedding layers, words with similar gender or semantic roles differ by a constant translation vector. <strong>Drag the cyan Result Vector directly on the grid</strong> (or use the sliders) until it lands on <strong>Queen</strong>.
           </p>
         </div>
         <div className="flex items-center gap-3 self-end md:self-auto">
@@ -77,12 +94,28 @@ export default function TokenizerStage({ stage, onStageComplete }) {
         {/* Left: 2D Vector Coordinate Plane (SVG) */}
         <div className="lg:col-span-2 bg-[#080d1a] border border-slate-800 rounded-2xl p-4 relative overflow-hidden shadow-2xl flex flex-col items-center">
           <div className="w-full flex items-center justify-between mb-2 px-2 text-xs font-mono text-slate-400">
-            <span>2D Latent Embedding Space</span>
+            <span>2D Latent Embedding Space (Click or Drag Vector Tip)</span>
             <span className="text-cyan-400">Target Tolerance: &gt;90.0%</span>
           </div>
 
           <div className="relative w-full max-w-[440px] aspect-square bg-[#050811] rounded-xl border border-slate-800/80 p-2">
-            <svg viewBox="0 0 400 400" className="w-full h-full select-none">
+            <svg
+              ref={svgRef}
+              viewBox="0 0 400 400"
+              className={`w-full h-full select-none ${isDraggingVec ? 'cursor-grabbing' : 'cursor-crosshair'}`}
+              onPointerDown={(e) => {
+                setIsDraggingVec(true);
+                aiSound.playTokenSnap(760);
+                updateVectorFromPointer(e.clientX, e.clientY);
+              }}
+              onPointerMove={(e) => {
+                if (isDraggingVec) {
+                  updateVectorFromPointer(e.clientX, e.clientY);
+                }
+              }}
+              onPointerUp={() => setIsDraggingVec(false)}
+              onPointerLeave={() => setIsDraggingVec(false)}
+            >
               {/* Grid lines */}
               <defs>
                 <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
@@ -147,17 +180,18 @@ export default function TokenizerStage({ stage, onStageComplete }) {
                 <text x="14" y="5" fill="#fef08a" fontSize="12" fontFamily="monospace" fontWeight="bold">Target: Queen</text>
               </g>
 
-              {/* Current Computed Node */}
-              <g transform={`translate(${toSvgX(currentResultVec[0])}, ${toSvgY(currentResultVec[1])})`}>
+              {/* Current Computed Node (Draggable Handle) */}
+              <g transform={`translate(${toSvgX(currentResultVec[0])}, ${toSvgY(currentResultVec[1])})`} className="cursor-grab active:cursor-grabbing">
+                <circle r="16" fill="transparent" />
                 <circle
-                  r="9"
+                  r="10"
                   fill={isCompleted ? '#059669' : '#0284c7'}
                   stroke={isCompleted ? '#34d399' : '#67e8f9'}
                   strokeWidth="3"
                   className="transition-all duration-75"
                 />
-                <text x="-35" y="-14" fill="#fff" fontSize="10" fontFamily="monospace" fontWeight="bold">
-                  Result: [{currentResultVec[0].toFixed(2)}, {currentResultVec[1].toFixed(2)}]
+                <text x="-42" y="-15" fill="#fff" fontSize="10" fontFamily="monospace" fontWeight="bold">
+                  Drag Me: [{currentResultVec[0].toFixed(2)}, {currentResultVec[1].toFixed(2)}]
                 </text>
               </g>
             </svg>
