@@ -47,16 +47,26 @@ export default function GameHeader({
             </p>
           </div>
 
-          {/* Quick Switcher Button to Return to System Saviour */}
+          {/* Quick Switcher Buttons: All Games Hub & System Saviour */}
           {onSwitchGame && (
-            <button
-              onClick={() => onSwitchGame('systemsaviour')}
-              className="ml-2 px-2.5 py-1 text-xs rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 flex items-center gap-1.5 transition-all shadow-sm group"
-              title="Switch to System Saviour (Distributed Systems Simulator)"
-            >
-              <Server className="w-3.5 h-3.5 text-indigo-400 group-hover:scale-110 transition-transform" />
-              <span className="hidden md:inline">Play System Saviour</span>
-            </button>
+            <div className="flex items-center gap-1.5 ml-2">
+              <button
+                onClick={() => onSwitchGame('systemsaviour', { openGameSelect: true })}
+                className="px-2.5 py-1 text-xs rounded-lg bg-gradient-to-r from-indigo-950/90 to-cyan-950/90 hover:from-indigo-900 hover:to-cyan-900 text-cyan-300 hover:text-white border border-cyan-500/40 flex items-center gap-1.5 transition-all shadow-sm font-bold"
+                title="View All Games & Switch Simulator"
+              >
+                <span>🎮</span>
+                <span className="hidden sm:inline">All Games</span>
+              </button>
+              <button
+                onClick={() => onSwitchGame('systemsaviour')}
+                className="px-2.5 py-1 text-xs rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 flex items-center gap-1.5 transition-all shadow-sm group"
+                title="Switch to System Saviour (Distributed Systems Simulator)"
+              >
+                <Server className="w-3.5 h-3.5 text-indigo-400 group-hover:scale-110 transition-transform" />
+                <span className="hidden md:inline">System Saviour</span>
+              </button>
+            </div>
           )}
         </div>
 

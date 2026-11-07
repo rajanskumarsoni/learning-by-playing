@@ -14,14 +14,20 @@ import SandboxStage from './components/stages/SandboxStage.jsx';
 import { GAME_STAGES } from './core/levelsData.js';
 import { aiSound } from './aiAudioEngine.js';
 
-export default function TransformerGameApp({ onSwitchGame }) {
-  const [currentStageIdx, setCurrentStageIdx] = useState(0);
+export default function TransformerGameApp({ onSwitchGame, initialStageIdx = 0 }) {
+  const [currentStageIdx, setCurrentStageIdx] = useState(initialStageIdx);
   const [score, setScore] = useState(0);
   const [streak, setStreak] = useState(1);
   const [completedStages, setCompletedStages] = useState(new Set());
   const [showBriefing, setShowBriefing] = useState(false);
   const [showVictory, setShowVictory] = useState(false);
   const [stageKey, setStageKey] = useState(0); // For clean re-mounting on reset
+
+  useEffect(() => {
+    if (typeof initialStageIdx === 'number' && initialStageIdx >= 0 && initialStageIdx < GAME_STAGES.length) {
+      setCurrentStageIdx(initialStageIdx);
+    }
+  }, [initialStageIdx]);
 
   const currentStage = GAME_STAGES[currentStageIdx];
 
