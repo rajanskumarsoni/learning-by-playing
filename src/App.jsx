@@ -3086,7 +3086,8 @@ export default function App({ onSwitchGame, openGameSelectSignal = 0 }) {
     }
   });
 
-  // Welcome Screen, Level Targets Briefing & Component Details Modal States (Disabled by default so Sign In/Sign Up is the primary landing page)
+  // Standalone Game Selection Screen (Shown immediately after Login Screen) & Welcome Screen States
+  const [showGameSelectModal, setShowGameSelectModal] = useState(false);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [levelBriefingModal, setLevelBriefingModal] = useState(null); // { mode: 'CAMPAIGN' | 'SURVIVAL' | 'SANDBOX', levelIdx?: number }
   const [detailModalComponent, setDetailModalComponent] = useState(null);
@@ -3156,11 +3157,12 @@ export default function App({ onSwitchGame, openGameSelectSignal = 0 }) {
     return { isOpen: true, initialTab: 'SIGNIN', isInitialOnboarding: true };
   }); // { isOpen: boolean, initialTab: 'SIGNIN' | 'SIGNUP', isInitialOnboarding?: boolean } | null
 
-  // When switching back from another game via 'All Games', open the Game Options screen directly
+  // When switching back from another game via 'All Games', open the standalone Game Selection screen directly
   useEffect(() => {
     if (openGameSelectSignal > 0) {
       setAuthModal(null);
-      setShowWelcomeModal(true);
+      setShowWelcomeModal(false);
+      setShowGameSelectModal(true);
     }
   }, [openGameSelectSignal]);
 
@@ -5407,7 +5409,7 @@ Can your architecture beat this? Test it in your browser:
                     onClick={() => {
                       sound.playClick();
                       setIsModeMenuOpen(false);
-                      setShowWelcomeModal(true);
+                      setShowGameSelectModal(true);
                     }}
                     className="w-full text-left px-2.5 py-1.5 rounded-xl transition flex items-center justify-between text-[11px] font-bold text-indigo-300 hover:text-white hover:bg-slate-800/80 mt-1"
                   >
@@ -5423,10 +5425,10 @@ Can your architecture beat this? Test it in your browser:
           <button
             onClick={() => {
               sound.playClick();
-              setShowWelcomeModal(true);
+              setShowGameSelectModal(true);
             }}
             className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-cyan-950/80 to-indigo-950/80 hover:from-cyan-900 hover:to-indigo-900 border border-cyan-500/40 text-cyan-300 hover:text-white text-xs font-bold shadow-md transition active:scale-95 cursor-pointer"
-            title="Open Game Selection Hub (Switch between System Saviour & AI Transformer Game)"
+            title="Open Game Selection Screen (Switch between System Saviour & AI Transformer Game)"
           >
             <span>🎮</span>
             <span>Games</span>
@@ -7945,6 +7947,242 @@ Can your architecture beat this? Test it in your browser:
       </nav>
 
       {/* =================================================================== */}
+      {/* 3.5. STANDALONE GAME SELECTION SCREEN (SHOWN RIGHT AFTER LOGIN)     */}
+      {/* =================================================================== */}
+      {showGameSelectModal && (
+        <div
+          id="game-selection-screen"
+          data-testid="game-selection-screen"
+          className="fixed inset-0 bg-[#070a13] flex items-center justify-center p-4 z-50 overflow-y-auto overflow-x-hidden animate-fade-in select-none"
+        >
+          {/* Subtle Ambient Arena Lighting */}
+          <div className="absolute inset-0 bg-gradient-to-r from-cyan-950/25 via-slate-950 to-indigo-950/25 pointer-events-none" />
+
+          {/* BIG HERO IN BACKGROUND (LEFT) */}
+          <div className="fixed -left-8 sm:-left-4 lg:left-0 2xl:left-6 top-1/2 -translate-y-1/2 z-20 pointer-events-none select-none flex flex-col items-start">
+            <div className="relative">
+              <div className="absolute -inset-14 bg-cyan-500/30 rounded-full blur-3xl animate-pulse pointer-events-none" />
+              <img
+                src={heroImg}
+                alt="System Saviour Hero"
+                className="w-72 sm:w-88 md:w-[440px] lg:w-[500px] xl:w-[580px] 2xl:w-[680px] max-h-[94vh] object-contain animate-hero-zoom drop-shadow-[0_0_60px_rgba(56,189,248,0.8)]"
+              />
+            </div>
+          </div>
+
+          {/* ARCHITECT HERO NAME BADGE - LEFT */}
+          <div className="fixed left-3 sm:left-6 md:left-8 xl:left-12 bottom-5 sm:bottom-7 z-40 pointer-events-auto select-none flex flex-col items-start">
+            <div className="px-3 sm:px-4 py-1.5 rounded-full bg-slate-950/90 border border-cyan-400 text-cyan-300 font-black text-xs sm:text-sm uppercase tracking-wider backdrop-blur-md shadow-[0_0_30px_rgba(34,211,238,0.5)] flex items-center gap-2 ring-2 ring-cyan-500/50 whitespace-nowrap">
+              <Shield className="w-4 h-4 text-cyan-400" />
+              <span>Architect Hero</span>
+            </div>
+            <span className="text-[10px] sm:text-xs font-mono text-cyan-300/90 mt-1 font-bold pl-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap">
+              High Availability Guardian
+            </span>
+          </div>
+
+          {/* BIG DEVIL IN BACKGROUND (RIGHT) */}
+          <div className="fixed -right-8 sm:-right-4 lg:right-0 2xl:right-6 top-1/2 -translate-y-1/2 z-20 pointer-events-none select-none flex flex-col items-end">
+            <div className="relative">
+              <div className="absolute -inset-14 bg-red-500/30 rounded-full blur-3xl animate-pulse pointer-events-none" />
+              <img
+                src={devilImg}
+                alt="Chaos Outage Devil"
+                className="w-72 sm:w-88 md:w-[440px] lg:w-[500px] xl:w-[580px] 2xl:w-[680px] max-h-[94vh] object-contain animate-devil-zoom drop-shadow-[0_0_60px_rgba(239,68,68,0.8)]"
+              />
+            </div>
+          </div>
+
+          {/* CHAOS DEVIL NAME BADGE - RIGHT */}
+          <div className="fixed right-3 sm:right-6 md:right-8 xl:right-12 bottom-5 sm:bottom-7 z-40 pointer-events-auto select-none flex flex-col items-end">
+            <div className="px-3 sm:px-4 py-1.5 rounded-full bg-slate-950/90 border border-red-500 text-red-300 font-black text-xs sm:text-sm uppercase tracking-wider backdrop-blur-md shadow-[0_0_30px_rgba(239,68,68,0.5)] flex items-center gap-2 ring-2 ring-red-500/50 whitespace-nowrap">
+              <Flame className="w-4 h-4 text-red-400" />
+              <span>Chaos Devil</span>
+            </div>
+            <span className="text-[10px] sm:text-xs font-mono text-red-300/90 mt-1 font-bold pr-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] whitespace-nowrap">
+              Outages &amp; Chaos Demon
+            </span>
+          </div>
+
+          {/* Standalone Center Glass Pane for Game Selection */}
+          <div className="relative max-w-3xl xl:max-w-4xl w-full bg-slate-950/85 border-2 border-cyan-400/50 rounded-3xl p-6 sm:p-8 shadow-[0_0_70px_rgba(0,0,0,0.85)] my-auto text-slate-100 max-h-[92vh] overflow-y-auto z-30 backdrop-blur-xl space-y-6">
+            {/* Header Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+              <div>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 text-[10px] font-black uppercase tracking-wider font-mono mb-1.5">
+                  <span>🎮 Learning By Playing Arcade</span>
+                  <span>•</span>
+                  <span>Select Game Type</span>
+                </div>
+                <h2 className="text-xl sm:text-3xl font-black text-white tracking-tight font-display">
+                  Choose Your Game
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-300 mt-0.5">
+                  {currentUser ? `Welcome, ${currentUser.name}! ` : ''}Select a game below to continue to its mission briefing and arena:
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 self-start sm:self-center">
+                <button
+                  onClick={() => {
+                    sound.playClick();
+                    setShowGameSelectModal(false);
+                    setAuthModal({ isOpen: true, initialTab: 'SIGNIN', isInitialOnboarding: true });
+                  }}
+                  className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                  title="Return to Login / Account Screen"
+                >
+                  <User className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>{currentUser ? currentUser.name : 'Switch Account'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Two Game Option Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {/* GAME 1: SYSTEM SAVIOUR */}
+              <div
+                data-testid="game-option-systemsaviour"
+                onClick={() => {
+                  sound.playSelect();
+                  setShowGameSelectModal(false);
+                  setShowWelcomeModal(true);
+                }}
+                className="cursor-pointer rounded-3xl bg-gradient-to-br from-indigo-950/80 via-slate-900/95 to-slate-950 border-2 border-indigo-400/60 hover:border-indigo-300 hover:shadow-[0_0_35px_rgba(99,102,241,0.35)] p-5 sm:p-6 flex flex-col justify-between gap-5 transition-all hover:-translate-y-1 group"
+              >
+                <div className="space-y-3.5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-3xl shadow-lg shadow-indigo-500/30 ring-2 ring-indigo-300/60 shrink-0 group-hover:scale-105 transition-transform">
+                      ⚡
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-mono font-bold uppercase px-2.5 py-0.5 rounded-full bg-indigo-500/25 text-indigo-200 border border-indigo-400/40">
+                        Game 1 • Distributed Systems
+                      </span>
+                      <h3 className="text-lg sm:text-xl font-black text-white font-display mt-1">
+                        System Saviour
+                      </h3>
+                      <p className="text-xs text-indigo-300 font-medium">
+                        Cloud Architecture &amp; Wave-Defense Simulator
+                      </p>
+                    </div>
+                  </div>
+
+                  <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                    Design, wire, and scale live cloud infrastructure under 35,000+ RPS traffic spikes, DDoS botnets, and Chaos Monkey hardware outages.
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-2 pt-1 text-[11px] font-mono text-slate-300">
+                    <div className="p-2 rounded-xl bg-slate-950/70 border border-indigo-500/30 flex items-center gap-1.5">
+                      <span>🎓</span>
+                      <span>5 Campaign Levels</span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-slate-950/70 border border-purple-500/30 flex items-center gap-1.5">
+                      <span>📅</span>
+                      <span>24h Daily Incident</span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-slate-950/70 border border-amber-500/30 flex items-center gap-1.5">
+                      <span>🔥</span>
+                      <span>Chaos Survival Mode</span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-slate-950/70 border border-emerald-500/30 flex items-center gap-1.5">
+                      <span>🧪</span>
+                      <span>35k+ RPS Sandbox</span>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    sound.playSelect();
+                    setShowGameSelectModal(false);
+                    setShowWelcomeModal(true);
+                  }}
+                  className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-500 hover:from-indigo-400 hover:to-cyan-400 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-indigo-500/30 flex items-center justify-center gap-2 active:scale-95 transition ring-2 ring-indigo-200 cursor-pointer"
+                >
+                  <span>Continue to System Saviour</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* GAME 2: ATTENTION! INSIDE THE TRANSFORMER */}
+              <div
+                data-testid="game-option-transformer"
+                onClick={() => {
+                  sound.playSelect();
+                  setShowGameSelectModal(false);
+                  if (onSwitchGame) {
+                    onSwitchGame('transformer', 0);
+                  }
+                }}
+                className="cursor-pointer rounded-3xl bg-gradient-to-br from-cyan-950/80 via-slate-900/95 to-blue-950/80 border-2 border-cyan-400/60 hover:border-cyan-300 hover:shadow-[0_0_35px_rgba(6,182,212,0.35)] p-5 sm:p-6 flex flex-col justify-between gap-5 transition-all hover:-translate-y-1 group"
+              >
+                <div className="space-y-3.5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center text-3xl shadow-lg shadow-cyan-500/30 ring-2 ring-cyan-200/60 shrink-0 group-hover:scale-105 transition-transform">
+                      🧠
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-mono font-bold uppercase px-2.5 py-0.5 rounded-full bg-cyan-500/25 text-cyan-200 border border-cyan-400/40">
+                        Game 2 • AI &amp; Deep Learning
+                      </span>
+                      <h3 className="text-lg sm:text-xl font-black text-white font-display mt-1">
+                        ATTENTION!
+                      </h3>
+                      <p className="text-xs text-cyan-300 font-medium">
+                        Inside The Transformer Neural Network
+                      </p>
+                    </div>
+                  </div>
+
+                  <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                    Master how modern AI &amp; Large Language Models work under the hood: Tokenization, 3D Vector Embeddings, Q&middot;K/V Self-Attention, Loss Canyon &amp; Temperature.
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-2 pt-1 text-[11px] font-mono text-slate-300">
+                    <div className="p-2 rounded-xl bg-slate-950/70 border border-cyan-500/30 flex items-center gap-1.5">
+                      <span>🔤</span>
+                      <span>Vectors &amp; Position</span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-slate-950/70 border border-blue-500/30 flex items-center gap-1.5">
+                      <span>⚡</span>
+                      <span>Q·K/V &amp; Multi-Head</span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-slate-950/70 border border-teal-500/30 flex items-center gap-1.5">
+                      <span>🏔️</span>
+                      <span>3D Loss Canyon</span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-slate-950/70 border border-purple-500/30 flex items-center gap-1.5">
+                      <span>🧪</span>
+                      <span>Tiny-GPT Sandbox</span>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    sound.playSelect();
+                    setShowGameSelectModal(false);
+                    if (onSwitchGame) {
+                      onSwitchGame('transformer', 0);
+                    }
+                  }}
+                  className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-cyan-400 via-teal-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-cyan-500/30 flex items-center justify-center gap-2 active:scale-95 transition ring-2 ring-cyan-200 cursor-pointer"
+                >
+                  <span>Continue to AI Transformer Game</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =================================================================== */}
       {/* 4. WELCOME & ORIENTATION MODAL (EXPLAINS REWARDS & 3 GAME MODES)   */}
       {/* =================================================================== */}
       {showWelcomeModal && (
@@ -8003,8 +8241,21 @@ Can your architecture beat this? Test it in your browser:
 
           {/* Transparent Glass Info Pane (Entire Content Scrollable) */}
           <div className="relative max-w-3xl xl:max-w-4xl w-full bg-slate-950/40 border border-indigo-400/35 rounded-3xl p-5 sm:p-7 shadow-[0_0_60px_rgba(0,0,0,0.6)] my-auto text-slate-100 max-h-[90vh] overflow-y-auto z-30 backdrop-blur-md space-y-4">
-            {/* Sticky Floating Close Button */}
-            <div className="sticky top-0 z-50 flex justify-end -mt-1 -mr-1 pointer-events-none">
+            {/* Sticky Floating Close Button & Back to Games Button */}
+            <div className="sticky top-0 z-50 flex justify-between items-center -mt-1 -mr-1 pointer-events-none">
+              <button
+                onClick={() => {
+                  sound.playClick();
+                  introAudioTour.stop();
+                  setShowWelcomeModal(false);
+                  setShowGameSelectModal(true);
+                }}
+                className="pointer-events-auto px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-cyan-500/40 text-cyan-300 hover:text-white text-xs font-bold flex items-center gap-1.5 transition shadow-xl backdrop-blur-md active:scale-95"
+                title="Back to Game Selection Screen"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                <span>🎮 Switch Game</span>
+              </button>
               <button
                 onClick={() => {
                   introAudioTour.stop();
@@ -8015,239 +8266,6 @@ Can your architecture beat this? Test it in your browser:
               >
                 <X className="w-5 h-5" />
               </button>
-            </div>
-
-            {/* ============================================================= */}
-            {/* 0. CHOOSE YOUR GAME HUB (DISPLAYED IMMEDIATELY AFTER LOGIN)   */}
-            {/* ============================================================= */}
-            <div
-              id="game-selection-hub"
-              data-testid="game-selection-hub"
-              className="rounded-3xl bg-slate-950/80 border-2 border-cyan-400/60 p-4 sm:p-5 shadow-[0_0_45px_rgba(6,182,212,0.2)] space-y-4 backdrop-blur-xl"
-            >
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
-                <div>
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 text-[10px] font-black uppercase tracking-wider font-mono mb-1">
-                    <span>🎮 Interactive Engineering Arcade</span>
-                    <span>•</span>
-                    <span>2 Games Available</span>
-                  </div>
-                  <h2 className="text-lg sm:text-2xl font-black text-white tracking-tight font-display flex items-center gap-2">
-                    <span>Choose Your Game</span>
-                  </h2>
-                  <p className="text-xs text-slate-300">
-                    {currentUser ? `Welcome, ${currentUser.name}! ` : ''}Select which interactive simulator you want to play below:
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 self-start sm:self-center">
-                  <button
-                    onClick={() => {
-                      sound.playClick();
-                      setShowWelcomeModal(false);
-                      setAuthModal({ isOpen: true, initialTab: 'SIGNIN', isInitialOnboarding: true });
-                    }}
-                    className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white text-xs font-bold flex items-center gap-1.5 transition"
-                  >
-                    <User className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>{currentUser ? currentUser.name : 'Account'}</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* 2-Column Game Options Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* GAME OPTION 1: SYSTEM SAVIOUR */}
-                <div
-                  data-testid="game-card-systemsaviour"
-                  className="rounded-2xl bg-gradient-to-br from-indigo-950/70 via-slate-900/90 to-slate-950 border-2 border-indigo-400/60 hover:border-indigo-300 p-4 flex flex-col justify-between gap-3.5 shadow-xl transition-all group"
-                >
-                  <div className="space-y-2.5">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-xl shadow-lg shadow-indigo-500/30 ring-2 ring-indigo-300/60 shrink-0">
-                          ⚡
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <h3 className="text-base font-black text-white font-display">System Saviour</h3>
-                            <span className="text-[9px] font-mono font-bold uppercase px-2 py-0.5 rounded-full bg-indigo-500/25 text-indigo-200 border border-indigo-400/40">
-                              Cloud &amp; Distributed Systems
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-indigo-300 font-medium">
-                            Cloud Architecture &amp; Wave-Defense Simulator
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <p className="text-xs text-slate-300 leading-relaxed">
-                      Defend live cloud infrastructure from 35,000+ RPS traffic spikes, DDoS botnets, and Chaos Monkey outages using Load Balancers, Redis Caches, Kafka Queues &amp; Sharded SQL.
-                    </p>
-
-                    {/* Quick Mode Buttons for System Saviour */}
-                    <div className="space-y-1.5 pt-1">
-                      <div className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold">
-                        Select Mode or Jump In:
-                      </div>
-                      <div className="grid grid-cols-2 gap-1.5">
-                        <button
-                          onClick={() => {
-                            sound.playSelect();
-                            introAudioTour.stop();
-                            setShowWelcomeModal(false);
-                            setLevelBriefingModal({ mode: 'CAMPAIGN', levelIdx: currentLevelIdx });
-                          }}
-                          className="px-2.5 py-1.5 rounded-xl bg-indigo-950/80 hover:bg-indigo-800/80 border border-indigo-500/40 text-indigo-200 hover:text-white text-[11px] font-bold flex items-center justify-between transition cursor-pointer"
-                        >
-                          <span>🎓 Campaign</span>
-                          <span className="text-[9px] font-mono text-indigo-300">5 Lvls</span>
-                        </button>
-                        <button
-                          onClick={() => {
-                            sound.playSelect();
-                            introAudioTour.stop();
-                            setShowWelcomeModal(false);
-                            setLevelBriefingModal({ mode: 'DAILY' });
-                          }}
-                          className="px-2.5 py-1.5 rounded-xl bg-purple-950/80 hover:bg-purple-800/80 border border-purple-500/40 text-purple-200 hover:text-white text-[11px] font-bold flex items-center justify-between transition cursor-pointer"
-                        >
-                          <span>📅 Daily Incident</span>
-                          <span className="text-[9px] font-mono text-purple-300">24h</span>
-                        </button>
-                        <button
-                          onClick={() => {
-                            sound.playSelect();
-                            introAudioTour.stop();
-                            setShowWelcomeModal(false);
-                            setLevelBriefingModal({ mode: 'SURVIVAL' });
-                          }}
-                          className="px-2.5 py-1.5 rounded-xl bg-amber-950/80 hover:bg-amber-800/80 border border-amber-500/40 text-amber-200 hover:text-white text-[11px] font-bold flex items-center justify-between transition cursor-pointer"
-                        >
-                          <span>🔥 Survival Wave</span>
-                          <span className="text-[9px] font-mono text-amber-300">Chaos</span>
-                        </button>
-                        <button
-                          onClick={() => {
-                            sound.playSelect();
-                            introAudioTour.stop();
-                            setShowWelcomeModal(false);
-                            setLevelBriefingModal({ mode: 'SANDBOX' });
-                          }}
-                          className="px-2.5 py-1.5 rounded-xl bg-emerald-950/80 hover:bg-emerald-800/80 border border-emerald-500/40 text-emerald-200 hover:text-white text-[11px] font-bold flex items-center justify-between transition cursor-pointer"
-                        >
-                          <span>🧪 Sandbox Lab</span>
-                          <span className="text-[9px] font-mono text-emerald-300">Free</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 pt-2 border-t border-slate-800/80">
-                    <button
-                      onClick={() => {
-                        sound.playSelect();
-                        introAudioTour.stop();
-                        setShowWelcomeModal(false);
-                      }}
-                      className="flex-1 py-2.5 px-3 rounded-xl bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-500 hover:from-indigo-400 hover:to-cyan-400 text-slate-950 font-black text-xs shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-1.5 active:scale-95 transition cursor-pointer ring-1 ring-indigo-200"
-                    >
-                      <span>⚡ Play System Saviour</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        sound.playClick();
-                        const el = document.getElementById('intro-header-card');
-                        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                      }}
-                      className="py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white text-xs font-bold transition cursor-pointer"
-                      title="Scroll down to watch walkthrough video & Ada's guide"
-                    >
-                      Guide &darr;
-                    </button>
-                  </div>
-                </div>
-
-                {/* GAME OPTION 2: ATTENTION! INSIDE THE TRANSFORMER */}
-                <div
-                  data-testid="game-card-transformer"
-                  className="rounded-2xl bg-gradient-to-br from-cyan-950/70 via-slate-900/90 to-blue-950/70 border-2 border-cyan-400/60 hover:border-cyan-300 p-4 flex flex-col justify-between gap-3.5 shadow-xl transition-all group"
-                >
-                  <div className="space-y-2.5">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center text-xl shadow-lg shadow-cyan-500/30 ring-2 ring-cyan-200/60 shrink-0">
-                          🧠
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <h3 className="text-base font-black text-white font-display">ATTENTION!</h3>
-                            <span className="text-[9px] font-mono font-bold uppercase px-2 py-0.5 rounded-full bg-cyan-500/25 text-cyan-200 border border-cyan-400/40">
-                              AI &amp; LLM Mechanics
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-cyan-300 font-medium">
-                            Inside The Transformer Neural Network
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <p className="text-xs text-slate-300 leading-relaxed">
-                      Peer inside modern AI &amp; Large Language Models. Tokenize prompts, align 3D vector embeddings, wire Q&middot;K/V self-attention heads, descend the 3D Loss Canyon &amp; tune Temperature.
-                    </p>
-
-                    {/* Quick Stage Buttons for Transformer Game */}
-                    <div className="space-y-1.5 pt-1">
-                      <div className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold">
-                        Select Stage or Start From Stage #1:
-                      </div>
-                      <div className="grid grid-cols-2 gap-1.5">
-                        {[
-                          { idx: 0, label: '🔤 #1 Token Vectors' },
-                          { idx: 1, label: '🌊 #2 Position Waves' },
-                          { idx: 2, label: '⚡ #3 Q·K/V Attention' },
-                          { idx: 3, label: '🔀 #4 Multi-Head' },
-                          { idx: 4, label: '🏔️ #5 Loss Canyon' },
-                          { idx: 6, label: '🧪 #7 AI Sandbox' }
-                        ].map((stg) => (
-                          <button
-                            key={stg.idx}
-                            onClick={() => {
-                              sound.playSelect();
-                              introAudioTour.stop();
-                              if (onSwitchGame) {
-                                onSwitchGame('transformer', stg.idx);
-                              }
-                            }}
-                            className="px-2.5 py-1.5 rounded-xl bg-cyan-950/80 hover:bg-cyan-800/80 border border-cyan-500/40 text-cyan-200 hover:text-white text-[11px] font-bold flex items-center justify-between transition cursor-pointer"
-                          >
-                            <span className="truncate">{stg.label}</span>
-                            <ChevronRight className="w-3 h-3 text-cyan-400 shrink-0" />
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 pt-2 border-t border-slate-800/80">
-                    <button
-                      onClick={() => {
-                        sound.playSelect();
-                        introAudioTour.stop();
-                        if (onSwitchGame) {
-                          onSwitchGame('transformer', 0);
-                        }
-                      }}
-                      className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-cyan-400 via-teal-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-slate-950 font-black text-xs shadow-lg shadow-cyan-500/25 flex items-center justify-center gap-1.5 active:scale-95 transition cursor-pointer ring-1 ring-cyan-200"
-                    >
-                      <span>🧠 Play AI Transformer Game</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
             </div>
 
             {/* 1. TOP BAR: AUDIO GUIDE MODE & SAVIOUR WARRIOR MUSIC CONTROLS */}
@@ -10114,7 +10132,7 @@ Can your architecture beat this? Test it in your browser:
             window.history.replaceState(null, '', window.location.pathname + window.location.search);
           }
           if (wasInitial) {
-            setShowWelcomeModal(true);
+            setShowGameSelectModal(true);
           }
         }}
         currentUser={currentUser}
@@ -10162,7 +10180,7 @@ Can your architecture beat this? Test it in your browser:
           });
           setTimeout(() => setToastNotification(null), 3500);
           if (wasInitial) {
-            setShowWelcomeModal(true);
+            setShowGameSelectModal(true);
           }
         }}
         onLogout={() => {
