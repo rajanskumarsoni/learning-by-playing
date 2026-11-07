@@ -10,8 +10,8 @@ export default function TokenizerStage({ stage, onStageComplete }) {
   const womanVec = [0.25, 0.20];
   const targetQueenVec = [0.30, 0.65];
 
-  // User adjustable vector transformation [dx, dy]
-  const [userDelta, setUserDelta] = useState({ x: -0.45, y: 0.45 });
+  // User adjustable vector transformation [dx, dy] (starts unaligned so player tunes it to [-0.45, 0.45])
+  const [userDelta, setUserDelta] = useState({ x: 0.10, y: -0.20 });
   const [isCompleted, setIsCompleted] = useState(false);
   const [similarity, setSimilarity] = useState(0);
 

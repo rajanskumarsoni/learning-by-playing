@@ -1,97 +1,288 @@
 /**
- * Complete Level & Stage Configurations for ATTENTION! The Transformer Simulator.
+ * Complete Level, Career Progression & Manager Configurations for
+ * ATTENTION! Inside The Transformer — modelled after System Saviour's game design.
  */
+
+export const AI_LEVEL_MANAGERS = [
+  {
+    name: 'Kenji Sato',
+    roleTag: 'Embeddings Team Lead',
+    title: 'VP of Vector Search',
+    avatarKey: 'angry_manager',
+    snackEmoji: '🍘',
+    snackName: 'Wasabi Rice Crackers',
+    currentJobTitle: 'Junior Embeddings Engineer (L3)',
+    promotedJobTitle: 'Semantic Vector Engineer (L4)',
+    baseSalary: '$115,000 / yr',
+    hikeAmount: '+$35,000 / yr (+30%)',
+    promotedSalary: '$150,000 / yr',
+    scoldQuote: 'Why is [King] - [Man] + [Woman] pointing at [Toaster]?! Align the latent space before our RAG pipeline ships!',
+    congratsTitle: 'LATENT SPACE LOCKED AT 90%+ COSINE SIMILARITY!',
+    congratsSpeech: 'Unbelievable! Our vector embeddings finally understand royal gender analogies without hallucinating! Here is your promotion to L4 Semantic Vector Engineer!',
+    nextManagerWarning: 'Next up is Daiki on the Positional Encoding team. The tokens are arriving completely out of order!'
+  },
+  {
+    name: 'Daiki Takahashi',
+    roleTag: 'Sequence Timing Director',
+    title: 'Head of Context Window Ops',
+    avatarKey: 'manager_daiki',
+    snackEmoji: '🍜',
+    snackName: 'Spicy Miso Ramen Cup',
+    currentJobTitle: 'Semantic Vector Engineer (L4)',
+    promotedJobTitle: 'Senior Attention Architect (L5)',
+    baseSalary: '$150,000 / yr',
+    hikeAmount: '+$45,000 / yr (+30%)',
+    promotedSalary: '$195,000 / yr',
+    scoldQuote: 'Without sinusoidal timestamps, our Transformer thinks "User deleted database" and "Database deleted user" mean the exact same thing!',
+    congratsTitle: 'SINUSOIDAL PHASE LOCKED ACROSS ALL 6 POSITIONS!',
+    congratsSpeech: 'Pure harmonic perfection! Every token now carries a crisp geometric timestamp into the attention layers. Take this $45k raise!',
+    nextManagerWarning: 'Brace yourself for Ryoko in the Q/K/V Spotlight Lab—ambiguous pronouns are crashing our production parser!'
+  },
+  {
+    name: 'Ryoko Kuroda',
+    roleTag: 'Self-Attention Principal',
+    title: 'Director of Coreference & Q/K/V',
+    avatarKey: 'manager_ryoko',
+    snackEmoji: '🍵',
+    snackName: 'Ceremonial Matcha Espresso',
+    currentJobTitle: 'Senior Attention Architect (L5)',
+    promotedJobTitle: 'Staff Multi-Head Lead (L6)',
+    baseSalary: '$195,000 / yr',
+    hikeAmount: '+$55,000 / yr (+28%)',
+    promotedSalary: '$250,000 / yr',
+    scoldQuote: 'The pronoun "it" is attending to "memory" instead of "server"! Scale your Q · Kᵀ dot product before our root-cause AI blames the wrong hardware!',
+    congratsTitle: 'Q · Kᵀ SPOTLIGHT BEAM FOCUSED AT 75%+!',
+    congratsSpeech: 'Flawless dot-product projection! The Value payload routed straight from "server" to "it" with zero ambiguity. Welcome to Staff level!',
+    nextManagerWarning: 'Next is Viktor—one attention head is not enough for enterprise scale. You need 3 parallel heads firing in harmony!'
+  },
+  {
+    name: 'Viktor Volkov',
+    roleTag: 'Multi-Head VP',
+    title: 'SVP of Parallel Subspaces',
+    avatarKey: 'manager_viktor',
+    snackEmoji: '🥟',
+    snackName: 'Smoked Pelmeni',
+    currentJobTitle: 'Staff Multi-Head Lead (L6)',
+    promotedJobTitle: 'Principal Pre-Training Scientist (L7)',
+    baseSalary: '$250,000 / yr',
+    hikeAmount: '+$70,000 / yr (+28%)',
+    promotedSalary: '$320,000 / yr',
+    scoldQuote: 'One head is watching verbs while dropping pronouns! Synchronize Syntax, Coreference, and Induction heads to 85%+ cohesion now!',
+    congratsTitle: 'MULTI-HEAD CONCATENATION & Wᴼ PROJECTION COMPLETE!',
+    congratsSpeech: 'All three subspace heads are tracking grammar, coreference, and in-context patterns simultaneously! You are officially promoted to Principal Pre-Training Scientist!',
+    nextManagerWarning: 'Hiroshi is waiting in the GPU Cluster—our training run is stuck on a non-convex Loss Canyon cliff!'
+  },
+  {
+    name: 'Hiroshi Tanaka',
+    roleTag: 'GPU Pre-Training Chief',
+    title: 'Executive VP of Backpropagation',
+    avatarKey: 'manager_hiroshi',
+    snackEmoji: '🍱',
+    snackName: 'Wagyu Bento Box',
+    currentJobTitle: 'Principal Pre-Training Scientist (L7)',
+    promotedJobTitle: 'Distinguished Alignment Fellow (L8)',
+    baseSalary: '$320,000 / yr',
+    hikeAmount: '+$90,000 / yr (+28%)',
+    promotedSalary: '$410,000 / yr',
+    scoldQuote: '10,000 H100 GPUs are burning $40,000 an hour! If your learning rate is too high, gradients will explode into NaN! Roll into the global minimum!',
+    congratsTitle: 'GLOBAL MINIMUM CONVERGENCE ACHIEVED (LOSS < 0.08)!',
+    congratsSpeech: 'Zero gradient explosions and textbook momentum past the local minimum ditch! Enjoy your $410k Distinguished Fellow package!',
+    nextManagerWarning: 'Final test with Chief AI Scientist Ada: tune the Softmax Temperature and Top-P nucleus sampler in the Generation Forge!'
+  },
+  {
+    name: 'Ada Lovelace AI',
+    roleTag: 'Chief AI Scientist',
+    title: 'Fellow of Frontier Intelligence',
+    avatarKey: 'mentor_ada',
+    snackEmoji: '⚡',
+    snackName: 'Quantum Electrolytes',
+    currentJobTitle: 'Distinguished Alignment Fellow (L8)',
+    promotedJobTitle: 'Chief Frontier AI Architect (Partner)',
+    baseSalary: '$410,000 / yr',
+    hikeAmount: '+$140,000 / yr (+34%)',
+    promotedSalary: '$550,000 / yr + Equity',
+    scoldQuote: 'At T=0.1 the model repeats itself like a broken clock; at T=2.0 it hallucinates quantum potatoes! Find the golden sampling zone!',
+    congratsTitle: 'FRONTIER LLM GENERATION & ALIGNMENT MASTERED!',
+    congratsSpeech: 'Phenomenal work, Architect! You have built, trained, and aligned a complete Transformer from raw token vectors to nucleus sampling. The Master LLM Sandbox is now unlocked!',
+    nextManagerWarning: 'You have unlocked the unrestricted Stage 7 Master LLM Sandbox Studio!'
+  },
+  {
+    name: 'Ada Lovelace AI',
+    roleTag: 'Chief AI Scientist',
+    title: 'Fellow of Frontier Intelligence',
+    avatarKey: 'mentor_ada',
+    snackEmoji: '⚡',
+    snackName: 'Quantum Electrolytes',
+    currentJobTitle: 'Chief Frontier AI Architect (Partner)',
+    promotedJobTitle: 'Chief Frontier AI Architect (Partner)',
+    baseSalary: '$550,000 / yr',
+    hikeAmount: 'MAX TIER UNLOCKED',
+    promotedSalary: '$550,000 / yr + Equity',
+    scoldQuote: 'Experiment freely in the Master LLM Sandbox! Inspect real-time N×N attention heatmaps and Q/K/V residual streams.',
+    congratsTitle: 'MASTER TRANSFORMER ARCHITECT!',
+    congratsSpeech: 'You have full command over the Transformer architecture!',
+    nextManagerWarning: null
+  }
+];
 
 export const GAME_STAGES = [
   {
     id: 'stage-1-vectors',
     stageNumber: 1,
-    title: 'The Vector Harbor',
+    title: 'Level 1: The Vector Harbor',
     subtitle: 'Word Embeddings & Semantic Geometry',
+    concept: 'High-Dimensional Token Embeddings & Cosine Similarity',
     badge: 'VECTOR VOYAGER',
     icon: 'Layers',
-    accentColor: '#38bdf8', // Sky blue
+    accentColor: '#38bdf8',
     story: 'Words are mere strings to humans, but to an AI, they are coordinates in multi-dimensional space! To teach the model what words mean, you must tune their semantic vectors so relationships hold mathematically.',
-    missionBrief: 'Solve the famous semantic vector analogy: [King] - [Man] + [Woman] = [?]. Drag the semantic delta vector until your combined coordinate hits the target Queen embedding within a 90% cosine similarity threshold!',
+    missionBrief: 'Solve the famous semantic vector analogy: [King] - [Man] + [Woman] = [?]. Drag the semantic delta vector sliders (ΔX and ΔY) until your combined coordinate hits the target Queen embedding within a 90% cosine similarity threshold!',
+    beginnerAnalogy: 'Think of a map where moving East means "more royal" and moving North means "more feminine". Starting at King, subtracting Man, and adding Woman lands you right on Queen!',
+    caseStudyCompany: 'OpenAI text-embedding-3 & Word2Vec',
+    caseStudyStory: 'Modern LLMs convert every sub-word token into a dense vector (e.g., 1,536 to 12,288 floating-point numbers). Directions in this space encode semantic concepts like gender, verb tense, and geography.',
+    slaTargetLabel: 'Cosine Similarity ≥ 90.0%',
     targetSimilarity: 0.90,
+    hints: [
+      'Move the ΔX Dimension slider toward -0.45 to align the horizontal royalty coordinate.',
+      'Move the ΔY Dimension slider toward +0.45 to shift into the feminine semantic subspace.',
+      'Watch the Cosine Similarity meter cross 90.0% to lock the embedding and unlock Level 2!'
+    ],
     learningTakeaway: 'In high-dimensional embedding spaces, arithmetic operations preserve semantic concepts like royalty, gender, and verb tense.'
   },
   {
     id: 'stage-2-position',
     stageNumber: 2,
-    title: 'Positional Clockwork',
+    title: 'Level 2: Positional Clockwork',
     subtitle: 'Parallel Attention & Sinusoidal Timing',
+    concept: 'Sinusoidal Positional Encoding & Word Order Resonance',
     badge: 'TEMPORAL TUNER',
     icon: 'Clock',
-    accentColor: '#a855f7', // Purple
+    accentColor: '#a855f7',
     story: 'Self-Attention operates on all words at the same instant—it is permutation invariant! Without positional encodings, "Dog bites man" and "Man bites dog" look 100% identical to the network.',
-    missionBrief: 'The tokens of an emergency firewall prompt have arrived in scrambled chaos. Adjust the low and high frequency sinusoidal phase dials to inject positional timestamps and lock the sentence into its correct syntactic order.',
+    missionBrief: 'The tokens of an emergency firewall prompt have arrived in scrambled chaos. Adjust the Harmonic Frequency (ω) and Phase Offset (θ) dials to inject positional timestamps and lock all 6 tokens into their correct syntactic order.',
+    beginnerAnalogy: 'Like stamping a unique clock-hand angle onto each page of a script before tossing them onto a desk, so the actors still know which line comes first, second, and third.',
+    caseStudyCompany: 'Google Brain ("Attention Is All You Need") & RoPE',
+    caseStudyStory: 'Original Transformers added sine and cosine waves of varying frequencies to token embeddings, while modern models like Llama-3 use Rotary Position Embeddings (RoPE) to preserve relative token distances across 128k+ context windows.',
+    slaTargetLabel: 'Order Resonance ≥ 88% (6/6 Tokens)',
     sentence: ['The', 'firewall', 'blocked', 'the', 'malicious', 'exploit'],
+    hints: [
+      'Tune Harmonic Frequency (ω) close to 1.00x so the wavelength matches the token spacing.',
+      'Tune Phase Offset (θ) close to 0.00 rad so POS #0 through POS #5 lock into green ALIGNED status.',
+      'Once all 6 tokens align ("The firewall blocked the malicious exploit"), Level 3 unlocks!'
+    ],
     learningTakeaway: 'Transformers use multi-frequency sine and cosine waves so the model can attend to relative token distances without linear sequential recurrence.'
   },
   {
     id: 'stage-3-attention',
     stageNumber: 3,
-    title: 'The Q/K/V Spotlight Room',
+    title: 'Level 3: The Q/K/V Spotlight Room',
     subtitle: 'Scaled Dot-Product Self-Attention',
+    concept: 'Query · Key Dot Product & Softmax Attention Routing',
     badge: 'SPOTLIGHT SNIPER',
     icon: 'Zap',
-    accentColor: '#eab308', // Amber / Gold
+    accentColor: '#eab308',
     story: 'Query seeks information. Key advertises content. Value transmits meaning. In the sentence: "The server crashed because it ran out of memory", the pronoun "it" is ambiguous. Does "it" refer to the server or the memory?',
-    missionBrief: 'Rotate the Query and Key projection weights for the token "it" to shine an 80%+ attention spotlight beam directly onto "server", passing the Value payload to resolve ambiguity!',
+    missionBrief: 'Increase the Query (W_Q) and Key (W_K) projection weights for the token "it" to shine a 75%+ attention spotlight beam directly onto "server", passing the Value payload to resolve ambiguity!',
+    beginnerAnalogy: 'Think of Query as a search bar query ("Who crashed?"), Key as the title tag on each candidate word ("I am a physical hardware subject"), and Value as the full article content once matched.',
+    caseStudyCompany: 'GPT-4 & Claude Coreference Resolution',
+    caseStudyStory: 'Scaled Dot-Product Attention computes Softmax((Q · Kᵀ) / √d_k) · V, allowing tokens separated by thousands of words to route context directly in a single hop without vanishing gradients.',
+    slaTargetLabel: 'Attention on "server" ≥ 75.0%',
     sentence: ['The', 'server', 'crashed', 'because', 'it', 'ran', 'out', 'of', 'memory'],
-    focusTokenIndex: 4, // "it"
-    targetTokenIndex: 1, // "server"
+    focusTokenIndex: 4,
+    targetTokenIndex: 1,
+    hints: [
+      'Notice the red dashed beam pulling "it" toward the trap noun "memory".',
+      'Slide Query (W_Q) Subject Affinity above 0.80 to seek the grammatical subject.',
+      'Slide Key (W_K) Hardware Relevance above 0.80 until attention on "server" exceeds 75%!'
+    ],
     learningTakeaway: 'Self-attention allows every word in a sequence to dynamically look at every other word, weighting relevance through the dot product Q · K^T.'
   },
   {
     id: 'stage-4-multihead',
     stageNumber: 4,
-    title: 'Multi-Head Specialization',
+    title: 'Level 4: Multi-Head Specialization',
     subtitle: 'Dividing Attention Across Syntactic & Semantic Layers',
+    concept: 'Parallel Attention Subspaces (Syntax, Coreference & Induction)',
     badge: 'HEADMASTER AI',
     icon: 'Cpu',
-    accentColor: '#ec4899', // Pink
-    story: 'A single attention head can only focus on one relationship at a time. State-of-the-art models like GPT-4 deploy 96 parallel attention heads, each developing its own linguistic superpower!',
+    accentColor: '#ec4899',
+    story: 'A single attention head can only focus on one relationship at a time. State-of-the-art models like GPT-4 deploy up to 96 parallel attention heads, each developing its own linguistic superpower!',
     missionBrief: 'Configure 3 specialized attention heads simultaneously: Head 1 (Syntax Linker: verbs to subjects), Head 2 (Coreference Resolver: pronouns to nouns), and Head 3 (Induction Head: detecting repetitive patterns). Achieve 85%+ total network cohesion.',
+    beginnerAnalogy: 'Instead of one detective investigating a mystery alone, you hire three specialists—a grammarian, a pronoun tracker, and a pattern spotter—who combine their notes at the end of the layer.',
+    caseStudyCompany: 'Anthropic Mechanistic Interpretability (Induction Heads)',
+    caseStudyStory: 'Researchers discovered that specific attention heads automatically specialize into "Induction Heads" that copy and complete "[A][B] ... [A] -> [B]" patterns—the primary engine behind few-shot in-context learning.',
+    slaTargetLabel: 'Average Head Cohesion ≥ 85%',
     sentence: ['Ada', 'trained', 'the', 'neural', 'net', 'and', 'she', 'deployed', 'it'],
+    hints: [
+      'Boost Head 1 (Syntax Linker) above 85% so "trained" and "deployed" bind to their subjects.',
+      'Boost Head 2 (Coreference Resolver) above 85% so "she" -> "Ada" and "it" -> "net".',
+      'Boost Head 3 (Induction Head) above 85% until total Network Cohesion reaches 85%+!'
+    ],
     learningTakeaway: 'Multi-head attention projects embeddings into multiple distinct subspaces simultaneously, allowing the model to track grammar, coreference, and facts concurrently.'
   },
   {
     id: 'stage-5-losscanyon',
     stageNumber: 5,
-    title: 'The Loss Canyon',
+    title: 'Level 5: The Loss Canyon',
     subtitle: 'Gradient Descent, Learning Rate & Exploding Gradients',
+    concept: 'Non-Convex Optimization, Momentum & Gradient Clipping',
     badge: 'GRADIENT NAVIGATOR',
     icon: 'Flame',
-    accentColor: '#f97316', // Orange
-    story: 'Backpropagation computes the slope of the loss function. You must roll the model weights down a treacherous 3D loss mountain into the global minimum valley without falling into local minima or blowing up your GPUs!',
-    missionBrief: 'Tune the Learning Rate (η) and Momentum (β). If your learning rate is too high, gradients explode and loss reaches NaN (GPU Fire!). If too low, training stalls. Reach loss < 0.05 within 35 epochs.',
+    accentColor: '#f97316',
+    story: 'Backpropagation computes the slope of the loss function. You must roll the model weights down a treacherous non-convex loss mountain into the global minimum valley without getting stuck in a local ditch or blowing up your GPUs!',
+    missionBrief: 'Tune the Learning Rate (η) and Momentum (β), then click "Run Gradient Descent". Avoid η > 1.25 (Exploding Gradients / NaN!) and use enough momentum to roll past the local minimum into the Global Minimum (Loss < 0.08).',
+    beginnerAnalogy: 'Rolling a heavy bowling ball down a foggy mountain valley: push too hard and it flies off the cliff (NaN explosion); push too softly without momentum and it gets stuck in a shallow pothole (local minimum).',
+    caseStudyCompany: 'AdamW Optimizer & Cosine Learning Rate Schedules',
+    caseStudyStory: 'Pre-training frontier LLMs across thousands of GPUs requires AdamW momentum, warmup schedules, and gradient norm clipping (e.g. max_norm=1.0) so a single noisy batch does not destroy weeks of training.',
+    slaTargetLabel: 'Global Minimum Loss < 0.08',
+    hints: [
+      'Keep Learning Rate (η) in the safe sweet spot around 0.12 – 0.25 (above 1.25 causes a NaN explosion!).',
+      'Set Momentum (β) around 0.60 – 0.80 so the weight ball rolls right through the shallow local ditch.',
+      'Click "Run Gradient Descent" and watch the ball settle into the green Global Min zone!'
+    ],
     learningTakeaway: 'Learning rate schedules, momentum, and gradient clipping are essential to prevent catastrophic divergence during large model training.'
   },
   {
     id: 'stage-6-temperature',
     stageNumber: 6,
-    title: 'The Generation Forge',
+    title: 'Level 6: The Generation Forge',
     subtitle: 'Logits, Softmax & Temperature Sampling',
+    concept: 'Autoregressive Decoding, Softmax Temperature & Top-P Nucleus',
     badge: 'ORACLE WHISPERER',
     icon: 'Sparkles',
-    accentColor: '#10b981', // Emerald
-    story: 'The final layer outputs raw unnormalized logit numbers. Softmax transforms them into probabilities. Now comes the magical dial: Temperature! How creative—or hallucinatory—should your model be?',
-    missionBrief: 'Experiment with Temperature (T) and Top-P (Nucleus) filtering. Observe how T=0.1 produces robotic loops, T=2.5 produces chaotic gibberish, and T=0.7 crafts poetic, coherent completions. Generate 3 consecutive high-quality completions to graduate.',
+    accentColor: '#10b981',
+    story: 'The final linear layer outputs raw unnormalized logit numbers. Softmax transforms them into probabilities. Now comes the magical dial: Temperature! How creative—or hallucinatory—should your model be?',
+    missionBrief: 'Tune Temperature (T) into the balanced sweet spot (0.40 – 1.00) and Top-P (Nucleus) filtering to cut off hallucination tail words ("banana", "quantum-potato"). Click "Sample Next Token" to generate 3 consecutive coherent tokens!',
+    beginnerAnalogy: 'Temperature is the "spiciness dial" of word choice: at 0.1 the AI is a cautious accountant picking the most obvious word every time; at 2.0 it is a wild poet picking random words out of a hat.',
+    caseStudyCompany: 'Nucleus Sampling (Holtzman et al.) in Production LLMs',
+    caseStudyStory: 'By combining Temperature (T ≈ 0.7) with Top-P Nucleus Sampling (p ≈ 0.9), production AI assistants truncate the long tail of thousands of low-probability nonsensical tokens while keeping natural human-like variety.',
+    slaTargetLabel: '3 Consecutive Coherent Tokens',
+    hints: [
+      'Set Temperature (T) between 0.50 and 0.90 (e.g. 0.70).',
+      'Set Top-P (Nucleus Cutoff) around 85%–90% so red hallucination words are marked "Filtered (Top-P)".',
+      'Click "Sample Next Token" 3 times to build a 3/3 Coherent Streak and unlock the Master Sandbox!'
+    ],
     learningTakeaway: 'Temperature divides logits before Softmax: higher temperature flattens probability peaks (more surprise), while lower temperature sharpens the top choice.'
   },
   {
     id: 'stage-7-sandbox',
     stageNumber: 7,
-    title: 'The Master LLM Sandbox',
+    title: 'Level 7: Master LLM Sandbox',
     subtitle: 'Live Interactive Transformer Playground',
+    concept: 'End-to-End Forward Pass, N×N Attention Heatmap & Residual Stream',
     badge: 'FRONTIER ARCHITECT',
     icon: 'Terminal',
-    accentColor: '#06b6d4', // Cyan
-    story: 'Welcome to the complete, unlocked Transformer Architecture Studio! You have mastered all components of the modern AI revolution.',
-    missionBrief: 'Type custom prompts, inspect live NxN attention heatmaps, scrub forward passes step-by-step, inspect Q/K/V vectors, and observe token generation in real time!',
+    accentColor: '#06b6d4',
+    story: 'Welcome to the complete, unlocked Transformer Architecture Studio! You have mastered all core building blocks of the modern AI revolution.',
+    missionBrief: 'Type custom prompts, inspect live N×N attention heatmaps, click any token in the sequence to inspect its Embedding + PE, Q/K/V projections, and Feed-Forward MLP activations in real time!',
+    beginnerAnalogy: 'An X-ray MRI scanner for a live neural network—type any sentence and watch every internal matrix light up simultaneously.',
+    caseStudyCompany: 'TransformerLens & Frontier Model Interpretability',
+    caseStudyStory: 'AI safety and interpretability engineers use activation inspection tools to trace how information flows from input embeddings through attention heads and MLP layers to the final output logits.',
+    slaTargetLabel: 'Unrestricted Freeform Lab',
+    hints: [
+      'Type any custom sentence or click one of the preset prompts.',
+      'Click any token card in the sequence to highlight its attention distribution row and inspect its internal Q/K/V vectors.'
+    ],
     learningTakeaway: 'Transformers are the unified engine behind modern LLMs, vision transformers (ViT), code synthesis, and multimodal AI.'
   }
 ];
-
