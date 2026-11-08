@@ -3140,17 +3140,21 @@ export default function App({ onSwitchGame, openGameSelectSignal = 0 }) {
       console.warn('Failed recording daily completion:', err);
     }
   }, [dailyIncident, dailyStreak, nodes, edges, currentUser]);
-  // Zero-friction onboarding: only open AuthModal on explicit #signin / #signup hash
+  // Default landing view is the Sign In / Sign Up page
   const [authModal, setAuthModal] = useState(() => {
     if (typeof window !== 'undefined') {
       if (window.location.hash === '#signup' || window.location.hash === '#register') {
-        return { isOpen: true, initialTab: 'SIGNUP', isInitialOnboarding: false };
+        return { isOpen: true, initialTab: 'SIGNUP', isInitialOnboarding: true };
       }
-      if (window.location.hash === '#signin' || window.location.hash === '#auth') {
-        return { isOpen: true, initialTab: 'SIGNIN', isInitialOnboarding: false };
+      if (window.location.hash === '#arena' || window.location.hash === '#play' || window.location.hash === '#game') {
+        return null;
+      }
+      if (initialChallengeRef.current) {
+        return null;
       }
     }
-    return null;
+    // Default page is Sign In / Sign Up!
+    return { isOpen: true, initialTab: 'SIGNIN', isInitialOnboarding: true };
   }); // { isOpen: boolean, initialTab: 'SIGNIN' | 'SIGNUP', isInitialOnboarding?: boolean } | null
 
   // When switching back from another game via 'All Games', open the standalone Game Selection screen directly
