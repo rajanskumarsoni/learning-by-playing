@@ -3,14 +3,8 @@ import App from './App.jsx';
 import TransformerGameApp from './transformerGame/TransformerGameApp.jsx';
 
 export default function RootApp() {
-  const [activeGame, setActiveGame] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const gameParam = params.get('game');
-      if (gameParam === 'transformer' || gameParam === 'ai') return 'transformer';
-    }
-    return 'systemsaviour';
-  });
+  // Always start on 'systemsaviour' so the Login / Sign Up screen & Game Selection Hub appear first
+  const [activeGame, setActiveGame] = useState('systemsaviour');
 
   const [transformerStageIdx, setTransformerStageIdx] = useState(0);
   const [openGameSelectCount, setOpenGameSelectCount] = useState(0);

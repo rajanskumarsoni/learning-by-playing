@@ -2223,6 +2223,7 @@ function ManagerPromotionModal({ promotion, onAccept, onReplay, onClose }) {
 function AuthModal({
   isOpen,
   initialTab = 'SIGNIN',
+  isInitialOnboarding = false,
   onClose,
   currentUser,
   onLogin,
@@ -2231,7 +2232,7 @@ function AuthModal({
   if (!isOpen) return null;
 
   const [tab, setTab] = useState(initialTab); // 'SIGNIN' | 'SIGNUP'
-  const [isSwitchingAccount, setIsSwitchingAccount] = useState(false);
+  const [isSwitchingAccount, setIsSwitchingAccount] = useState(Boolean(isInitialOnboarding));
 
   // Sign In State
   const [signInEmail, setSignInEmail] = useState('');
@@ -3140,20 +3141,11 @@ export default function App({ onSwitchGame, openGameSelectSignal = 0 }) {
       console.warn('Failed recording daily completion:', err);
     }
   }, [dailyIncident, dailyStreak, nodes, edges, currentUser]);
-  // Default landing view is the Sign In / Sign Up page
+  // Always open the Sign In / Sign Up Login screen first on launch
   const [authModal, setAuthModal] = useState(() => {
-    if (typeof window !== 'undefined') {
-      if (window.location.hash === '#signup' || window.location.hash === '#register') {
-        return { isOpen: true, initialTab: 'SIGNUP', isInitialOnboarding: true };
-      }
-      if (window.location.hash === '#arena' || window.location.hash === '#play' || window.location.hash === '#game') {
-        return null;
-      }
-      if (initialChallengeRef.current) {
-        return null;
-      }
+    if (typeof window !== 'undefined' && (window.location.hash === '#signup' || window.location.hash === '#register')) {
+      return { isOpen: true, initialTab: 'SIGNUP', isInitialOnboarding: true };
     }
-    // Default page is Sign In / Sign Up!
     return { isOpen: true, initialTab: 'SIGNIN', isInitialOnboarding: true };
   }); // { isOpen: boolean, initialTab: 'SIGNIN' | 'SIGNUP', isInitialOnboarding?: boolean } | null
 
@@ -10458,6 +10450,7 @@ Can your architecture beat this? Test it in your browser:
       <AuthModal
         isOpen={Boolean(authModal?.isOpen)}
         initialTab={authModal?.initialTab || 'SIGNIN'}
+        isInitialOnboarding={Boolean(authModal?.isInitialOnboarding)}
         onClose={() => {
           const wasInitial = authModal?.isInitialOnboarding !== false;
           setAuthModal(null);
